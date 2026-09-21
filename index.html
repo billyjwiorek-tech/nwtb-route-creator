@@ -23,69 +23,20 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:10px;bor
 <body>
 <header><h1>NWTB BOLINGBROOK — DAILY SALES ROUTE CREATOR</h1><div>FREE road-based optimization • OpenStreetMap / OSRM • NO GOOGLE API KEY • NO USER LOGIN</div></header>
 <div class="wrap">
-<div class="panel">
-  <div class="notice" style="border-left-color:#a32222">
-    <b>PUBLIC WEB VERSION — NO LOGIN:</b> This route creator is hosted online through GitHub Pages and can be opened from any internet-connected device.
-    No Google API key or Google Cloud billing is required. Finished routes still open in normal Google Maps.
-  </div>
-</div>
-
+<div class="panel"><div class="notice" style="border-left-color:#a32222"><b>PUBLIC WEB VERSION — NO LOGIN:</b> This route creator is hosted online through GitHub Pages and can be opened from any internet-connected device. No Google API key or Google Cloud billing is required. Finished routes still open in normal Google Maps.</div></div>
 <div class="panel"><div class="stats"><div class="stat"><strong>79</strong>GO FIRST</div><div class="stat"><strong>11</strong>Verified Prospects</div><div class="stat"><strong>269</strong>Win-Back</div><div class="stat"><strong>154</strong>Active</div><div class="stat"><strong>513</strong>Total</div></div></div>
-
 <div class="panel"><div class="notice" style="border-left-color:#18864b"><b>FREE ROUTING READY:</b> No API key, no Google Cloud account, and no Google routing bill. NWTB uses OpenStreetMap/OSRM road data directly in Edge/Chrome to optimize the stop order, then creates normal Google Maps navigation links.</div></div>
 <div class="panel"><div id="safetyNotice" class="notice" style="border-left-color:#a32222"><b>ROUTE SAFETY FILTER ACTIVE:</b> Loading audit status...</div></div>
-
-<div class="panel"><h2 style="margin-top:0">Build Today's Route</h2>
-<div class="controls">
-<div><label>Sales Day Type</label><select id="routeType"><option value="new_business">New Business</option><option value="go_first">GO FIRST Only</option><option value="prospects_regular">Regular Verified Prospects Only</option><option value="winback">Win-Back</option><option value="existing">Existing Customers</option><option value="mixed">Mixed</option></select></div>
-<div><label>Area</label><select id="radius"><option value="5">5 Miles</option><option value="10" selected>10 Miles</option><option value="999">Full Sales Territory</option></select></div>
-<div><label>Number of Stops</label><input id="stopCount" type="number" min="1" max="25" value="10"></div>
-<div><button class="primary" style="width:100%" onclick="buildRoute()">CREATE + FREE OPTIMIZE</button></div></div>
-<p class="small">NWTB selects the eligible accounts. Free OpenStreetMap/OSRM road routing reorders the stops. Drivers still receive normal Google Maps links.</p></div>
-
+<div class="panel"><h2 style="margin-top:0">Build Today's Route</h2><div class="controls"><div><label>Sales Day Type</label><select id="routeType"><option value="new_business">New Business</option><option value="go_first">GO FIRST Only</option><option value="prospects_regular">Regular Verified Prospects Only</option><option value="winback">Win-Back</option><option value="existing">Existing Customers</option><option value="mixed">Mixed</option></select></div><div><label>Area</label><select id="radius"><option value="5">5 Miles</option><option value="10" selected>10 Miles</option><option value="999">Full Sales Territory</option></select></div><div><label>Number of Stops</label><input id="stopCount" type="number" min="1" max="25" value="10"></div><div><button class="primary" style="width:100%" onclick="buildRoute()">CREATE + FREE OPTIMIZE</button></div></div><p class="small">NWTB selects the eligible accounts. Free OpenStreetMap/OSRM road routing reorders the stops. Drivers still receive normal Google Maps links.</p></div>
 <div id="output" class="panel" style="display:none"></div></div>
-
 <div id="modal" class="modal" onclick="if(event.target===this)closeModal()"><div class="modal-content"><div id="modalTop" class="modal-top"><button class="close" onclick="closeModal()">×</button><div id="modalBadge"></div><h2 id="modalName"></h2></div><div class="modal-body"><h3 id="modalWarning"></h3><div class="grid" id="modalGrid"></div><p id="modalNote"></p></div></div></div>
-
 <script>
 let accounts=[]; const depot={name:"Northwest Trucks - Bolingbrook",address:"201 S W Frontage Rd, Bolingbrook, IL 60440",lat:41.682487,lon:-88.072262}; const MAX_LINK_STOPS=9; let currentRoute=[];
 const knownAuditStatus={
-"10225":"MOVED / OLD LOCATION",
-"18331":"DUPLICATE",
-"22855":"DUPLICATE",
-"11811":"MOVED / OLD LOCATION",
-"26505":"DUPLICATE",
-"25941":"DUPLICATE / ALT LOCATION",
-"12039":"MOVED",
-"12038":"DUPLICATE / MOVED",
-"24503":"DUPLICATE",
-"10227":"VERIFIED ACTIVE",
-"10720":"VERIFIED ACTIVE",
-"17772":"VERIFIED ACTIVE",
-"11812":"VERIFIED ACTIVE",
-"24889":"VERIFIED ACTIVE",
-"22663":"VERIFIED ACTIVE",
-"28566":"VERIFIED ACTIVE"
-};
+"10225":"MOVED / OLD LOCATION","18331":"DUPLICATE","22855":"DUPLICATE","11811":"MOVED / OLD LOCATION","26505":"DUPLICATE","25941":"DUPLICATE / ALT LOCATION","12039":"MOVED","12038":"DUPLICATE / MOVED","24503":"DUPLICATE","10227":"VERIFIED ACTIVE","10720":"VERIFIED ACTIVE","17772":"VERIFIED ACTIVE","11812":"VERIFIED ACTIVE","24889":"VERIFIED ACTIVE","22663":"VERIFIED ACTIVE","28566":"VERIFIED ACTIVE","25606":"VERIFIED ACTIVE","23325":"VERIFIED ACTIVE","11060":"MOVED / OLD LOCATION","28369":"VERIFIED ACTIVE","10803":"MOVED / OLD LOCATION","22961":"VERIFIED ACTIVE","28518":"VERIFIED ACTIVE","27662":"VERIFIED ACTIVE","27500":"VERIFIED ACTIVE"};
+const knownAuditNameStatus={"WOLFDOM EXPRESS":"VERIFIED ACTIVE","KOROL TRUCKING":"VERIFIED ACTIVE","KARGOMITTEN":"VERIFIED ACTIVE","SEVEN CORNERS LOGISTICS":"VERIFIED ACTIVE"};
 function auditName(s){return String(s||"").toUpperCase().replace(/[^A-Z0-9 ]/g," ").split(/\s+/).filter(x=>x&&!(["INC","LLC","CORP","CORPORATION","CO","COMPANY","LTD","LIMITED","THE"].includes(x))).join(" ")}
-function applyAuditSafety(){
-  const groups={};
-  accounts.forEach(a=>{const k=auditName(a.name);(groups[k]??=[]).push(a)});
-  const addrRisk=/\b(APT\.?|APARTMENT|UNIT\s+\d+|#\s*\d+|COURT|CT\.?|LANE|LN\.?)\b/i;
-  accounts.forEach(a=>{
-    const id=String(a.customerNumber||"");
-    if(knownAuditStatus[id]) a.auditStatus=knownAuditStatus[id];
-    else if((groups[auditName(a.name)]||[]).length>1) a.auditStatus="HOLD - DUPLICATE REVIEW";
-    else if(addrRisk.test(a.address||"")) a.auditStatus="HOLD - ADDRESS REVIEW";
-    else if(!(a.phone||"").trim()) a.auditStatus="NEEDS REVIEW";
-    else a.auditStatus="PRELIMINARY PASS";
-    a.routeEligible=!(a.auditStatus.startsWith("HOLD")||a.auditStatus.startsWith("MOVED")||a.auditStatus.startsWith("DUPLICATE")||a.auditStatus.startsWith("CLOSED"));
-  });
-  const blocked=accounts.filter(a=>!a.routeEligible).length;
-  const eligible=accounts.length-blocked;
-  const n=document.getElementById("safetyNotice");
-  if(n)n.innerHTML=`<b>ROUTE SAFETY FILTER ACTIVE:</b> ${blocked} audited records are blocked from route selection because they are HOLD, MOVED, DUPLICATE or CLOSED. ${eligible} records remain route-eligible while live verification continues.`;
-}
+function applyAuditSafety(){const groups={};accounts.forEach(a=>{const k=auditName(a.name);(groups[k]??=[]).push(a)});const addrRisk=/\b(APT\.?|APARTMENT|UNIT\s+\d+|#\s*\d+|COURT|CT\.?|LANE|LN\.?)\b/i;accounts.forEach(a=>{const id=String(a.customerNumber||"");if(knownAuditStatus[id]) a.auditStatus=knownAuditStatus[id];else if(knownAuditNameStatus[auditName(a.name)]) a.auditStatus=knownAuditNameStatus[auditName(a.name)];else if((groups[auditName(a.name)]||[]).length>1) a.auditStatus="HOLD - DUPLICATE REVIEW";else if(addrRisk.test(a.address||"")) a.auditStatus="HOLD - ADDRESS REVIEW";else if(!(a.phone||"").trim()) a.auditStatus="NEEDS REVIEW";else a.auditStatus="PRELIMINARY PASS";a.routeEligible=!(a.auditStatus.startsWith("HOLD")||a.auditStatus.startsWith("MOVED")||a.auditStatus.startsWith("DUPLICATE")||a.auditStatus.startsWith("CLOSED"));});const blocked=accounts.filter(a=>!a.routeEligible).length;const eligible=accounts.length-blocked;const n=document.getElementById("safetyNotice");if(n)n.innerHTML=`<b>ROUTE SAFETY FILTER ACTIVE:</b> ${blocked} audited records are blocked from route selection because they are HOLD, MOVED, DUPLICATE or CLOSED. ${eligible} records remain route-eligible while live verification continues.`;}
 async function init(){accounts=await (await fetch("./accounts.json")).json();applyAuditSafety()}
 function rad(x){return x*Math.PI/180} function miles(a,b){const R=3958.7613,dLat=rad(b.lat-a.lat),dLon=rad(b.lon-a.lon),la1=rad(a.lat),la2=rad(b.lat);const h=Math.sin(dLat/2)**2+Math.cos(la1)*Math.cos(la2)*Math.sin(dLon/2)**2;return 2*R*Math.asin(Math.sqrt(h))}
 function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[m]))}
@@ -96,69 +47,11 @@ function selectCluster(c,n,t){const ranked=c.slice().sort((a,b)=>(b.planningScor
 function selectMixed(c,n){const p=c.filter(a=>a.broadType==="PROSPECT"),e=c.filter(a=>a.broadType==="EXISTING CUSTOMER");let pn=Math.floor(n/2),en=n-pn;if(p.length<pn){pn=p.length;en=Math.min(e.length,n-pn)}if(e.length<en){en=e.length;pn=Math.min(p.length,n-en)}return selectCluster(p,pn,"mixed").concat(selectCluster(e,en,"mixed"))}
 function enc(x){return encodeURIComponent(x.name+", "+x.address)}
 function mapsLinks(order){const out=[];if(order.length<=MAX_LINK_STOPS){out.push({label:"OPEN FULL ROUTE IN GOOGLE MAPS",url:`https://www.google.com/maps/dir/?api=1&origin=${enc(depot)}&destination=${enc(depot)}&travelmode=driving&waypoints=${order.map(enc).join("%7C")}`});return out}let i=0,start=depot,part=1;while(i<order.length){const take=Math.min(MAX_LINK_STOPS,order.length-i),chunk=order.slice(i,i+take),last=i+take>=order.length,dest=last?depot:chunk[chunk.length-1],wps=last?chunk:chunk.slice(0,-1);out.push({label:`OPEN PART ${part} — STOPS ${i+1}-${i+take}${last?" + RETURN":""}`,url:`https://www.google.com/maps/dir/?api=1&origin=${enc(start)}&destination=${enc(dest)}&travelmode=driving${wps.length?"&waypoints="+wps.map(enc).join("%7C"):""}`});start=dest;i+=take;part++}return out}
-
-async function osrmGet(url){
-  const r=await fetch(url,{method:"GET"});
-  if(!r.ok) throw new Error("Free routing service returned HTTP "+r.status);
-  return await r.json();
-}
-function routeCost(order,matrix){
-  if(!order.length)return 0;
-  const seq=[0,...order,0]; let total=0;
-  for(let i=0;i<seq.length-1;i++){
-    const v=matrix[seq[i]][seq[i+1]];
-    if(v==null)return Infinity;
-    total+=v;
-  }
-  return total;
-}
-function nearestNeighbor(matrix,n){
-  const remaining=new Set(Array.from({length:n},(_,i)=>i+1));
-  const order=[]; let cur=0;
-  while(remaining.size){
-    let best=null,bestVal=Infinity;
-    for(const j of remaining){
-      const v=matrix[cur][j];
-      if(v!=null&&v<bestVal){bestVal=v;best=j;}
-    }
-    if(best==null)best=[...remaining][0];
-    order.push(best); remaining.delete(best); cur=best;
-  }
-  return order;
-}
-function twoOpt(order,matrix){
-  let best=order.slice(), bestCost=routeCost(best,matrix), improved=true, rounds=0;
-  while(improved&&rounds<10){
-    improved=false; rounds++;
-    for(let i=0;i<best.length-1;i++){
-      for(let k=i+1;k<best.length;k++){
-        const cand=best.slice(0,i).concat(best.slice(i,k+1).reverse(),best.slice(k+1));
-        const c=routeCost(cand,matrix);
-        if(c+0.5<bestCost){best=cand;bestCost=c;improved=true;}
-      }
-    }
-  }
-  return best;
-}
-async function freeOptimize(selected){
-  const pts=[depot,...selected.map(a=>({lat:+a.lat,lon:+a.lon}))];
-  const coords=pts.map(p=>`${p.lon},${p.lat}`).join(";");
-  const table=await osrmGet(`https://router.project-osrm.org/table/v1/driving/${coords}?annotations=duration`);
-  if(table.code!=="Ok"||!table.durations)throw new Error("Free road matrix could not be created.");
-  let order=nearestNeighbor(table.durations,selected.length);
-  order=twoOpt(order,table.durations);
-  const ordered=order.map(i=>selected[i-1]);
-  const rpts=[depot,...ordered.map(a=>({lat:+a.lat,lon:+a.lon})),depot];
-  const rcoords=rpts.map(p=>`${p.lon},${p.lat}`).join(";");
-  const route=await osrmGet(`https://router.project-osrm.org/route/v1/driving/${rcoords}?overview=false&steps=false`);
-  let milesOut=null,minutesOut=null;
-  if(route.code==="Ok"&&route.routes&&route.routes[0]){
-    milesOut=Math.round((route.routes[0].distance/1609.344)*10)/10;
-    minutesOut=Math.round(route.routes[0].duration/60);
-  }
-  return {order:order.map(i=>i-1),miles:milesOut,minutes:minutesOut};
-}
-
+async function osrmGet(url){const r=await fetch(url,{method:"GET"});if(!r.ok) throw new Error("Free routing service returned HTTP "+r.status);return await r.json();}
+function routeCost(order,matrix){if(!order.length)return 0;const seq=[0,...order,0];let total=0;for(let i=0;i<seq.length-1;i++){const v=matrix[seq[i]][seq[i+1]];if(v==null)return Infinity;total+=v;}return total;}
+function nearestNeighbor(matrix,n){const remaining=new Set(Array.from({length:n},(_,i)=>i+1));const order=[];let cur=0;while(remaining.size){let best=null,bestVal=Infinity;for(const j of remaining){const v=matrix[cur][j];if(v!=null&&v<bestVal){bestVal=v;best=j;}}if(best==null)best=[...remaining][0];order.push(best);remaining.delete(best);cur=best;}return order;}
+function twoOpt(order,matrix){let best=order.slice(),bestCost=routeCost(best,matrix),improved=true,rounds=0;while(improved&&rounds<10){improved=false;rounds++;for(let i=0;i<best.length-1;i++){for(let k=i+1;k<best.length;k++){const cand=best.slice(0,i).concat(best.slice(i,k+1).reverse(),best.slice(k+1));const c=routeCost(cand,matrix);if(c+0.5<bestCost){best=cand;bestCost=c;improved=true;}}}}return best;}
+async function freeOptimize(selected){const pts=[depot,...selected.map(a=>({lat:+a.lat,lon:+a.lon}))];const coords=pts.map(p=>`${p.lon},${p.lat}`).join(";");const table=await osrmGet(`https://router.project-osrm.org/table/v1/driving/${coords}?annotations=duration`);if(table.code!=="Ok"||!table.durations)throw new Error("Free road matrix could not be created.");let order=nearestNeighbor(table.durations,selected.length);order=twoOpt(order,table.durations);const ordered=order.map(i=>selected[i-1]);const rpts=[depot,...ordered.map(a=>({lat:+a.lat,lon:+a.lon})),depot];const rcoords=rpts.map(p=>`${p.lon},${p.lat}`).join(";");const route=await osrmGet(`https://router.project-osrm.org/route/v1/driving/${rcoords}?overview=false&steps=false`);let milesOut=null,minutesOut=null;if(route.code==="Ok"&&route.routes&&route.routes[0]){milesOut=Math.round((route.routes[0].distance/1609.344)*10)/10;minutesOut=Math.round(route.routes[0].duration/60);}return {order:order.map(i=>i-1),miles:milesOut,minutes:minutesOut};}
 async function buildRoute(){const out=document.getElementById("output"),t=document.getElementById("routeType").value,radius=+document.getElementById("radius").value;let n=Math.max(1,Math.min(25,+document.getElementById("stopCount").value||10));let cand=accounts.filter(a=>a.routeEligible!==false).filter(filterFn(t)).filter(a=>radius>=999||miles(depot,a)<=radius);if(!cand.length)return alert("No eligible accounts matched.");n=Math.min(n,cand.length);const selected=t==="mixed"?selectMixed(cand,n):selectCluster(cand,n,t);out.style.display="block";out.innerHTML='<div class="notice"><b>FREE ROAD OPTIMIZATION...</b> Calculating road-based stop order with OpenStreetMap / OSRM.</div>';let j;try{j=await freeOptimize(selected)}catch(err){out.innerHTML=`<div class="notice"><b>ROUTE NOT CREATED:</b> ${esc(err.message||err)}</div>`;return}const order=j.order.map(i=>selected[i]);currentRoute=order;const p=order.filter(a=>a.broadType==="PROSPECT").length,e=order.length-p,g=order.filter(a=>a.layer==="GO FIRST").length,links=mapsLinks(order);const rows=order.map((a,i)=>`<tr><td><b>${i+1}</b></td><td><div class="stopname">${esc(a.name)}</div><div class="small">${esc(a.address)}</div></td><td><span class="badge ${a.badge}">${esc(a.accountType)}</span></td><td>${a.customerNumber?"#"+esc(a.customerNumber):"—"}</td><td><b>${esc(objective(a))}</b></td><td><button class="cardbtn" onclick="showCard(${i})">STOP CARD</button></td></tr>`).join("");out.innerHTML=`<h2>Today's Free Road-Optimized Route</h2><div>${links.map(x=>`<a class="routebtn" target="_blank" href="${x.url}">${x.label}</a>`).join("")}</div><div class="notice" style="margin-top:12px"><b>FREE ROAD OPTIMIZED:</b> ${order.length} stops • ${p} prospects / ${e} existing • ${g} GO FIRST • ${j.miles??"—"} road miles • ${j.minutes??"—"} estimated minutes.</div><table><thead><tr><th>Stop</th><th>Business</th><th>Account Type</th><th>Customer #</th><th>Call Objective</th><th>Brief</th></tr></thead><tbody>${rows}</tbody></table>`}
 function note(a){if(a.accountType==="GO FIRST - PROSPECT")return"PROSPECT — NEW BUSINESS. Verify buyer, fleet, current supplier, Freightliner presence, parts needs and quote opportunity.";if(a.accountType==="VERIFIED PROSPECT")return"PROSPECT — NEW BUSINESS. Qualified prospect; confirm buyer, fleet, supplier, needs and follow-up.";if(a.accountType==="WIN-BACK CUSTOMER")return"EXISTING CUSTOMER — WIN-BACK. Do not create a duplicate customer account. Recover lost or inactive parts business.";if(a.accountType==="ACTIVE CUSTOMER")return(a.activityReason?("EXISTING CUSTOMER — "+a.activityReason+". Protect and grow the relationship; this account was removed from WIN-BACK because current service/back-counter activity was found."):"EXISTING CUSTOMER — ACTIVE. Protect and grow share-of-wallet and additional parts opportunities.");return"EXISTING CUSTOMER — GO FIRST. High-priority existing account; do not treat as a cold prospect."}
 function showCard(i){const a=currentRoute[i],top=document.getElementById("modalTop");top.className="modal-top "+a.badge;document.getElementById("modalBadge").innerHTML=`<span class="badge ${a.badge}">${esc(a.accountType)}</span>`;document.getElementById("modalName").textContent=a.name;document.getElementById("modalWarning").textContent=a.broadType==="PROSPECT"?"⚠ THIS IS A PROSPECT — NEW BUSINESS":"✓ THIS IS AN EXISTING NWTB CUSTOMER";const f=[["Address",a.address],["Customer #",a.customerNumber||"No current NWTB customer number"],["Phone",a.phone||"—"],["Planning Score",a.planningScore],["Sales Fit",a.salesFit||"—"],["Priority",a.priority||"—"],["Power Units",a.powerUnits??"—"],["Last Positive Sale",a.lastPositiveSale||"—"],["Audit Status",a.auditStatus||"—"]];document.getElementById("modalGrid").innerHTML=f.map(x=>`<div><b>${esc(x[0])}</b><br>${esc(x[1])}</div>`).join("");document.getElementById("modalNote").textContent=note(a);document.getElementById("modal").style.display="block"} function closeModal(){document.getElementById("modal").style.display="none"} init();
