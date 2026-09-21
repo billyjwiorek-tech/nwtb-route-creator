@@ -451,3 +451,10 @@
     });
   };
 })();
+
+(()=>{
+  const s=document.createElement('script');
+  s.src='./navigation.js?v=20260921A';
+  s.defer=true;
+  document.body.appendChild(s);
+})();
