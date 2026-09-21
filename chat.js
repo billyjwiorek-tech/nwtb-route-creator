@@ -3,7 +3,7 @@
   const APIKEY='sb_publishable_EqF-iooqhmngSG5BbzOxfQ_Vnf9Altc';
   const $=id=>document.getElementById(id);
   const token=()=>localStorage.getItem('nwtb_chat_token')||'';
-  const h=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+  const h=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#039;'}[m]));
   const when=s=>{const d=new Date(s);return isNaN(d)?'':d.toLocaleString()};
   let chatTimer=null;
   const visitMap=new Map();
@@ -55,8 +55,6 @@
     '1763 RUDOLPH CT','288 HERITAGE PKWY','648 ASPEN DR','104 WILLIAMSBURG LN','1799 HELEN DR'
   ];
 
-  // Corrected customer locations. Address is always used in Google Maps for these records.
-  // Lat/lon are supplied where verified so radius filtering and OSRM use the corrected geography.
   const ADDRESS_OVERRIDES=new Map(Object.entries({
     '21267':{address:'1802 N Division St, Suite 304, Morris, IL 60450',lat:41.37691,lon:-88.422801,note:'VANNER current carrier location'},
     '11058':{address:'18202 W Union Rd, Union, IL 60180',lat:42.2342823,lon:-88.5523231,note:'INTREN current headquarters'},
@@ -78,8 +76,6 @@
     '25941':{address:'721 Parkwood Ave, Suite D, Romeoville, IL 60446',lat:41.656179,lon:-88.075574,note:'ROAD KING duplicate record; suppressed'}
   }));
 
-  // 42 previously route-eligible GO FIRST existing customers:
-  // 30 commercial route-approved, 12 residential blocked, 0 unresolved holds.
   const COMMERCIAL_GO_FIRST_EXISTING_IDS=new Set([
     '21267','17772','11058','28276','28369','22663','20779','15491','20507','23325',
     '16350','27388','18091','20672','26334','19079','10366','11914','25846','26781',
@@ -89,8 +85,6 @@
     '27727','11771','23016','18153','11252','26145','17219','16106','25606','12635','25909','25817'
   ]);
   const HOLD_GO_FIRST_EXISTING_IDS=new Set();
-
-  // Duplicate customer records remain suppressed by the base app.
   const DUPLICATE_SUPPRESS_IDS=new Set(['25941','12038','12039']);
 
   function applyAddressOverrides(){
@@ -189,7 +183,8 @@
   #nwtbChatBtn{position:fixed;right:22px;bottom:22px;z-index:60;background:#17202a;color:#fff;border:0;border-radius:999px;padding:14px 18px;font-weight:800;box-shadow:0 6px 20px #0004;cursor:pointer}
   #nwtbChatPanel{position:fixed;right:22px;bottom:82px;width:min(420px,calc(100vw - 30px));height:min(650px,calc(100vh - 120px));z-index:59;background:#fff;border:1px solid #cfd6dd;border-radius:14px;box-shadow:0 10px 36px #0005;display:none;overflow:hidden}
   #nwtbChatPanel.open{display:flex;flex-direction:column}.nwtb-chat-head{background:#17202a;color:#fff;padding:13px 15px;display:flex;justify-content:space-between;align-items:center}.nwtb-chat-head button{background:#fff2;color:#fff;padding:6px 9px}.nwtb-chat-login{padding:20px}.nwtb-chat-login input{margin:9px 0}.nwtb-chat-login button{width:100%;background:#17202a;color:#fff}.nwtb-chat-body{display:none;flex:1;min-height:0}.nwtb-chat-body.on{display:flex;flex-direction:column}.nwtb-chat-who{padding:9px 12px;background:#eef2f6;border-bottom:1px solid #d9dee4;font-size:13px}.nwtb-chat-messages{flex:1;overflow:auto;padding:12px;background:#f7f9fb}.nwtb-msg{background:#fff;border:1px solid #d9dee4;border-radius:10px;padding:9px 10px;margin-bottom:9px}.nwtb-msg .meta{font-size:12px;color:#65717c;margin-bottom:5px}.nwtb-msg.route{border-left:5px solid #1a73e8}.nwtb-load-route{background:#1a73e8;color:#fff;padding:8px 10px}.nwtb-chat-send{padding:10px;border-top:1px solid #d9dee4}.nwtb-chat-send textarea{width:100%;height:68px;resize:none;padding:9px;border:1px solid #bcc6cf;border-radius:8px;font:inherit}.nwtb-chat-actions{display:flex;gap:7px;margin-top:7px}.nwtb-chat-actions button{flex:1}.nwtb-send-msg{background:#17202a;color:#fff}.nwtb-send-route{background:#18864b;color:#fff}.nwtb-chat-error{color:#b3261e;font-weight:700;font-size:13px;margin-top:7px}
-  .visitbox,.locationbox{margin-top:16px;padding:14px;border:2px solid #d9dee4;border-radius:10px;background:#f8fafb}.visitbox h3,.locationbox h3{margin:0 0 8px}.visitstatus,.locationstatus{display:inline-block;padding:6px 10px;border-radius:999px;font-weight:800;font-size:12px}.vs-not{background:#e7eaee;color:#263238}.vs-follow{background:#fff2b3;color:#6b5500}.vs-stop{background:#ffd9d9;color:#8e1b1b}.loc-ok{background:#d8f3df;color:#0c5d2e}.loc-hold{background:#fff2b3;color:#6b5500}.loc-stop{background:#ffd9d9;color:#8e1b1b}.visit-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px}.visit-actions button{padding:9px}.visit-note{margin-top:8px;font-size:12px;color:#52606d}.follow-toggle{margin-top:10px;font-size:13px;font-weight:700}.follow-toggle input{width:auto;margin-right:6px}`;
+  .visitbox,.locationbox{margin-top:16px;padding:14px;border:2px solid #d9dee4;border-radius:10px;background:#f8fafb}.visitbox h3,.locationbox h3{margin:0 0 8px}.visitstatus,.locationstatus{display:inline-block;padding:6px 10px;border-radius:999px;font-weight:800;font-size:12px}.vs-not{background:#e7eaee;color:#263238}.vs-follow{background:#fff2b3;color:#6b5500}.vs-stop{background:#ffd9d9;color:#8e1b1b}.loc-ok{background:#d8f3df;color:#0c5d2e}.loc-hold{background:#fff2b3;color:#6b5500}.loc-stop{background:#ffd9d9;color:#8e1b1b}.visit-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px}.visit-actions button{padding:9px}.visit-note{margin-top:8px;font-size:12px;color:#52606d}.follow-toggle{margin-top:10px;font-size:13px;font-weight:700}.follow-toggle input{width:auto;margin-right:6px}
+  #routeSubFilterWrap{margin-top:12px;max-width:520px;padding:12px;border:1px solid #d9dee4;border-radius:9px;background:#f8fafb}#routeSubFilterWrap label{margin-bottom:6px}#routeSubFilterHelp{margin-top:6px;font-size:12px;color:#5f6b76}`;
   const st=document.createElement('style');st.textContent=css;document.head.appendChild(st);
 
   const panel=document.createElement('div');
@@ -221,7 +216,7 @@
     }catch(e){if(!quiet)$('nwtbChatError').textContent=e.message}
   }
   async function sendText(){const body=$('nwtbMessageText').value.trim();if(!body)return;try{await call('send_text',{body});$('nwtbMessageText').value='';loadMessages()}catch(e){$('nwtbChatError').textContent=e.message}}
-  async function sendRoute(){if(!currentRoute?.length){$('nwtbChatError').textContent='Create a route first.';return}try{await call('send_route',{route_payload:{title:'NWTB Sales Route - '+currentRoute.length+' Stops',stops:currentRoute,route_type:$('routeType')?.value||null,radius:$('radius')?.value||null}});loadMessages();alert('Route sent to NWTB Chat.')}catch(e){$('nwtbChatError').textContent=e.message}}
+  async function sendRoute(){if(!currentRoute?.length){$('nwtbChatError').textContent='Create a route first.';return}try{await call('send_route',{route_payload:{title:'NWTB Sales Route - '+currentRoute.length+' Stops',stops:currentRoute,route_type:$('routeType')?.value||null,route_subtype:$('routeSubFilter')?.value||null,radius:$('radius')?.value||null}});loadMessages();alert('Route sent to NWTB Chat.')}catch(e){$('nwtbChatError').textContent=e.message}}
 
   chatBtn.onclick=()=>{panel.classList.toggle('open');if(panel.classList.contains('open'))restore()};
   $('nwtbChatClose').onclick=()=>panel.classList.remove('open');
@@ -238,10 +233,70 @@
   function waitForAccounts(tries=0){try{if(accounts?.length){enforceLocationVerification();refreshVisitMap();return}}catch{}if(tries<30)setTimeout(()=>waitForAccounts(tries+1),200)}
   waitForAccounts();
 
+  // SIMPLIFIED SALES-DAY UI: five main choices with contextual subfilters.
+  const routeType=$('routeType');
+  if(routeType){
+    const previous=routeType.value;
+    routeType.innerHTML=`
+      <option value="new_business">NEW BUSINESS — Find New Customers</option>
+      <option value="go_first">GO FIRST — Highest Priority Accounts</option>
+      <option value="winback">WIN-BACK — Recover Lost Business</option>
+      <option value="existing">EXISTING CUSTOMERS — Protect & Grow</option>
+      <option value="mixed">BEST OVERALL ROUTE — Mix Everything</option>`;
+    if(['new_business','go_first','winback','existing','mixed'].includes(previous))routeType.value=previous;
+  }
+
+  let subWrap=$('routeSubFilterWrap');
+  if(!subWrap&&routeType){
+    subWrap=document.createElement('div');
+    subWrap.id='routeSubFilterWrap';
+    subWrap.innerHTML='<label id="routeSubFilterLabel" for="routeSubFilter">Prospect Type</label><select id="routeSubFilter"></select><div id="routeSubFilterHelp"></div>';
+    const controls=routeType.closest('.controls');
+    controls?.insertAdjacentElement('afterend',subWrap);
+  }
+
+  function refreshSubFilter(){
+    const t=routeType?.value,wrap=$('routeSubFilterWrap'),sel=$('routeSubFilter'),lab=$('routeSubFilterLabel'),help=$('routeSubFilterHelp');
+    if(!wrap||!sel)return;
+    if(t==='new_business'){
+      wrap.style.display='block';
+      lab.textContent='Prospect Type';
+      sel.innerHTML='<option value="all_prospects">All Prospects</option><option value="go_first_prospects">GO FIRST Prospects Only</option><option value="regular_prospects">Regular Verified Prospects Only</option>';
+      help.textContent='All Prospects includes both RED GO FIRST new-potential accounts and PURPLE verified prospects.';
+    }else if(t==='existing'){
+      wrap.style.display='block';
+      lab.textContent='Customer Type';
+      sel.innerHTML='<option value="all_existing">All Existing Customers</option><option value="go_first_existing">GO FIRST Existing Customers Only</option><option value="winback_existing">Win-Back Customers Only</option><option value="active_existing">Active Customers Only</option>';
+      help.textContent='All Existing includes GREEN GO FIRST existing, ORANGE Win-Back, and BLUE Active customers.';
+    }else{
+      wrap.style.display='none';
+      sel.innerHTML='';
+      help.textContent='';
+    }
+  }
+  routeType?.addEventListener('change',refreshSubFilter);
+  refreshSubFilter();
+
   if(!document.getElementById('includeFollowUps')){
     const div=document.createElement('div');div.className='follow-toggle';
     div.innerHTML='<label><input id="includeFollowUps" type="checkbox"> Include VISITED — FOLLOW UP prospects</label>';
-    $('routeType')?.closest('.panel')?.appendChild(div);
+    routeType?.closest('.panel')?.appendChild(div);
+  }
+
+  function applySubFilter(cand,t){
+    const sub=$('routeSubFilter')?.value||'';
+    if(t==='new_business'){
+      if(sub==='go_first_prospects')return cand.filter(a=>a.broadType==='PROSPECT'&&a.layer==='GO FIRST');
+      if(sub==='regular_prospects')return cand.filter(a=>a.broadType==='PROSPECT'&&a.layer==='VERIFIED PROSPECTS');
+      return cand.filter(a=>a.broadType==='PROSPECT');
+    }
+    if(t==='existing'){
+      if(sub==='go_first_existing')return cand.filter(a=>a.broadType==='EXISTING CUSTOMER'&&a.layer==='GO FIRST');
+      if(sub==='winback_existing')return cand.filter(a=>a.broadType==='EXISTING CUSTOMER'&&a.layer==='WIN-BACK CUSTOMERS');
+      if(sub==='active_existing')return cand.filter(a=>a.broadType==='EXISTING CUSTOMER'&&a.layer==='ACTIVE CUSTOMERS');
+      return cand.filter(a=>a.broadType==='EXISTING CUSTOMER');
+    }
+    return cand;
   }
 
   window.buildRoute=async function(){
@@ -252,14 +307,15 @@
       .filter(a=>!isLocationAuditedGroup(a)||locationStatus(a)==='COMMERCIAL_ROUTE_OK')
       .filter(filterFn(t))
       .filter(a=>r>=999||miles(depot,a)<=r);
+    cand=applySubFilter(cand,t);
     cand=cand.filter(a=>{
       if(a.broadType!=='PROSPECT')return true;
       const s=visitMap.get(accountKey(a))||a.visitStatus||'NOT_VISITED';
       if(s==='DO_NOT_ROUTE'||s==='NOT_A_FIT')return false;
-      if((t==='new_business'||t==='prospects_regular')&&s==='FOLLOW_UP'&&!includeFollow)return false;
+      if(t==='new_business'&&s==='FOLLOW_UP'&&!includeFollow)return false;
       return true;
     });
-    if(!cand.length){alert('No eligible audited-commercial accounts matched.');return}
+    if(!cand.length){alert('No eligible audited-commercial accounts matched these filters.');return}
     n=Math.min(n,cand.length);
     const sel=t==='mixed'?selectMixed(cand,n):selectCluster(cand,n,t);
     out.style.display='block';out.innerHTML='<b>Optimizing...</b>';
