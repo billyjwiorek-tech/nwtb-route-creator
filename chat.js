@@ -8,9 +8,9 @@
   let chatTimer=null;
   const visitMap=new Map();
 
-  // FAIL-CLOSED LOCATION AUDIT.
-  // Prospects and GO FIRST existing customers must be explicitly approved as commercial to route.
-  // Any new/changed record in either audited group automatically becomes UNCERTAIN — HOLD.
+  // FINAL 2026-09-21 FAIL-CLOSED LOCATION AUDIT.
+  // Prospects keep the completed prospect audit gate.
+  // GO FIRST existing customers use the completed 42-account audit.
   const auditNorm=s=>String(s||'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim().replace(/\s+/g,' ');
   const auditKey=a=>auditNorm(a?.name)+'|'+auditNorm(a?.address);
 
@@ -55,16 +55,64 @@
     '1763 RUDOLPH CT','288 HERITAGE PKWY','648 ASPEN DR','104 WILLIAMSBURG LN','1799 HELEN DR'
   ];
 
-  // 42 previously route-eligible GO FIRST existing customers audited 2026-09-21.
+  // Corrected customer locations. Address is always used in Google Maps for these records.
+  // Lat/lon are supplied where verified so radius filtering and OSRM use the corrected geography.
+  const ADDRESS_OVERRIDES=new Map(Object.entries({
+    '21267':{address:'1802 N Division St, Suite 304, Morris, IL 60450',lat:41.37691,lon:-88.422801,note:'VANNER current carrier location'},
+    '11058':{address:'18202 W Union Rd, Union, IL 60180',lat:42.2342823,lon:-88.5523231,note:'INTREN current headquarters'},
+    '27388':{address:'75 Executive Dr, Suite 441, Aurora, IL 60504',lat:41.7563751,lon:-88.2185473,note:'AZSAFI current carrier location'},
+    '20672':{address:'1730 Park St, Suite 202, Naperville, IL 60563',lat:41.7998,lon:-88.1482,note:'MARTIAN EXPRESS current carrier location'},
+    '26334':{address:'1200 Knell Rd, Montgomery, IL 60538',note:'SUNWAY current carrier/office location'},
+    '10366':{address:'145 Tower Dr, Unit 12, Burr Ridge, IL 60527',lat:41.7617846,lon:-87.9119959,note:'CARGO RUNNER current carrier location'},
+    '25846':{address:'4699 Auvergne Ave, Unit 7, Lisle, IL 60532',lat:41.8019244,lon:-88.0604841,note:'UBN LOGISTICS corrected commercial location'},
+    '11935':{address:'850 Windham Pkwy, Bolingbrook, IL 60440',note:'ROADRUNNER current Chicago service center'},
+    '22663':{address:'721 Parkwood Ave, Suite D, Romeoville, IL 60446',lat:41.656179,lon:-88.075574,note:'ROAD KING canonical route stop'},
+    '27727':{address:'10S530 Thames Dr, Downers Grove, IL 60516',note:'UZB current residential registration'},
+    '11771':{address:'1024 Brentwood Cir, Buffalo Grove, IL 60089',note:'PJ TWINS current residential registration'},
+    '18153':{address:'2451 Sharon Ct, Naperville, IL 60565',note:'AFF TRANS current residential registration'},
+    '11252':{address:'672 Banbury Way, Bolingbrook, IL 60440',note:'KZ EXPRESS current residential registration'},
+    '16106':{address:'1226 N Webster St, Naperville, IL 60563',note:'US TRANS ONE current residential registration'},
+    '12635':{address:'25015 Edison Ln, Plainfield, IL 60585',note:'GN EXPRESS current residential registration'},
+    '12039':{address:'1738 Irish Indian Trail, Joliet, IL 60436',lat:41.4900651,lon:-88.1403365,note:'SCHWARZ current HQ; duplicate record remains suppressed'},
+    '12038':{address:'1738 Irish Indian Trail, Joliet, IL 60436',lat:41.4900651,lon:-88.1403365,note:'SCHWARZ duplicate record; suppressed'},
+    '25941':{address:'721 Parkwood Ave, Suite D, Romeoville, IL 60446',lat:41.656179,lon:-88.075574,note:'ROAD KING duplicate record; suppressed'}
+  }));
+
+  // 42 previously route-eligible GO FIRST existing customers:
+  // 30 commercial route-approved, 12 residential blocked, 0 unresolved holds.
   const COMMERCIAL_GO_FIRST_EXISTING_IDS=new Set([
-    '21267','17772','28276','28369','20779','15491','20507','23325','16350','27388',
-    '18091','26334','18153','19079','10366','11914','26781','11179','11935','24881',
-    '15474','11395','15096','12389','26423','11218','21986'
+    '21267','17772','11058','28276','28369','22663','20779','15491','20507','23325',
+    '16350','27388','18091','20672','26334','19079','10366','11914','25846','26781',
+    '11179','11935','24881','15474','11395','15096','12389','26423','11218','21986'
   ]);
   const RESIDENTIAL_GO_FIRST_EXISTING_IDS=new Set([
-    '11771','23016','20672','11252','26145','17219','16106','25606','12635','25909','25817'
+    '27727','11771','23016','18153','11252','26145','17219','16106','25606','12635','25909','25817'
   ]);
-  const HOLD_GO_FIRST_EXISTING_IDS=new Set(['11058','22663','27727','25846']);
+  const HOLD_GO_FIRST_EXISTING_IDS=new Set();
+
+  // Duplicate customer records remain suppressed by the base app.
+  const DUPLICATE_SUPPRESS_IDS=new Set(['25941','12038','12039']);
+
+  function applyAddressOverrides(){
+    try{
+      accounts.forEach(a=>{
+        const id=String(a?.customerNumber||'').trim();
+        const o=ADDRESS_OVERRIDES.get(id);
+        if(!o)return;
+        if(!a.originalAddress)a.originalAddress=a.address;
+        a.address=o.address;
+        if(Number.isFinite(o.lat)){a.lat=o.lat;a.lon=o.lon}
+        a.auditAddressCorrected=true;
+        a.auditLocationNote=o.note;
+      });
+    }catch{}
+  }
+
+  const originalEnc=window.enc;
+  window.enc=function(x){
+    if(x?.auditAddressCorrected)return encodeURIComponent(x.address||x.name||'');
+    return originalEnc(x);
+  };
 
   function locationStatus(a){
     if(a?.broadType==='PROSPECT'){
@@ -75,6 +123,7 @@
     }
     if(a?.layer==='GO FIRST'&&a?.broadType==='EXISTING CUSTOMER'){
       const id=String(a?.customerNumber||'').trim();
+      if(DUPLICATE_SUPPRESS_IDS.has(id))return 'DUPLICATE_SUPPRESSED';
       if(RESIDENTIAL_GO_FIRST_EXISTING_IDS.has(id))return 'RESIDENTIAL_DO_NOT_ROUTE';
       if(COMMERCIAL_GO_FIRST_EXISTING_IDS.has(id))return 'COMMERCIAL_ROUTE_OK';
       if(HOLD_GO_FIRST_EXISTING_IDS.has(id))return 'UNCERTAIN_HOLD';
@@ -82,18 +131,23 @@
     }
     return 'NOT_APPLICABLE';
   }
-  function locationLabel(s){return s==='COMMERCIAL_ROUTE_OK'?'COMMERCIAL — ROUTE OK':s==='RESIDENTIAL_DO_NOT_ROUTE'?'RESIDENTIAL — DO NOT ROUTE':s==='UNCERTAIN_HOLD'?'UNCERTAIN — HOLD':'NOT YET AUDITED'}
-  function locationClass(s){return s==='COMMERCIAL_ROUTE_OK'?'loc-ok':s==='RESIDENTIAL_DO_NOT_ROUTE'?'loc-stop':'loc-hold'}
+  function locationLabel(s){
+    return s==='COMMERCIAL_ROUTE_OK'?'COMMERCIAL — ROUTE OK':
+      s==='RESIDENTIAL_DO_NOT_ROUTE'?'RESIDENTIAL — DO NOT ROUTE':
+      s==='DUPLICATE_SUPPRESSED'?'DUPLICATE — DO NOT ROUTE':
+      s==='UNCERTAIN_HOLD'?'UNCERTAIN — HOLD':'NOT YET AUDITED';
+  }
+  function locationClass(s){return s==='COMMERCIAL_ROUTE_OK'?'loc-ok':s==='RESIDENTIAL_DO_NOT_ROUTE'||s==='DUPLICATE_SUPPRESSED'?'loc-stop':'loc-hold'}
   function isLocationAuditedGroup(a){return a?.broadType==='PROSPECT'||(a?.layer==='GO FIRST'&&a?.broadType==='EXISTING CUSTOMER')}
 
   function enforceLocationVerification(){
     try{
+      applyAddressOverrides();
       accounts.forEach(a=>{
-        if(isLocationAuditedGroup(a)){
-          const s=locationStatus(a);
-          a.locationVerification=locationLabel(s);
-          if(s!=='COMMERCIAL_ROUTE_OK')a.routeEligible=false;
-        }
+        if(!isLocationAuditedGroup(a))return;
+        const s=locationStatus(a);
+        a.locationVerification=locationLabel(s);
+        if(s!=='COMMERCIAL_ROUTE_OK')a.routeEligible=false;
       });
       updateAuditNotice();
       updateSafeStats();
@@ -121,12 +175,12 @@
       const pc=p.filter(a=>locationStatus(a)==='COMMERCIAL_ROUTE_OK').length;
       const pr=p.filter(a=>locationStatus(a)==='RESIDENTIAL_DO_NOT_ROUTE').length;
       const ph=p.filter(a=>locationStatus(a)==='UNCERTAIN_HOLD').length;
-      const ge=accounts.filter(a=>a.layer==='GO FIRST'&&a.broadType==='EXISTING CUSTOMER');
+      const ge=accounts.filter(a=>a.layer==='GO FIRST'&&a.broadType==='EXISTING CUSTOMER'&&!DUPLICATE_SUPPRESS_IDS.has(String(a.customerNumber||'')));
       const gec=ge.filter(a=>locationStatus(a)==='COMMERCIAL_ROUTE_OK').length;
       const ger=ge.filter(a=>locationStatus(a)==='RESIDENTIAL_DO_NOT_ROUTE').length;
       const geh=ge.filter(a=>locationStatus(a)==='UNCERTAIN_HOLD').length;
       const n=$('safetyNotice');
-      if(n)n.innerHTML=`<b>LOCATION SAFETY GATE:</b> Prospects: ${pc} commercial approved • ${pr} residential blocked • ${ph} hold. GO FIRST existing: ${gec} commercial approved • ${ger} residential blocked • ${geh} hold. <b>Only audited commercial records in these groups can route.</b>`;
+      if(n)n.innerHTML=`<b>LOCATION SAFETY GATE:</b> Prospects: ${pc} commercial approved • ${pr} residential blocked • ${ph} hold. GO FIRST existing audit: ${gec} commercial approved • ${ger} residential blocked • ${geh} hold. Duplicate customer records stay suppressed. <b>Only audited commercial records in these groups can route.</b>`;
     }catch{}
   }
 
@@ -138,17 +192,34 @@
   .visitbox,.locationbox{margin-top:16px;padding:14px;border:2px solid #d9dee4;border-radius:10px;background:#f8fafb}.visitbox h3,.locationbox h3{margin:0 0 8px}.visitstatus,.locationstatus{display:inline-block;padding:6px 10px;border-radius:999px;font-weight:800;font-size:12px}.vs-not{background:#e7eaee;color:#263238}.vs-follow{background:#fff2b3;color:#6b5500}.vs-stop{background:#ffd9d9;color:#8e1b1b}.loc-ok{background:#d8f3df;color:#0c5d2e}.loc-hold{background:#fff2b3;color:#6b5500}.loc-stop{background:#ffd9d9;color:#8e1b1b}.visit-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px}.visit-actions button{padding:9px}.visit-note{margin-top:8px;font-size:12px;color:#52606d}.follow-toggle{margin-top:10px;font-size:13px;font-weight:700}.follow-toggle input{width:auto;margin-right:6px}`;
   const st=document.createElement('style');st.textContent=css;document.head.appendChild(st);
 
-  const panel=document.createElement('div');panel.id='nwtbChatPanel';panel.innerHTML=`<div class="nwtb-chat-head"><b>NWTB CHAT + ROUTES</b><button id="nwtbChatClose">X</button></div><div id="nwtbChatLogin" class="nwtb-chat-login"><b>Enter your 4-digit employee number</b><input id="nwtbEmpNo" inputmode="numeric" maxlength="4" placeholder="0000"><button id="nwtbLoginBtn">ENTER CHAT</button><div id="nwtbLoginError" class="nwtb-chat-error"></div></div><div id="nwtbChatBody" class="nwtb-chat-body"><div class="nwtb-chat-who"><span id="nwtbWho"></span><button id="nwtbLogoutBtn" style="float:right;padding:3px 7px">LOG OUT</button></div><div id="nwtbMessages" class="nwtb-chat-messages"></div><div class="nwtb-chat-send"><textarea id="nwtbMessageText" placeholder="Type a message..."></textarea><div class="nwtb-chat-actions"><button class="nwtb-send-msg" id="nwtbSendMsg">SEND MESSAGE</button><button class="nwtb-send-route" id="nwtbSendRoute">SEND CURRENT ROUTE</button></div><div id="nwtbChatError" class="nwtb-chat-error"></div></div></div>`;document.body.appendChild(panel);
+  const panel=document.createElement('div');
+  panel.id='nwtbChatPanel';
+  panel.innerHTML=`<div class="nwtb-chat-head"><b>NWTB CHAT + ROUTES</b><button id="nwtbChatClose">X</button></div><div id="nwtbChatLogin" class="nwtb-chat-login"><b>Enter your 4-digit employee number</b><input id="nwtbEmpNo" inputmode="numeric" maxlength="4" placeholder="0000"><button id="nwtbLoginBtn">ENTER CHAT</button><div id="nwtbLoginError" class="nwtb-chat-error"></div></div><div id="nwtbChatBody" class="nwtb-chat-body"><div class="nwtb-chat-who"><span id="nwtbWho"></span><button id="nwtbLogoutBtn" style="float:right;padding:3px 7px">LOG OUT</button></div><div id="nwtbMessages" class="nwtb-chat-messages"></div><div class="nwtb-chat-send"><textarea id="nwtbMessageText" placeholder="Type a message..."></textarea><div class="nwtb-chat-actions"><button class="nwtb-send-msg" id="nwtbSendMsg">SEND MESSAGE</button><button class="nwtb-send-route" id="nwtbSendRoute">SEND CURRENT ROUTE</button></div><div id="nwtbChatError" class="nwtb-chat-error"></div></div></div>`;
+  document.body.appendChild(panel);
   const chatBtn=document.createElement('button');chatBtn.id='nwtbChatBtn';chatBtn.textContent='CHAT';document.body.appendChild(chatBtn);
 
-  async function call(action,data={}){const headers={'Content-Type':'application/json','apikey':APIKEY};if(token())headers['x-nwtb-session']=token();const r=await fetch(API,{method:'POST',headers,body:JSON.stringify({action,...data})});let j={};try{j=await r.json()}catch{}if(!r.ok)throw new Error(j.error||'Service error');return j}
+  async function call(action,data={}){
+    const headers={'Content-Type':'application/json','apikey':APIKEY};
+    if(token())headers['x-nwtb-session']=token();
+    const r=await fetch(API,{method:'POST',headers,body:JSON.stringify({action,...data})});
+    let j={};try{j=await r.json()}catch{}
+    if(!r.ok)throw new Error(j.error||'Service error');
+    return j;
+  }
   function setIdentity(t,n){if(t)localStorage.setItem('nwtb_chat_token',t);if(n)localStorage.setItem('nwtb_chat_name',n)}
   function clearIdentity(){localStorage.removeItem('nwtb_chat_token');localStorage.removeItem('nwtb_chat_name')}
   function showLoggedIn(name){$('nwtbChatLogin').style.display='none';$('nwtbChatBody').classList.add('on');$('nwtbWho').textContent='Signed in as '+name;loadMessages();if(chatTimer)clearInterval(chatTimer);chatTimer=setInterval(()=>{if(panel.classList.contains('open'))loadMessages(true)},5000)}
   function showLoggedOut(){$('nwtbChatBody').classList.remove('on');$('nwtbChatLogin').style.display='block';if(chatTimer){clearInterval(chatTimer);chatTimer=null}}
   async function login(){const n=$('nwtbEmpNo').value.trim();$('nwtbLoginError').textContent='';if(!/^\d{4}$/.test(n)){$('nwtbLoginError').textContent='Enter exactly 4 digits.';return}try{const j=await call('login',{employee_number:n});setIdentity(j.token,j.display_name);showLoggedIn(j.display_name)}catch(e){$('nwtbLoginError').textContent=e.message}}
   async function restore(){if(!token())return showLoggedOut();try{const j=await call('whoami');showLoggedIn(j.display_name)}catch{clearIdentity();showLoggedOut()}}
-  async function loadMessages(quiet=false){try{const j=await call('list');const box=$('nwtbMessages');box.innerHTML=(j.messages||[]).map(m=>m.message_type==='route'?`<div class="nwtb-msg route"><div class="meta"><b>${h(m.display_name)}</b> - ${h(when(m.created_at))}</div><b>${h(m.route_payload?.title||'NWTB Sales Route')}</b><div>${(m.route_payload?.stops||[]).length} stops</div><button class="nwtb-load-route" data-id="${m.id}">LOAD ROUTE</button></div>`:`<div class="nwtb-msg"><div class="meta"><b>${h(m.display_name)}</b> - ${h(when(m.created_at))}</div>${h(m.body||'')}</div>`).join('');(j.messages||[]).filter(m=>m.message_type==='route').forEach(m=>{const b=box.querySelector(`[data-id="${m.id}"]`);if(b)b.onclick=()=>{currentRoute=(m.route_payload?.stops||[]).map(s=>({...s}));renderRoute(currentRoute,{shared:true});panel.classList.remove('open')}});if(!quiet)box.scrollTop=box.scrollHeight}catch(e){if(!quiet)$('nwtbChatError').textContent=e.message}}
+  async function loadMessages(quiet=false){
+    try{
+      const j=await call('list'),box=$('nwtbMessages');
+      box.innerHTML=(j.messages||[]).map(m=>m.message_type==='route'?`<div class="nwtb-msg route"><div class="meta"><b>${h(m.display_name)}</b> - ${h(when(m.created_at))}</div><b>${h(m.route_payload?.title||'NWTB Sales Route')}</b><div>${(m.route_payload?.stops||[]).length} stops</div><button class="nwtb-load-route" data-id="${m.id}">LOAD ROUTE</button></div>`:`<div class="nwtb-msg"><div class="meta"><b>${h(m.display_name)}</b> - ${h(when(m.created_at))}</div>${h(m.body||'')}</div>`).join('');
+      (j.messages||[]).filter(m=>m.message_type==='route').forEach(m=>{const b=box.querySelector(`[data-id="${m.id}"]`);if(b)b.onclick=()=>{currentRoute=(m.route_payload?.stops||[]).map(s=>({...s}));renderRoute(currentRoute,{shared:true});panel.classList.remove('open')}});
+      if(!quiet)box.scrollTop=box.scrollHeight;
+    }catch(e){if(!quiet)$('nwtbChatError').textContent=e.message}
+  }
   async function sendText(){const body=$('nwtbMessageText').value.trim();if(!body)return;try{await call('send_text',{body});$('nwtbMessageText').value='';loadMessages()}catch(e){$('nwtbChatError').textContent=e.message}}
   async function sendRoute(){if(!currentRoute?.length){$('nwtbChatError').textContent='Create a route first.';return}try{await call('send_route',{route_payload:{title:'NWTB Sales Route - '+currentRoute.length+' Stops',stops:currentRoute,route_type:$('routeType')?.value||null,radius:$('radius')?.value||null}});loadMessages();alert('Route sent to NWTB Chat.')}catch(e){$('nwtbChatError').textContent=e.message}}
 
@@ -167,7 +238,11 @@
   function waitForAccounts(tries=0){try{if(accounts?.length){enforceLocationVerification();refreshVisitMap();return}}catch{}if(tries<30)setTimeout(()=>waitForAccounts(tries+1),200)}
   waitForAccounts();
 
-  if(!document.getElementById('includeFollowUps')){const div=document.createElement('div');div.className='follow-toggle';div.innerHTML='<label><input id="includeFollowUps" type="checkbox"> Include VISITED — FOLLOW UP prospects</label>';$('routeType')?.closest('.panel')?.appendChild(div)}
+  if(!document.getElementById('includeFollowUps')){
+    const div=document.createElement('div');div.className='follow-toggle';
+    div.innerHTML='<label><input id="includeFollowUps" type="checkbox"> Include VISITED — FOLLOW UP prospects</label>';
+    $('routeType')?.closest('.panel')?.appendChild(div);
+  }
 
   window.buildRoute=async function(){
     enforceLocationVerification();
@@ -177,12 +252,19 @@
       .filter(a=>!isLocationAuditedGroup(a)||locationStatus(a)==='COMMERCIAL_ROUTE_OK')
       .filter(filterFn(t))
       .filter(a=>r>=999||miles(depot,a)<=r);
-    cand=cand.filter(a=>{if(a.broadType!=='PROSPECT')return true;const s=visitMap.get(accountKey(a))||'NOT_VISITED';if(s==='DO_NOT_ROUTE'||s==='NOT_A_FIT')return false;if((t==='new_business'||t==='prospects_regular')&&s==='FOLLOW_UP'&&!includeFollow)return false;return true});
+    cand=cand.filter(a=>{
+      if(a.broadType!=='PROSPECT')return true;
+      const s=visitMap.get(accountKey(a))||a.visitStatus||'NOT_VISITED';
+      if(s==='DO_NOT_ROUTE'||s==='NOT_A_FIT')return false;
+      if((t==='new_business'||t==='prospects_regular')&&s==='FOLLOW_UP'&&!includeFollow)return false;
+      return true;
+    });
     if(!cand.length){alert('No eligible audited-commercial accounts matched.');return}
     n=Math.min(n,cand.length);
     const sel=t==='mixed'?selectMixed(cand,n):selectCluster(cand,n,t);
     out.style.display='block';out.innerHTML='<b>Optimizing...</b>';
-    try{const j=await optimize(sel);renderRoute(j.order.map(i=>sel[i]),{miles:j.miles,minutes:j.minutes})}catch(e){out.innerHTML=`<div class="notice"><b>ROUTE NOT CREATED:</b> ${esc(e.message||e)}</div>`}
+    try{const j=await optimize(sel);renderRoute(j.order.map(i=>sel[i]),{miles:j.miles,minutes:j.minutes})}
+    catch(e){out.innerHTML=`<div class="notice"><b>ROUTE NOT CREATED:</b> ${esc(e.message||e)}</div>`}
   };
 
   const baseShowCard=window.showCard;
@@ -195,21 +277,33 @@
     body.querySelector('.visitbox')?.remove();
 
     if(isLocationAuditedGroup(a)){
-      const loc=locationStatus(a);
-      const lbox=document.createElement('div');
+      const loc=locationStatus(a),lbox=document.createElement('div');
       lbox.className='locationbox';
-      lbox.innerHTML=`<h3>LOCATION VERIFICATION</h3><span class="locationstatus ${locationClass(loc)}">${h(locationLabel(loc))}</span><div class="visit-note">Routing is fail-closed for this account group: only audited commercial locations can be selected.</div>`;
+      const correction=a.auditAddressCorrected&&a.originalAddress&&a.originalAddress!==a.address?`<div class="visit-note"><b>Address corrected:</b> ${h(a.originalAddress)} → ${h(a.address)}</div>`:'';
+      const note=a.auditLocationNote?`<div class="visit-note">${h(a.auditLocationNote)}</div>`:'';
+      lbox.innerHTML=`<h3>LOCATION VERIFICATION</h3><span class="locationstatus ${locationClass(loc)}">${h(locationLabel(loc))}</span>${correction}${note}<div class="visit-note">Routing is fail-closed for this account group: only audited commercial locations can be selected.</div>`;
       body.insertBefore(lbox,body.children[1]||null);
     }
 
     if(a.broadType!=='PROSPECT')return;
     const key=accountKey(a);
-    let v=null;
-    try{v=(await call('visit_get',{account_key:key})).visit}catch{}
+    let v=null;try{v=(await call('visit_get',{account_key:key})).visit}catch{}
     const s=v?.status||visitMap.get(key)||'NOT_VISITED';
     const lbox=body.querySelector('.locationbox');
-    const box=document.createElement('div');box.className='visitbox';box.innerHTML=`<h3>VISIT STATUS</h3><span id="cardVisitStatus" class="visitstatus ${statusClass(s)}">${h(statusLabel(s))}</span><div class="visit-note" id="cardVisitMeta">${v?.updated_by_name?`Last changed by ${h(v.updated_by_name)} • ${h(when(v.updated_at))}`:'No visit recorded yet.'}${v?.note?`<br><b>Note:</b> ${h(v.note)}`:''}</div><div class="visit-actions"><button data-vs="NOT_VISITED">NOT VISITED</button><button data-vs="FOLLOW_UP">FOLLOW UP</button><button data-vs="DO_NOT_ROUTE">DO NOT ROUTE</button><button data-vs="NOT_A_FIT">NOT A FIT</button></div><div class="small" style="margin-top:8px">Employee number is optional.</div>`;
+    const box=document.createElement('div');box.className='visitbox';
+    box.innerHTML=`<h3>VISIT STATUS</h3><span id="cardVisitStatus" class="visitstatus ${statusClass(s)}">${h(statusLabel(s))}</span><div class="visit-note" id="cardVisitMeta">${v?.updated_by_name?`Last changed by ${h(v.updated_by_name)} • ${h(when(v.updated_at))}`:'No visit recorded yet.'}${v?.note?`<br><b>Note:</b> ${h(v.note)}`:''}</div><div class="visit-actions"><button data-vs="NOT_VISITED">NOT VISITED</button><button data-vs="FOLLOW_UP">FOLLOW UP</button><button data-vs="DO_NOT_ROUTE">DO NOT ROUTE</button><button data-vs="NOT_A_FIT">NOT A FIT</button></div><div class="small" style="margin-top:8px">Employee number is optional.</div>`;
     if(lbox)body.insertBefore(box,lbox.nextSibling);else body.insertBefore(box,body.children[1]||null);
-    box.querySelectorAll('[data-vs]').forEach(b=>b.onclick=async()=>{const ns=b.dataset.vs;let employee='';if(!token()){const x=prompt('Optional 4-digit employee number. Leave blank to continue:','');if(x===null)return;employee=x.trim();if(employee&&!/^\d{4}$/.test(employee)){alert('Enter 4 digits or leave blank.');return}}const note=prompt('Optional visit note:',v?.note||'');if(note===null)return;try{v=(await call('visit_set',{account_key:key,name:a.name,address:a.address,status:ns,note,employee_number:employee})).visit;visitMap.set(key,ns);a.visitStatus=ns;$('cardVisitStatus').className='visitstatus '+statusClass(ns);$('cardVisitStatus').textContent=statusLabel(ns);$('cardVisitMeta').innerHTML=`Last changed by ${h(v.updated_by_name)} • ${h(when(v.updated_at))}${v.note?`<br><b>Note:</b> ${h(v.note)}`:''}`;alert(ns==='DO_NOT_ROUTE'||ns==='NOT_A_FIT'?'Saved. This prospect will be excluded from future routes.':ns==='FOLLOW_UP'?'Saved as FOLLOW UP.':'Saved.')}catch(e){alert(e.message)}});
+    box.querySelectorAll('[data-vs]').forEach(b=>b.onclick=async()=>{
+      const ns=b.dataset.vs;let employee='';
+      if(!token()){const x=prompt('Optional 4-digit employee number. Leave blank to continue:','');if(x===null)return;employee=x.trim();if(employee&&!/^\d{4}$/.test(employee)){alert('Enter 4 digits or leave blank.');return}}
+      const note=prompt('Optional visit note:',v?.note||'');if(note===null)return;
+      try{
+        v=(await call('visit_set',{account_key:key,name:a.name,address:a.address,status:ns,note,employee_number:employee})).visit;
+        visitMap.set(key,ns);a.visitStatus=ns;
+        $('cardVisitStatus').className='visitstatus '+statusClass(ns);$('cardVisitStatus').textContent=statusLabel(ns);
+        $('cardVisitMeta').innerHTML=`Last changed by ${h(v.updated_by_name)} • ${h(when(v.updated_at))}${v.note?`<br><b>Note:</b> ${h(v.note)}`:''}`;
+        alert(ns==='DO_NOT_ROUTE'||ns==='NOT_A_FIT'?'Saved. This prospect will be excluded from future routes.':ns==='FOLLOW_UP'?'Saved as FOLLOW UP.':'Saved.');
+      }catch(e){alert(e.message)}
+    });
   };
 })();
