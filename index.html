@@ -33,6 +33,7 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:10px;bor
 <div class="panel"><div class="stats"><div class="stat"><strong>79</strong>GO FIRST</div><div class="stat"><strong>11</strong>Verified Prospects</div><div class="stat"><strong>269</strong>Win-Back</div><div class="stat"><strong>154</strong>Active</div><div class="stat"><strong>513</strong>Total</div></div></div>
 
 <div class="panel"><div class="notice" style="border-left-color:#18864b"><b>FREE ROUTING READY:</b> No API key, no Google Cloud account, and no Google routing bill. NWTB uses OpenStreetMap/OSRM road data directly in Edge/Chrome to optimize the stop order, then creates normal Google Maps navigation links.</div></div>
+<div class="panel"><div id="safetyNotice" class="notice" style="border-left-color:#a32222"><b>ROUTE SAFETY FILTER ACTIVE:</b> Loading audit status...</div></div>
 
 <div class="panel"><h2 style="margin-top:0">Build Today's Route</h2>
 <div class="controls">
@@ -48,7 +49,44 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:10px;bor
 
 <script>
 let accounts=[]; const depot={name:"Northwest Trucks - Bolingbrook",address:"201 S W Frontage Rd, Bolingbrook, IL 60440",lat:41.682487,lon:-88.072262}; const MAX_LINK_STOPS=9; let currentRoute=[];
-async function init(){accounts=await (await fetch("./accounts.json")).json()}
+const knownAuditStatus={
+"10225":"MOVED / OLD LOCATION",
+"18331":"DUPLICATE",
+"22855":"DUPLICATE",
+"11811":"MOVED / OLD LOCATION",
+"26505":"DUPLICATE",
+"25941":"DUPLICATE / ALT LOCATION",
+"12039":"MOVED",
+"12038":"DUPLICATE / MOVED",
+"24503":"DUPLICATE",
+"10227":"VERIFIED ACTIVE",
+"10720":"VERIFIED ACTIVE",
+"17772":"VERIFIED ACTIVE",
+"11812":"VERIFIED ACTIVE",
+"24889":"VERIFIED ACTIVE",
+"22663":"VERIFIED ACTIVE",
+"28566":"VERIFIED ACTIVE"
+};
+function auditName(s){return String(s||"").toUpperCase().replace(/[^A-Z0-9 ]/g," ").split(/\s+/).filter(x=>x&&!(["INC","LLC","CORP","CORPORATION","CO","COMPANY","LTD","LIMITED","THE"].includes(x))).join(" ")}
+function applyAuditSafety(){
+  const groups={};
+  accounts.forEach(a=>{const k=auditName(a.name);(groups[k]??=[]).push(a)});
+  const addrRisk=/\b(APT\.?|APARTMENT|UNIT\s+\d+|#\s*\d+|COURT|CT\.?|LANE|LN\.?)\b/i;
+  accounts.forEach(a=>{
+    const id=String(a.customerNumber||"");
+    if(knownAuditStatus[id]) a.auditStatus=knownAuditStatus[id];
+    else if((groups[auditName(a.name)]||[]).length>1) a.auditStatus="HOLD - DUPLICATE REVIEW";
+    else if(addrRisk.test(a.address||"")) a.auditStatus="HOLD - ADDRESS REVIEW";
+    else if(!(a.phone||"").trim()) a.auditStatus="NEEDS REVIEW";
+    else a.auditStatus="PRELIMINARY PASS";
+    a.routeEligible=!(a.auditStatus.startsWith("HOLD")||a.auditStatus.startsWith("MOVED")||a.auditStatus.startsWith("DUPLICATE")||a.auditStatus.startsWith("CLOSED"));
+  });
+  const blocked=accounts.filter(a=>!a.routeEligible).length;
+  const eligible=accounts.length-blocked;
+  const n=document.getElementById("safetyNotice");
+  if(n)n.innerHTML=`<b>ROUTE SAFETY FILTER ACTIVE:</b> ${blocked} audited records are blocked from route selection because they are HOLD, MOVED, DUPLICATE or CLOSED. ${eligible} records remain route-eligible while live verification continues.`;
+}
+async function init(){accounts=await (await fetch("./accounts.json")).json();applyAuditSafety()}
 function rad(x){return x*Math.PI/180} function miles(a,b){const R=3958.7613,dLat=rad(b.lat-a.lat),dLon=rad(b.lon-a.lon),la1=rad(a.lat),la2=rad(b.lat);const h=Math.sin(dLat/2)**2+Math.cos(la1)*Math.cos(la2)*Math.sin(dLon/2)**2;return 2*R*Math.asin(Math.sqrt(h))}
 function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[m]))}
 function objective(a){if(a.accountType.includes("PROSPECT"))return"WIN NEW BUSINESS";if(a.accountType==="WIN-BACK CUSTOMER")return"RECOVER LOST BUSINESS";if(a.accountType==="ACTIVE CUSTOMER")return"PROTECT / GROW ACCOUNT";return"HIGH-PRIORITY EXISTING ACCOUNT"}
@@ -121,7 +159,7 @@ async function freeOptimize(selected){
   return {order:order.map(i=>i-1),miles:milesOut,minutes:minutesOut};
 }
 
-async function buildRoute(){const out=document.getElementById("output"),t=document.getElementById("routeType").value,radius=+document.getElementById("radius").value;let n=Math.max(1,Math.min(25,+document.getElementById("stopCount").value||10));let cand=accounts.filter(filterFn(t)).filter(a=>radius>=999||miles(depot,a)<=radius);if(!cand.length)return alert("No eligible accounts matched.");n=Math.min(n,cand.length);const selected=t==="mixed"?selectMixed(cand,n):selectCluster(cand,n,t);out.style.display="block";out.innerHTML='<div class="notice"><b>FREE ROAD OPTIMIZATION...</b> Calculating road-based stop order with OpenStreetMap / OSRM.</div>';let j;try{j=await freeOptimize(selected)}catch(err){out.innerHTML=`<div class="notice"><b>ROUTE NOT CREATED:</b> ${esc(err.message||err)}</div>`;return}const order=j.order.map(i=>selected[i]);currentRoute=order;const p=order.filter(a=>a.broadType==="PROSPECT").length,e=order.length-p,g=order.filter(a=>a.layer==="GO FIRST").length,links=mapsLinks(order);const rows=order.map((a,i)=>`<tr><td><b>${i+1}</b></td><td><div class="stopname">${esc(a.name)}</div><div class="small">${esc(a.address)}</div></td><td><span class="badge ${a.badge}">${esc(a.accountType)}</span></td><td>${a.customerNumber?"#"+esc(a.customerNumber):"—"}</td><td><b>${esc(objective(a))}</b></td><td><button class="cardbtn" onclick="showCard(${i})">STOP CARD</button></td></tr>`).join("");out.innerHTML=`<h2>Today's Free Road-Optimized Route</h2><div>${links.map(x=>`<a class="routebtn" target="_blank" href="${x.url}">${x.label}</a>`).join("")}</div><div class="notice" style="margin-top:12px"><b>FREE ROAD OPTIMIZED:</b> ${order.length} stops • ${p} prospects / ${e} existing • ${g} GO FIRST • ${j.miles??"—"} road miles • ${j.minutes??"—"} estimated minutes.</div><table><thead><tr><th>Stop</th><th>Business</th><th>Account Type</th><th>Customer #</th><th>Call Objective</th><th>Brief</th></tr></thead><tbody>${rows}</tbody></table>`}
+async function buildRoute(){const out=document.getElementById("output"),t=document.getElementById("routeType").value,radius=+document.getElementById("radius").value;let n=Math.max(1,Math.min(25,+document.getElementById("stopCount").value||10));let cand=accounts.filter(a=>a.routeEligible!==false).filter(filterFn(t)).filter(a=>radius>=999||miles(depot,a)<=radius);if(!cand.length)return alert("No eligible accounts matched.");n=Math.min(n,cand.length);const selected=t==="mixed"?selectMixed(cand,n):selectCluster(cand,n,t);out.style.display="block";out.innerHTML='<div class="notice"><b>FREE ROAD OPTIMIZATION...</b> Calculating road-based stop order with OpenStreetMap / OSRM.</div>';let j;try{j=await freeOptimize(selected)}catch(err){out.innerHTML=`<div class="notice"><b>ROUTE NOT CREATED:</b> ${esc(err.message||err)}</div>`;return}const order=j.order.map(i=>selected[i]);currentRoute=order;const p=order.filter(a=>a.broadType==="PROSPECT").length,e=order.length-p,g=order.filter(a=>a.layer==="GO FIRST").length,links=mapsLinks(order);const rows=order.map((a,i)=>`<tr><td><b>${i+1}</b></td><td><div class="stopname">${esc(a.name)}</div><div class="small">${esc(a.address)}</div></td><td><span class="badge ${a.badge}">${esc(a.accountType)}</span></td><td>${a.customerNumber?"#"+esc(a.customerNumber):"—"}</td><td><b>${esc(objective(a))}</b></td><td><button class="cardbtn" onclick="showCard(${i})">STOP CARD</button></td></tr>`).join("");out.innerHTML=`<h2>Today's Free Road-Optimized Route</h2><div>${links.map(x=>`<a class="routebtn" target="_blank" href="${x.url}">${x.label}</a>`).join("")}</div><div class="notice" style="margin-top:12px"><b>FREE ROAD OPTIMIZED:</b> ${order.length} stops • ${p} prospects / ${e} existing • ${g} GO FIRST • ${j.miles??"—"} road miles • ${j.minutes??"—"} estimated minutes.</div><table><thead><tr><th>Stop</th><th>Business</th><th>Account Type</th><th>Customer #</th><th>Call Objective</th><th>Brief</th></tr></thead><tbody>${rows}</tbody></table>`}
 function note(a){if(a.accountType==="GO FIRST - PROSPECT")return"PROSPECT — NEW BUSINESS. Verify buyer, fleet, current supplier, Freightliner presence, parts needs and quote opportunity.";if(a.accountType==="VERIFIED PROSPECT")return"PROSPECT — NEW BUSINESS. Qualified prospect; confirm buyer, fleet, supplier, needs and follow-up.";if(a.accountType==="WIN-BACK CUSTOMER")return"EXISTING CUSTOMER — WIN-BACK. Do not create a duplicate customer account. Recover lost or inactive parts business.";if(a.accountType==="ACTIVE CUSTOMER")return(a.activityReason?("EXISTING CUSTOMER — "+a.activityReason+". Protect and grow the relationship; this account was removed from WIN-BACK because current service/back-counter activity was found."):"EXISTING CUSTOMER — ACTIVE. Protect and grow share-of-wallet and additional parts opportunities.");return"EXISTING CUSTOMER — GO FIRST. High-priority existing account; do not treat as a cold prospect."}
-function showCard(i){const a=currentRoute[i],top=document.getElementById("modalTop");top.className="modal-top "+a.badge;document.getElementById("modalBadge").innerHTML=`<span class="badge ${a.badge}">${esc(a.accountType)}</span>`;document.getElementById("modalName").textContent=a.name;document.getElementById("modalWarning").textContent=a.broadType==="PROSPECT"?"⚠ THIS IS A PROSPECT — NEW BUSINESS":"✓ THIS IS AN EXISTING NWTB CUSTOMER";const f=[["Address",a.address],["Customer #",a.customerNumber||"No current NWTB customer number"],["Phone",a.phone||"—"],["Planning Score",a.planningScore],["Sales Fit",a.salesFit||"—"],["Priority",a.priority||"—"],["Power Units",a.powerUnits??"—"],["Last Positive Sale",a.lastPositiveSale||"—"]];document.getElementById("modalGrid").innerHTML=f.map(x=>`<div><b>${esc(x[0])}</b><br>${esc(x[1])}</div>`).join("");document.getElementById("modalNote").textContent=note(a);document.getElementById("modal").style.display="block"} function closeModal(){document.getElementById("modal").style.display="none"} init();
+function showCard(i){const a=currentRoute[i],top=document.getElementById("modalTop");top.className="modal-top "+a.badge;document.getElementById("modalBadge").innerHTML=`<span class="badge ${a.badge}">${esc(a.accountType)}</span>`;document.getElementById("modalName").textContent=a.name;document.getElementById("modalWarning").textContent=a.broadType==="PROSPECT"?"⚠ THIS IS A PROSPECT — NEW BUSINESS":"✓ THIS IS AN EXISTING NWTB CUSTOMER";const f=[["Address",a.address],["Customer #",a.customerNumber||"No current NWTB customer number"],["Phone",a.phone||"—"],["Planning Score",a.planningScore],["Sales Fit",a.salesFit||"—"],["Priority",a.priority||"—"],["Power Units",a.powerUnits??"—"],["Last Positive Sale",a.lastPositiveSale||"—"],["Audit Status",a.auditStatus||"—"]];document.getElementById("modalGrid").innerHTML=f.map(x=>`<div><b>${esc(x[0])}</b><br>${esc(x[1])}</div>`).join("");document.getElementById("modalNote").textContent=note(a);document.getElementById("modal").style.display="block"} function closeModal(){document.getElementById("modal").style.display="none"} init();
 </script></body></html>
