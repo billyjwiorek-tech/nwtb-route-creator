@@ -113,6 +113,32 @@
     return Number.isFinite(lat)&&Number.isFinite(lon)?encodeURIComponent(`${lat.toFixed(6)},${lon.toFixed(6)}`):'';
   };
 
+  // Clear Google Maps labels. Desktop opens a route preview; a phone can hand the
+  // same URL to the Google Maps app for turn-by-turn navigation.
+  window.mapsLinks=function(order){
+    const out=[];
+    if(order.length<=9){
+      out.push({
+        label:'OPEN IN GOOGLE MAPS — FULL ROUND TRIP + RETURN TO NWTB',
+        url:`https://www.google.com/maps/dir/?api=1&origin=${enc(depot)}&destination=${enc(depot)}&travelmode=driving&dir_action=navigate&waypoints=${order.map(enc).join('%7C')}`
+      });
+      return out;
+    }
+    let i=0,start=depot,part=1;
+    while(i<order.length){
+      const take=Math.min(9,order.length-i),chunk=order.slice(i,i+take),last=i+take>=order.length;
+      const dest=last?depot:chunk[chunk.length-1],wps=last?chunk:chunk.slice(0,-1);
+      out.push({
+        label:last
+          ?`PART ${part} — OPEN IN GOOGLE MAPS — STOPS ${i+1}-${i+take} + RETURN TO NWTB`
+          :`PART ${part} — OPEN IN GOOGLE MAPS — STOPS ${i+1}-${i+take}`,
+        url:`https://www.google.com/maps/dir/?api=1&origin=${enc(start)}&destination=${enc(dest)}&travelmode=driving&dir_action=navigate${wps.length?'&waypoints='+wps.map(enc).join('%7C'):''}`
+      });
+      start=dest;i+=take;part++;
+    }
+    return out;
+  };
+
   function locationStatus(a){
     if(a?.broadType==='PROSPECT'){
       const addr=auditNorm(a?.address);
@@ -345,7 +371,7 @@
       const out=$('output'),notice=out?.querySelector('.notice'),table=out?.querySelector('table');
       if(notice){
         const efficiency=meta.efficiencyFirst?' <b>NEW BUSINESS RULE:</b> Customer selection is efficiency-first.':'';
-        notice.innerHTML+=`<br><b>ROUND TRIP:</b> Start at Northwest Trucks – Bolingbrook → customer stops → <b>FINAL STOP: Northwest Trucks – Bolingbrook</b>.${efficiency}`;
+        notice.innerHTML+=`<br><b>ROUND TRIP:</b> Start at Northwest Trucks – Bolingbrook → customer stops → <b>FINAL STOP: Northwest Trucks – Bolingbrook</b>.${efficiency}<br><b>GOOGLE MAPS:</b> On a desktop, each button opens a route preview. On a phone, open the button in the Google Maps app for turn-by-turn navigation. If the route has multiple PARTS, run them in order; the final PART returns to NWTB.`;
       }
       if(table&&!table.querySelector('[data-nwtb-return="1"]')){
         const tr=document.createElement('tr');
