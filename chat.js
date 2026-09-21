@@ -7,6 +7,47 @@
   const when=s=>{const d=new Date(s);return isNaN(d)?'':d.toLocaleString()};
   let chatTimer=null;
   const visitMap=new Map();
+
+  // FAIL-CLOSED PROSPECT LOCATION AUDIT.
+  // Only the exact prospect records audited as commercial below may route.
+  // Any new or changed prospect automatically becomes UNCERTAIN — HOLD until audited.
+  const auditNorm=s=>String(s||'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim().replace(/\s+/g,' ');
+  const auditKey=a=>auditNorm(a?.name)+'|'+auditNorm(a?.address);
+  const COMMERCIAL_PROSPECT_KEYS=new Set([
+    'ROGUE CARRIER INC|1312 MARQUETTE DR UNIT E ROMEOVILLE IL 60446',
+    'BSL EXPRESS TRUCKING INC|1316 MARQUETTE DR ROMEOVILLE IL 60446',
+    'TRUCK SERVICE POINT TRAILER SHOP|110 ANTON DR ROMEOVILLE IL 60446',
+    'WILL COUNTY TRAILER REPAIR|1337 N ABBOTT RD ROMEOVILLE IL 60446',
+    'BESTDRIVE COMMERCIAL TIRE CENTER|595 E S FRONTAGE RD BOLINGBROOK IL 60440',
+    'CENTRAL FLEET REPAIR|675 PHELPS AVE ROMEOVILLE IL 60446',
+    'GO NEAL LOGISTICS INC|1352 ENTERPRISE DR UNIT A ROMEOVILLE IL 60446',
+    'TRANS QUALITY INC|465 CROSSROADS PKWY BOLINGBROOK IL 60440',
+    'SELECT ONE INC|215 REMINGTON BLVD SUITE C BOLINGBROOK IL 60440',
+    'USA LOGISTICS INC|3550 HOBSON RD STE 104 WOODRIDGE IL 60517',
+    'INNOVATIVE INTERMODAL INC|940 S FRONTAGE RD SUITE 2000 WOODRIDGE IL 60517',
+    'ALTEX TRANSPORTATION INC|11295 LEMONT RD LEMONT IL 60439',
+    'AMERO LINE LLC|13769 MAIN ST SUITE 102 LEMONT IL 60439',
+    'ASAP TRANS CORP|15120 E 127TH ST LEMONT IL 60439',
+    'MARK IT EXPRESS LOGISTICS LLC|13555 MAIN ST LEMONT IL 60439',
+    'BENTOS INC|400 N SCHMIDT RD SUITE 206 BOLINGBROOK IL 60440',
+    'HEGELMANN USA|1124 WINDHAM PKWY ROMEOVILLE IL 60446',
+    'KOROL TRUCKING INC|1336 ENTERPRISE DR UNIT 107 ROMEOVILLE IL 60446',
+    'DAB TRUCKING SERVICES COMPANY|1407 CATON FARM RD LOCKPORT IL 60441',
+    'ROLAND MACHINERY|220 E S FRONTAGE RD BOLINGBROOK IL 60440',
+    'JRV LOGISTICS|1000 S HAMILTON ST STE G LOCKPORT IL 60441',
+    'CLASSIC HEAVY DUTY TOWING|10119 CLOW CREEK RD B PLAINFIELD IL 60585',
+    'WOLFDOM EXPRESS INC|1999 75TH ST UNIT 200 WOODRIDGE IL 60517',
+    'EDWARD DON COMPANY LLC|9801 ADAM DON PKWY WOODRIDGE IL 60517',
+    'FLYWAY SERVICE LLC|19464 W ARPT RD ROMEOVILLE IL 60446',
+    'LNG HOLDING LOAD N GO INC|534 TERRITORIAL DR STE B BOLINGBROOK IL 60440',
+    'U K A TRANSPORTATION LLC|125 W BOUGHTON RD BOLINGBROOK IL 60440',
+    'PRESTIGE HAULING|13769 MAIN ST 110 LEMONT IL 60439',
+    'TFORCE WORLDWIDE|1000 WINDHAM PKWY ROMEOVILLE IL 60446',
+    'F T TRANSPORT CORP|101 ROYCE RD 18 BOLINGBROOK IL 60440',
+    'DIJ CORP|1300 LAKEVIEW DR ROMEOVILLE IL 60446',
+    'GREAT DANE CHICAGO|699 E S FRONTAGE RD BOLINGBROOK IL 60440',
+    'HURSTHOUSE LANDSCAPE|751 N BOLINGBROOK DR 21 BOLINGBROOK IL 60440'
+  ]);
   const RESIDENTIAL_ADDRESS_PARTS=[
     '1381 LILY CACHE LN',
     '1373 LILY CACHE LN',
@@ -18,15 +59,46 @@
     '104 WILLIAMSBURG LN',
     '1799 HELEN DR'
   ];
-  const isVerifiedResidential=a=>RESIDENTIAL_ADDRESS_PARTS.some(x=>String(a?.address||'').toUpperCase().includes(x));
-  function enforceResidentialBlocks(){try{accounts.forEach(a=>{if(isVerifiedResidential(a)){a.routeEligible=false;a.locationVerification='RESIDENTIAL — DO NOT ROUTE'}})}catch{}}
+  function prospectLocationStatus(a){
+    if(a?.broadType!=='PROSPECT')return 'NOT_APPLICABLE';
+    const addr=auditNorm(a?.address);
+    if(RESIDENTIAL_ADDRESS_PARTS.some(x=>addr.includes(auditNorm(x))))return 'RESIDENTIAL_DO_NOT_ROUTE';
+    if(COMMERCIAL_PROSPECT_KEYS.has(auditKey(a)))return 'COMMERCIAL_ROUTE_OK';
+    return 'UNCERTAIN_HOLD';
+  }
+  function locationLabel(s){return s==='COMMERCIAL_ROUTE_OK'?'COMMERCIAL — ROUTE OK':s==='RESIDENTIAL_DO_NOT_ROUTE'?'RESIDENTIAL — DO NOT ROUTE':s==='UNCERTAIN_HOLD'?'UNCERTAIN — HOLD':'NOT APPLICABLE'}
+  function locationClass(s){return s==='COMMERCIAL_ROUTE_OK'?'loc-ok':s==='RESIDENTIAL_DO_NOT_ROUTE'?'loc-stop':'loc-hold'}
+  function enforceLocationVerification(){
+    try{
+      accounts.forEach(a=>{
+        if(a.broadType==='PROSPECT'){
+          const s=prospectLocationStatus(a);
+          a.locationVerification=locationLabel(s);
+          if(s!=='COMMERCIAL_ROUTE_OK')a.routeEligible=false;
+        }
+      });
+      updateAuditNotice();
+    }catch{}
+  }
+  function updateAuditNotice(){
+    try{
+      const p=accounts.filter(a=>a.broadType==='PROSPECT');
+      const commercial=p.filter(a=>prospectLocationStatus(a)==='COMMERCIAL_ROUTE_OK').length;
+      const residential=p.filter(a=>prospectLocationStatus(a)==='RESIDENTIAL_DO_NOT_ROUTE').length;
+      const hold=p.filter(a=>prospectLocationStatus(a)==='UNCERTAIN_HOLD').length;
+      const go=p.filter(a=>a.layer==='GO FIRST');
+      const vp=p.filter(a=>a.layer==='VERIFIED PROSPECTS');
+      const n=$('safetyNotice');
+      if(n)n.innerHTML=`<b>PROSPECT LOCATION SAFETY GATE:</b> ${commercial} audited commercial prospects approved • ${residential} residential prospects blocked • ${hold} uncertain prospects held. GO FIRST prospects: ${go.filter(a=>prospectLocationStatus(a)==='COMMERCIAL_ROUTE_OK').length} route OK / ${go.filter(a=>prospectLocationStatus(a)==='RESIDENTIAL_DO_NOT_ROUTE').length} residential blocked. Verified Prospects: ${vp.filter(a=>prospectLocationStatus(a)==='COMMERCIAL_ROUTE_OK').length} route OK / ${vp.filter(a=>prospectLocationStatus(a)==='RESIDENTIAL_DO_NOT_ROUTE').length} residential blocked. <b>Any new or changed prospect is automatically HOLD until verified commercial.</b>`;
+    }catch{}
+  }
 
   const css=`
   button[onclick="openRouteXLAllStops()"]{display:none!important}
   #nwtbChatBtn{position:fixed;right:22px;bottom:22px;z-index:60;background:#17202a;color:#fff;border:0;border-radius:999px;padding:14px 18px;font-weight:800;box-shadow:0 6px 20px #0004;cursor:pointer}
   #nwtbChatPanel{position:fixed;right:22px;bottom:82px;width:min(420px,calc(100vw - 30px));height:min(650px,calc(100vh - 120px));z-index:59;background:#fff;border:1px solid #cfd6dd;border-radius:14px;box-shadow:0 10px 36px #0005;display:none;overflow:hidden}
   #nwtbChatPanel.open{display:flex;flex-direction:column}.nwtb-chat-head{background:#17202a;color:#fff;padding:13px 15px;display:flex;justify-content:space-between;align-items:center}.nwtb-chat-head button{background:#fff2;color:#fff;padding:6px 9px}.nwtb-chat-login{padding:20px}.nwtb-chat-login input{margin:9px 0}.nwtb-chat-login button{width:100%;background:#17202a;color:#fff}.nwtb-chat-body{display:none;flex:1;min-height:0}.nwtb-chat-body.on{display:flex;flex-direction:column}.nwtb-chat-who{padding:9px 12px;background:#eef2f6;border-bottom:1px solid #d9dee4;font-size:13px}.nwtb-chat-messages{flex:1;overflow:auto;padding:12px;background:#f7f9fb}.nwtb-msg{background:#fff;border:1px solid #d9dee4;border-radius:10px;padding:9px 10px;margin-bottom:9px}.nwtb-msg .meta{font-size:12px;color:#65717c;margin-bottom:5px}.nwtb-msg.route{border-left:5px solid #1a73e8}.nwtb-load-route{background:#1a73e8;color:#fff;padding:8px 10px}.nwtb-chat-send{padding:10px;border-top:1px solid #d9dee4}.nwtb-chat-send textarea{width:100%;height:68px;resize:none;padding:9px;border:1px solid #bcc6cf;border-radius:8px;font:inherit}.nwtb-chat-actions{display:flex;gap:7px;margin-top:7px}.nwtb-chat-actions button{flex:1}.nwtb-send-msg{background:#17202a;color:#fff}.nwtb-send-route{background:#18864b;color:#fff}.nwtb-chat-error{color:#b3261e;font-weight:700;font-size:13px;margin-top:7px}
-  .visitbox{margin-top:16px;padding:14px;border:2px solid #d9dee4;border-radius:10px;background:#f8fafb}.visitbox h3{margin:0 0 8px}.visitstatus{display:inline-block;padding:6px 10px;border-radius:999px;font-weight:800;font-size:12px}.vs-not{background:#e7eaee;color:#263238}.vs-follow{background:#fff2b3;color:#6b5500}.vs-stop{background:#ffd9d9;color:#8e1b1b}.visit-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px}.visit-actions button{padding:9px}.visit-note{margin-top:8px;font-size:12px;color:#52606d}.follow-toggle{margin-top:10px;font-size:13px;font-weight:700}.follow-toggle input{width:auto;margin-right:6px}`;
+  .visitbox,.locationbox{margin-top:16px;padding:14px;border:2px solid #d9dee4;border-radius:10px;background:#f8fafb}.visitbox h3,.locationbox h3{margin:0 0 8px}.visitstatus,.locationstatus{display:inline-block;padding:6px 10px;border-radius:999px;font-weight:800;font-size:12px}.vs-not{background:#e7eaee;color:#263238}.vs-follow{background:#fff2b3;color:#6b5500}.vs-stop{background:#ffd9d9;color:#8e1b1b}.loc-ok{background:#d8f3df;color:#0c5d2e}.loc-hold{background:#fff2b3;color:#6b5500}.loc-stop{background:#ffd9d9;color:#8e1b1b}.visit-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px}.visit-actions button{padding:9px}.visit-note{margin-top:8px;font-size:12px;color:#52606d}.follow-toggle{margin-top:10px;font-size:13px;font-weight:700}.follow-toggle input{width:auto;margin-right:6px}`;
   const st=document.createElement('style');st.textContent=css;document.head.appendChild(st);
 
   const panel=document.createElement('div');panel.id='nwtbChatPanel';panel.innerHTML=`<div class="nwtb-chat-head"><b>NWTB CHAT + ROUTES</b><button id="nwtbChatClose">X</button></div><div id="nwtbChatLogin" class="nwtb-chat-login"><b>Enter your 4-digit employee number</b><input id="nwtbEmpNo" inputmode="numeric" maxlength="4" placeholder="0000"><button id="nwtbLoginBtn">ENTER CHAT</button><div id="nwtbLoginError" class="nwtb-chat-error"></div></div><div id="nwtbChatBody" class="nwtb-chat-body"><div class="nwtb-chat-who"><span id="nwtbWho"></span><button id="nwtbLogoutBtn" style="float:right;padding:3px 7px">LOG OUT</button></div><div id="nwtbMessages" class="nwtb-chat-messages"></div><div class="nwtb-chat-send"><textarea id="nwtbMessageText" placeholder="Type a message..."></textarea><div class="nwtb-chat-actions"><button class="nwtb-send-msg" id="nwtbSendMsg">SEND MESSAGE</button><button class="nwtb-send-route" id="nwtbSendRoute">SEND CURRENT ROUTE</button></div><div id="nwtbChatError" class="nwtb-chat-error"></div></div></div>`;document.body.appendChild(panel);
@@ -37,33 +109,59 @@
   function clearIdentity(){localStorage.removeItem('nwtb_chat_token');localStorage.removeItem('nwtb_chat_name')}
   function showLoggedIn(name){$('nwtbChatLogin').style.display='none';$('nwtbChatBody').classList.add('on');$('nwtbWho').textContent='Signed in as '+name;loadMessages();if(chatTimer)clearInterval(chatTimer);chatTimer=setInterval(()=>{if(panel.classList.contains('open'))loadMessages(true)},5000)}
   function showLoggedOut(){$('nwtbChatBody').classList.remove('on');$('nwtbChatLogin').style.display='block';if(chatTimer){clearInterval(chatTimer);chatTimer=null}}
-  async function login(){const n=$('nwtbEmpNo').value.trim();$('nwtbLoginError').textContent='';if(!/^\d{4}$/.test(n)){ $('nwtbLoginError').textContent='Enter exactly 4 digits.';return}try{const j=await call('login',{employee_number:n});setIdentity(j.token,j.display_name);showLoggedIn(j.display_name)}catch(e){$('nwtbLoginError').textContent=e.message}}
+  async function login(){const n=$('nwtbEmpNo').value.trim();$('nwtbLoginError').textContent='';if(!/^\d{4}$/.test(n)){$('nwtbLoginError').textContent='Enter exactly 4 digits.';return}try{const j=await call('login',{employee_number:n});setIdentity(j.token,j.display_name);showLoggedIn(j.display_name)}catch(e){$('nwtbLoginError').textContent=e.message}}
   async function restore(){if(!token())return showLoggedOut();try{const j=await call('whoami');showLoggedIn(j.display_name)}catch{clearIdentity();showLoggedOut()}}
   async function loadMessages(quiet=false){try{const j=await call('list');const box=$('nwtbMessages');box.innerHTML=(j.messages||[]).map(m=>m.message_type==='route'?`<div class="nwtb-msg route"><div class="meta"><b>${h(m.display_name)}</b> - ${h(when(m.created_at))}</div><b>${h(m.route_payload?.title||'NWTB Sales Route')}</b><div>${(m.route_payload?.stops||[]).length} stops</div><button class="nwtb-load-route" data-id="${m.id}">LOAD ROUTE</button></div>`:`<div class="nwtb-msg"><div class="meta"><b>${h(m.display_name)}</b> - ${h(when(m.created_at))}</div>${h(m.body||'')}</div>`).join('');(j.messages||[]).filter(m=>m.message_type==='route').forEach(m=>{const b=box.querySelector(`[data-id="${m.id}"]`);if(b)b.onclick=()=>{currentRoute=(m.route_payload?.stops||[]).map(s=>({...s}));renderRoute(currentRoute,{shared:true});panel.classList.remove('open')}});if(!quiet)box.scrollTop=box.scrollHeight}catch(e){if(!quiet)$('nwtbChatError').textContent=e.message}}
   async function sendText(){const body=$('nwtbMessageText').value.trim();if(!body)return;try{await call('send_text',{body});$('nwtbMessageText').value='';loadMessages()}catch(e){$('nwtbChatError').textContent=e.message}}
   async function sendRoute(){if(!currentRoute?.length){$('nwtbChatError').textContent='Create a route first.';return}try{await call('send_route',{route_payload:{title:'NWTB Sales Route - '+currentRoute.length+' Stops',stops:currentRoute,route_type:$('routeType')?.value||null,radius:$('radius')?.value||null}});loadMessages();alert('Route sent to NWTB Chat.')}catch(e){$('nwtbChatError').textContent=e.message}}
 
-  chatBtn.onclick=()=>{panel.classList.toggle('open');if(panel.classList.contains('open'))restore()};$('nwtbChatClose').onclick=()=>panel.classList.remove('open');$('nwtbLoginBtn').onclick=login;$('nwtbEmpNo').onkeydown=e=>{if(e.key==='Enter')login()};$('nwtbSendMsg').onclick=sendText;$('nwtbSendRoute').onclick=sendRoute;$('nwtbLogoutBtn').onclick=async()=>{try{await call('logout')}catch{}clearIdentity();showLoggedOut()};
+  chatBtn.onclick=()=>{panel.classList.toggle('open');if(panel.classList.contains('open'))restore()};
+  $('nwtbChatClose').onclick=()=>panel.classList.remove('open');
+  $('nwtbLoginBtn').onclick=login;
+  $('nwtbEmpNo').onkeydown=e=>{if(e.key==='Enter')login()};
+  $('nwtbSendMsg').onclick=sendText;
+  $('nwtbSendRoute').onclick=sendRoute;
+  $('nwtbLogoutBtn').onclick=async()=>{try{await call('logout')}catch{}clearIdentity();showLoggedOut()};
 
   function accountKey(a){const cn=String(a?.customerNumber||'').trim();return cn?'CUST:'+cn:'ADDR:'+String(a?.name||'').trim().toUpperCase()+'|'+String(a?.address||'').trim().toUpperCase()}
   function statusLabel(s){return s==='FOLLOW_UP'?'VISITED — FOLLOW UP':s==='DO_NOT_ROUTE'?'VISITED — DO NOT ROUTE':s==='NOT_A_FIT'?'NOT A FIT / DO NOT CALL':'NOT VISITED'}
   function statusClass(s){return s==='FOLLOW_UP'?'vs-follow':(s==='DO_NOT_ROUTE'||s==='NOT_A_FIT')?'vs-stop':'vs-not'}
-  async function refreshVisitMap(){try{const j=await call('visit_list');visitMap.clear();(j.statuses||[]).forEach(x=>visitMap.set(x.account_key,x.status));accounts.forEach(a=>a.visitStatus=visitMap.get(accountKey(a))||'NOT_VISITED');enforceResidentialBlocks()}catch(e){console.warn(e)}}
-  setTimeout(()=>{enforceResidentialBlocks();refreshVisitMap()},500);
+  async function refreshVisitMap(){try{const j=await call('visit_list');visitMap.clear();(j.statuses||[]).forEach(x=>visitMap.set(x.account_key,x.status));accounts.forEach(a=>a.visitStatus=visitMap.get(accountKey(a))||'NOT_VISITED');enforceLocationVerification()}catch(e){console.warn(e)}}
+  function waitForAccounts(tries=0){try{if(accounts?.length){enforceLocationVerification();refreshVisitMap();return}}catch{}if(tries<30)setTimeout(()=>waitForAccounts(tries+1),200)}
+  waitForAccounts();
 
   if(!document.getElementById('includeFollowUps')){const div=document.createElement('div');div.className='follow-toggle';div.innerHTML='<label><input id="includeFollowUps" type="checkbox"> Include VISITED — FOLLOW UP prospects</label>';$('routeType')?.closest('.panel')?.appendChild(div)}
 
   window.buildRoute=async function(){
+    enforceLocationVerification();
     const out=$('output'),t=$('routeType').value,r=+$('radius').value,includeFollow=$('includeFollowUps')?.checked;
     let n=Math.max(1,Math.min(25,+$('stopCount').value||10));
-    let cand=accounts.filter(a=>a.routeEligible).filter(a=>!isVerifiedResidential(a)).filter(filterFn(t)).filter(a=>r>=999||miles(depot,a)<=r);
+    let cand=accounts.filter(a=>a.routeEligible)
+      .filter(a=>a.broadType!=='PROSPECT'||prospectLocationStatus(a)==='COMMERCIAL_ROUTE_OK')
+      .filter(filterFn(t))
+      .filter(a=>r>=999||miles(depot,a)<=r);
     cand=cand.filter(a=>{if(a.broadType!=='PROSPECT')return true;const s=visitMap.get(accountKey(a))||'NOT_VISITED';if(s==='DO_NOT_ROUTE'||s==='NOT_A_FIT')return false;if((t==='new_business'||t==='prospects_regular')&&s==='FOLLOW_UP'&&!includeFollow)return false;return true});
-    if(!cand.length){alert('No eligible accounts matched.');return}
-    n=Math.min(n,cand.length);const sel=t==='mixed'?selectMixed(cand,n):selectCluster(cand,n,t);
+    if(!cand.length){alert('No eligible audited-commercial accounts matched.');return}
+    n=Math.min(n,cand.length);
+    const sel=t==='mixed'?selectMixed(cand,n):selectCluster(cand,n,t);
     out.style.display='block';out.innerHTML='<b>Optimizing...</b>';
     try{const j=await optimize(sel);renderRoute(j.order.map(i=>sel[i]),{miles:j.miles,minutes:j.minutes})}catch(e){out.innerHTML=`<div class="notice"><b>ROUTE NOT CREATED:</b> ${esc(e.message||e)}</div>`}
   };
 
   const baseShowCard=window.showCard;
-  window.showCard=async function(i){baseShowCard(i);const a=currentRoute[i];if(!a||a.broadType!=='PROSPECT')return;const key=accountKey(a);let v=null;try{v=(await call('visit_get',{account_key:key})).visit}catch{}const s=v?.status||visitMap.get(key)||'NOT_VISITED';const body=document.querySelector('#modal .modal-body');if(!body)return;body.querySelector('.visitbox')?.remove();const box=document.createElement('div');box.className='visitbox';box.innerHTML=`<h3>VISIT STATUS</h3><span id="cardVisitStatus" class="visitstatus ${statusClass(s)}">${h(statusLabel(s))}</span><div class="visit-note" id="cardVisitMeta">${v?.updated_by_name?`Last changed by ${h(v.updated_by_name)} • ${h(when(v.updated_at))}`:'No visit recorded yet.'}${v?.note?`<br><b>Note:</b> ${h(v.note)}`:''}</div><div class="visit-actions"><button data-vs="NOT_VISITED">NOT VISITED</button><button data-vs="FOLLOW_UP">FOLLOW UP</button><button data-vs="DO_NOT_ROUTE">DO NOT ROUTE</button><button data-vs="NOT_A_FIT">NOT A FIT</button></div><div class="small" style="margin-top:8px">Employee number is optional.</div>`;body.insertBefore(box,body.children[1]||null);box.querySelectorAll('[data-vs]').forEach(b=>b.onclick=async()=>{const ns=b.dataset.vs;let employee='';if(!token()){const x=prompt('Optional 4-digit employee number. Leave blank to continue:','');if(x===null)return;employee=x.trim();if(employee&&!/^\d{4}$/.test(employee)){alert('Enter 4 digits or leave blank.');return}}const note=prompt('Optional visit note:',v?.note||'');if(note===null)return;try{v=(await call('visit_set',{account_key:key,name:a.name,address:a.address,status:ns,note,employee_number:employee})).visit;visitMap.set(key,ns);a.visitStatus=ns;$('cardVisitStatus').className='visitstatus '+statusClass(ns);$('cardVisitStatus').textContent=statusLabel(ns);$('cardVisitMeta').innerHTML=`Last changed by ${h(v.updated_by_name)} • ${h(when(v.updated_at))}${v.note?`<br><b>Note:</b> ${h(v.note)}`:''}`;alert(ns==='DO_NOT_ROUTE'||ns==='NOT_A_FIT'?'Saved. This prospect will be excluded from future routes.':ns==='FOLLOW_UP'?'Saved as FOLLOW UP.':'Saved.')}catch(e){alert(e.message)}})};
+  window.showCard=async function(i){
+    baseShowCard(i);
+    const a=currentRoute[i];
+    if(!a||a.broadType!=='PROSPECT')return;
+    const key=accountKey(a),loc=prospectLocationStatus(a);
+    let v=null;
+    try{v=(await call('visit_get',{account_key:key})).visit}catch{}
+    const s=v?.status||visitMap.get(key)||'NOT_VISITED';
+    const body=document.querySelector('#modal .modal-body');if(!body)return;
+    body.querySelector('.locationbox')?.remove();
+    body.querySelector('.visitbox')?.remove();
+    const lbox=document.createElement('div');lbox.className='locationbox';lbox.innerHTML=`<h3>LOCATION VERIFICATION</h3><span class="locationstatus ${locationClass(loc)}">${h(locationLabel(loc))}</span><div class="visit-note">Prospect routing is fail-closed: only audited commercial locations can be selected for a new route.</div>`;body.insertBefore(lbox,body.children[1]||null);
+    const box=document.createElement('div');box.className='visitbox';box.innerHTML=`<h3>VISIT STATUS</h3><span id="cardVisitStatus" class="visitstatus ${statusClass(s)}">${h(statusLabel(s))}</span><div class="visit-note" id="cardVisitMeta">${v?.updated_by_name?`Last changed by ${h(v.updated_by_name)} • ${h(when(v.updated_at))}`:'No visit recorded yet.'}${v?.note?`<br><b>Note:</b> ${h(v.note)}`:''}</div><div class="visit-actions"><button data-vs="NOT_VISITED">NOT VISITED</button><button data-vs="FOLLOW_UP">FOLLOW UP</button><button data-vs="DO_NOT_ROUTE">DO NOT ROUTE</button><button data-vs="NOT_A_FIT">NOT A FIT</button></div><div class="small" style="margin-top:8px">Employee number is optional.</div>`;body.insertBefore(box,lbox.nextSibling);
+    box.querySelectorAll('[data-vs]').forEach(b=>b.onclick=async()=>{const ns=b.dataset.vs;let employee='';if(!token()){const x=prompt('Optional 4-digit employee number. Leave blank to continue:','');if(x===null)return;employee=x.trim();if(employee&&!/^\d{4}$/.test(employee)){alert('Enter 4 digits or leave blank.');return}}const note=prompt('Optional visit note:',v?.note||'');if(note===null)return;try{v=(await call('visit_set',{account_key:key,name:a.name,address:a.address,status:ns,note,employee_number:employee})).visit;visitMap.set(key,ns);a.visitStatus=ns;$('cardVisitStatus').className='visitstatus '+statusClass(ns);$('cardVisitStatus').textContent=statusLabel(ns);$('cardVisitMeta').innerHTML=`Last changed by ${h(v.updated_by_name)} • ${h(when(v.updated_at))}${v.note?`<br><b>Note:</b> ${h(v.note)}`:''}`;alert(ns==='DO_NOT_ROUTE'||ns==='NOT_A_FIT'?'Saved. This prospect will be excluded from future routes.':ns==='FOLLOW_UP'?'Saved as FOLLOW UP.':'Saved.')}catch(e){alert(e.message)}});
+  };
 })();
