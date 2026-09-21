@@ -1,0 +1,43 @@
+Name,Address,Customer_Number,Layer,Location_Status,Route_Eligible,Audit_Note,Audit_Date
+VANNER,"85 Executive Dr, AURORA, IL",21267,GO FIRST,COMMERCIAL - ROUTE OK,YES,"Commercial property; 85 Executive Dr is a 33k+ sq ft commercial building",2026-09-21
+INTERLAND INC,"1305 LAKESIDE DR, ROMEOVILLE, IL",17772,GO FIRST,COMMERCIAL - ROUTE OK,YES,"Commercial/industrial Lakeside Dr property; 2.11-acre parcel in business corridor",2026-09-21
+INTREN,"9144 N BOLINGBROOK DR, BOLINGBROOK, IL",11058,GO FIRST,UNCERTAIN - HOLD,NO,"Stored address could not be validated; current INTREN sources show Bolingbrook at 235 Remington Blvd and headquarters in Union IL",2026-09-21
+VYNERA TRANSPORTATION INC,"1333 N ABBOTT RD, ROMEOVILLE, IL",28276,GO FIRST,COMMERCIAL - ROUTE OK,YES,"Industrial M-2 property; company and FMCSA use exact address",2026-09-21
+HIGHBOOST CORP,"5 TERRITORIAL COURT, BOLINGBROOK, IL",28369,GO FIRST,COMMERCIAL - ROUTE OK,YES,"Industrial/warehouse property and business address",2026-09-21
+ROAD KING EXPRESS INC.,"721 PARKWOOD DR, ROMEOVILLE, IL",22663,GO FIRST,UNCERTAIN - HOLD,NO,"Exact Parkwood Dr address could not be validated in Romeoville; public commercial records show 721 Parkwood Ave instead",2026-09-21
+HERMES NVC CORP,"650 E 107TH STREET, STE 140, BOLINGBROOK, IL",20779,GO FIRST,COMMERCIAL - ROUTE OK,YES,"Commercial/industrial property with truck-oriented use",2026-09-21
+LIV ENTERPRISES,"101 ROYCE ROAD, BOLINGBROOK, IL",15491,GO FIRST,COMMERCIAL - ROUTE OK,YES,"Commercial office property",2026-09-21
+FREIGHTECH INC,"525 ANDERSON DR, DELIVERIES DOOR 1 & 2, ROMEOVILLE, IL",20507,GO FIRST,COMMERCIAL - ROUTE OK,YES,"Industrial facility with truck/fleet/logistics use",2026-09-21
+ZMile Inc,"1227 W LAKEVIEW CT, ROMEOVILLE, IL",23325,GO FIRST,COMMERCIAL - ROUTE OK,YES,"Company publishes in-person office/headquarters at exact address; Lakeview Ct is an industrial/office business park",2026-09-21
+UZB TRANS INC,"10S THAMES DR, DOWNERS GROVE, IL",27727,GO FIRST,UNCERTAIN - HOLD,NO,"Address is incomplete/malformed; Thames Dr uses full 10Sxxx house numbers and surrounding properties are residential",2026-09-21
+PJ TWINS INC.,"7925 CHELSEA DR, WOODRIDGE, IL",11771,GO FIRST,RESIDENTIAL - DO NOT ROUTE,NO,"Historical carrier/address records identify apartment/unit usage; residential location",2026-09-21
+Spot Edge Trucking Inc.,"7501 Lemont Rd, Ste 305, WOODRIDGE, IL",16350,GO FIRST,COMMERCIAL - ROUTE OK,YES,"Commercial office property",2026-09-21
+AZSAFI,"2760 FORQUE DR, NAPERVILLE, IL",27388,GO FIRST,COMMERCIAL - ROUTE OK,YES,"Commercial office property; street spelling appears to be Forgue in property records",2026-09-21
+PROGRESSIVE CARRIERS,"2760 FORGUE DRIVE, STE 104, NAPERVILLE, IL",18091,GO FIRST,COMMERCIAL - ROUTE OK,YES,"Commercial office property",2026-09-21
+GIZA TRUCKING LLC,"2140 FULHAM DR, NAPERVILLE, IL",23016,GO FIRST,RESIDENTIAL - DO NOT ROUTE,NO,"Townhome/residential property",2026-09-21
+MARTIAN EXPRESS CO,"1504 GREENBRIAR PLACE, NAPERVILLE, IL",20672,GO FIRST,RESIDENTIAL - DO NOT ROUTE,NO,"Townhome/residential property",2026-09-21
+SUNWAY CARRIERS INC.,"13550 S Route 30, Ste 306, PLAINFIELD, IL",26334,GO FIRST,COMMERCIAL - ROUTE OK,YES,"Commercial office building/highway-business property",2026-09-21
+AFF TRANS LLC,"75 EXECUTIVE DR, AURORA, IL",18153,GO FIRST,COMMERCIAL - ROUTE OK,YES,"112k+ sq ft commercial office property",2026-09-21
+KURTEX LOGISTICS INC,"75 EXECUTIVE DR, STE 301, AURORA, IL",19079,GO FIRST,COMMERCIAL - ROUTE OK,YES,"112k+ sq ft commercial office property",2026-09-21
+CARGO RUNNER CO.,"141 TOWER DR, BURR RIDGE, IL",10366,GO FIRST,COMMERCIAL - ROUTE OK,YES,"Multiple active businesses publish exact address; commercial supplier/business location",2026-09-21
+RICHARDS BUILDING SUPPLY CO,"12070 W 159TH STREET, HOMER GLEN, IL",11914,GO FIRST,COMMERCIAL - ROUTE OK,YES,"Listed in Village of Homer Glen commercial business directory",2026-09-21
+KZ EXPRESS INC,"672 BENBURY WAY, WOODRIDGE, IL",11252,GO FIRST,RESIDENTIAL - DO NOT ROUTE,NO,"Stored address is incorrect; current FMCSA address is 672 Banbury Way Bolingbrook, a single-family home",2026-09-21
+RG TRANSPORT,"411 PORTER ST, LEMONT, IL",26145,GO FIRST,RESIDENTIAL - DO NOT ROUTE,NO,"Single-family residential property",2026-09-21
+MLAZ LOGISTICS,"1905 BELLER RD, WOODRIDGE, IL",17219,GO FIRST,RESIDENTIAL - DO NOT ROUTE,NO,"Single-family residential property",2026-09-21
+US TRANS ONE,"2032 COUNTRY CLUB DR, WOODRIDGE, IL",16106,GO FIRST,RESIDENTIAL - DO NOT ROUTE,NO,"Residential condo/townhome property",2026-09-21
+POWERMAX FREIGHT LLC,"1915 TOMAHAWK LN, NAPERVILLE, IL",25606,GO FIRST,RESIDENTIAL - DO NOT ROUTE,NO,"Current carrier spelling is Tamahawk Ln; property is residential condo/townhome",2026-09-21
+UBN LOGISTICS,"4652 AUVERGNE AVE, LISLE, IL",25846,GO FIRST,UNCERTAIN - HOLD,NO,"Exact stored address could not be validated in current Auvergne Ave property directories; surrounding numbered addresses are residential",2026-09-21
+GN EXPRESS,"4405 BUCKLEY RD, LISLE, IL",12635,GO FIRST,RESIDENTIAL - DO NOT ROUTE,NO,"Buckley Rd property record is residential-home inventory",2026-09-21
+C2B CARGO,"3030 WARRENVILLE RD STE 450-30, LISLE, IL",26781,GO FIRST,COMMERCIAL - ROUTE OK,YES,"Large commercial office property",2026-09-21
+JX TRUCK CENTER,"535 E. SOUTH FRONTAGE RD, BOLINGBROOK, IL",11179,GO FIRST,COMMERCIAL - ROUTE OK,YES,"Truck dealership/service business location",2026-09-21
+ROADRUNNER TRANSPORTATION SERVICES,"250 OLD CHICAGO DR, BOLINGBROOK, IL",11935,GO FIRST,COMMERCIAL - ROUTE OK,YES,"Industrial distribution property with trailer parking",2026-09-21
+TOTAL TRUCK & AUTO,"13662 S ARCHER AVE, LEMONT, IL",24881,GO FIRST,COMMERCIAL - ROUTE OK,YES,"Full truck/auto repair shop facility at exact address",2026-09-21
+EDI EXPRESS,"350 KROMRAY RD, LEMONT, IL",25909,GO FIRST,RESIDENTIAL - DO NOT ROUTE,NO,"Single-family residential property",2026-09-21
+LEMONT TRUCK CENTER,"13751 Main Street, LEMONT, IL",15474,GO FIRST,COMMERCIAL - ROUTE OK,YES,"Official truck center/service location",2026-09-21
+MAURER TRUCK REPAIR,"20702 GASKIN DR, ROMEOVILLE, IL",11395,GO FIRST,COMMERCIAL - ROUTE OK,YES,"Large commercial-scale truck repair property",2026-09-21
+EXPERT TRUCK AND TRAILER SERVICES,"1263 CATON FARM RD, CREST HILL, IL",15096,GO FIRST,COMMERCIAL - ROUTE OK,YES,"Industrial property; repair company publishes exact location",2026-09-21
+VILLAGE OF DOWNERS GROVE,"5101 WALNUT AVE, DOWNERS GROVE, IL",12389,GO FIRST,COMMERCIAL - ROUTE OK,YES,"Municipal/tax-exempt facility; not residential",2026-09-21
+MAUL PAVING INC.,"10201 CLOW CREEK RD, PLAINFIELD, IL",26423,GO FIRST,COMMERCIAL - ROUTE OK,YES,"Commercial office property",2026-09-21
+KITS TOWING,"1680 QUINCY AVE., NAPERVILLE, IL",11218,GO FIRST,COMMERCIAL - ROUTE OK,YES,"Commercial-scale towing property",2026-09-21
+HEAVY DUTY TRUCK REPAIR INC,"15761 ANNICO DR, HOMER GLEN, IL",21986,GO FIRST,COMMERCIAL - ROUTE OK,YES,"Village commercial-business directory and commercial-scale property",2026-09-21
+KINGS GAMBIT INC.,"2442 BALDWIN CT., AURORA, IL",25817,GO FIRST,RESIDENTIAL - DO NOT ROUTE,NO,"Single-family home; 3 bed / 3 bath residential property",2026-09-21
