@@ -3,7 +3,7 @@
   const APIKEY='sb_publishable_EqF-iooqhmngSG5BbzOxfQ_Vnf9Altc';
   const $=id=>document.getElementById(id);
   const token=()=>localStorage.getItem('nwtb_chat_token')||'';
-  const h=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#039;'}[m]));
+  const h=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
   const when=s=>{const d=new Date(s);return isNaN(d)?'':d.toLocaleString()};
   let chatTimer=null;
   const visitMap=new Map();
@@ -102,10 +102,15 @@
     }catch{}
   }
 
-  const originalEnc=window.enc;
+  // Google Maps launchers use recognizable business name + full address.
+  // Road optimization still uses coordinates separately.
   window.enc=function(x){
-    if(x?.auditAddressCorrected)return encodeURIComponent(x.address||x.name||'');
-    return originalEnc(x);
+    const name=String(x?.name||'').trim(),address=String(x?.address||'').trim();
+    if(name&&address)return encodeURIComponent(`${name}, ${address}`);
+    if(address)return encodeURIComponent(address);
+    if(name)return encodeURIComponent(name);
+    const lat=Number(x?.lat),lon=Number(x?.lon);
+    return Number.isFinite(lat)&&Number.isFinite(lon)?encodeURIComponent(`${lat.toFixed(6)},${lon.toFixed(6)}`):'';
   };
 
   function locationStatus(a){
@@ -261,8 +266,8 @@
     if(t==='new_business'){
       wrap.style.display='block';
       lab.textContent='Prospect Type';
-      sel.innerHTML='<option value="all_prospects">All Prospects</option><option value="go_first_prospects">GO FIRST Prospects Only</option><option value="regular_prospects">Regular Verified Prospects Only</option>';
-      help.textContent='All Prospects includes both RED GO FIRST new-potential accounts and PURPLE verified prospects.';
+      sel.innerHTML='<option value="all_prospects">All Prospects — Efficiency First</option><option value="go_first_prospects">GO FIRST Prospects Only</option><option value="regular_prospects">Regular Verified Prospects Only</option>';
+      help.textContent='NEW BUSINESS is efficiency-first: color does not override the shortest practical driving route. Every route starts and finishes at Northwest Trucks – Bolingbrook.';
     }else if(t==='existing'){
       wrap.style.display='block';
       lab.textContent='Customer Type';
@@ -299,6 +304,58 @@
     return cand;
   }
 
+  // Efficiency-first subset selection for NEW BUSINESS.
+  // It chooses the requested customer stops by the smallest added ROAD travel time
+  // in a round trip that begins and ends at NWTB. Red/Purple status is not used
+  // as a distance penalty, so priority color cannot force a wasteful drive.
+  async function selectEfficientNewBusiness(cand,n){
+    if(cand.length<=n)return cand.slice();
+    try{
+      const pts=[depot,...cand];
+      const coords=pts.map(p=>`${p.lon},${p.lat}`).join(';');
+      const matrix=await osrm(`https://router.project-osrm.org/table/v1/driving/${coords}?annotations=duration`);
+      if(matrix.code!=='Ok'||!matrix.durations)throw new Error('Road matrix unavailable');
+      const m=matrix.durations,remaining=new Set(Array.from({length:cand.length},(_,i)=>i+1));
+      const tour=[0,0];
+      while(tour.length-2<n&&remaining.size){
+        let bestIdx=null,bestPos=null,bestDelta=Infinity;
+        for(const idx of remaining){
+          for(let pos=0;pos<tour.length-1;pos++){
+            const a=tour[pos],b=tour[pos+1],ab=m[a]?.[b],ai=m[a]?.[idx],ib=m[idx]?.[b];
+            if(ab==null||ai==null||ib==null)continue;
+            const delta=ai+ib-ab;
+            if(delta<bestDelta){bestDelta=delta;bestIdx=idx;bestPos=pos+1}
+          }
+        }
+        if(bestIdx==null)break;
+        tour.splice(bestPos,0,bestIdx);
+        remaining.delete(bestIdx);
+      }
+      const chosen=tour.slice(1,-1).map(i=>cand[i-1]);
+      if(chosen.length===n)return chosen;
+    }catch(e){console.warn('Efficiency-first selection fallback:',e)}
+    return cand.slice().sort((a,b)=>miles(depot,a)-miles(depot,b)).slice(0,n);
+  }
+
+  // Make the return to Northwest Trucks visible as the final stop in every route.
+  const baseRenderRoute=window.renderRoute;
+  window.renderRoute=function(order,meta={}){
+    baseRenderRoute(order,meta);
+    try{
+      const out=$('output'),notice=out?.querySelector('.notice'),table=out?.querySelector('table');
+      if(notice){
+        const efficiency=meta.efficiencyFirst?' <b>NEW BUSINESS RULE:</b> Customer selection is efficiency-first.':'';
+        notice.innerHTML+=`<br><b>ROUND TRIP:</b> Start at Northwest Trucks – Bolingbrook → customer stops → <b>FINAL STOP: Northwest Trucks – Bolingbrook</b>.${efficiency}`;
+      }
+      if(table&&!table.querySelector('[data-nwtb-return="1"]')){
+        const tr=document.createElement('tr');
+        tr.dataset.nwtbReturn='1';
+        tr.innerHTML=`<td>${order.length+1}</td><td><b>Northwest Trucks – Bolingbrook</b><div class="small">${h(depot.address)}</div></td><td><span class="badge blue">RETURN TO BASE</span></td><td>—</td><td><b>FINAL STOP</b></td><td>Return to NWTB</td>`;
+        table.appendChild(tr);
+      }
+    }catch(e){console.warn(e)}
+  };
+
   window.buildRoute=async function(){
     enforceLocationVerification();
     const out=$('output'),t=$('routeType').value,r=+$('radius').value,includeFollow=$('includeFollowUps')?.checked;
@@ -317,10 +374,15 @@
     });
     if(!cand.length){alert('No eligible audited-commercial accounts matched these filters.');return}
     n=Math.min(n,cand.length);
-    const sel=t==='mixed'?selectMixed(cand,n):selectCluster(cand,n,t);
-    out.style.display='block';out.innerHTML='<b>Optimizing...</b>';
-    try{const j=await optimize(sel);renderRoute(j.order.map(i=>sel[i]),{miles:j.miles,minutes:j.minutes})}
-    catch(e){out.innerHTML=`<div class="notice"><b>ROUTE NOT CREATED:</b> ${esc(e.message||e)}</div>`}
+    out.style.display='block';out.innerHTML='<b>Choosing the most efficient customer group and optimizing the road route...</b>';
+    try{
+      let sel;
+      if(t==='new_business')sel=await selectEfficientNewBusiness(cand,n);
+      else if(t==='mixed')sel=selectMixed(cand,n);
+      else sel=selectCluster(cand,n,t);
+      const j=await optimize(sel);
+      renderRoute(j.order.map(i=>sel[i]),{miles:j.miles,minutes:j.minutes,efficiencyFirst:t==='new_business'});
+    }catch(e){out.innerHTML=`<div class="notice"><b>ROUTE NOT CREATED:</b> ${esc(e.message||e)}</div>`}
   };
 
   const baseShowCard=window.showCard;
