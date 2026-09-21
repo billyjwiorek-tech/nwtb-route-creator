@@ -1,0 +1,42 @@
+Name,Address,Layer,Location_Status,Route_Eligible,Audit_Note,Audit_Date
+Rogue Carrier Inc,"1312 Marquette Dr Unit E, Romeoville, IL 60446",GO FIRST,COMMERCIAL - ROUTE OK,YES,Exact carrier/business address verified,2026-09-21
+BSL Express Trucking Inc,"1316 Marquette Dr, Romeoville, IL 60446",GO FIRST,COMMERCIAL - ROUTE OK,YES,Exact carrier/business address verified,2026-09-21
+DJ Cargo Inc,"2044 Kentland Dr, Romeoville, IL 60446",GO FIRST,RESIDENTIAL - DO NOT ROUTE,NO,Single-family residential property,2026-09-21
+WESTBOYS Truck & Trailer Repair,"104 Williamsburg Ln, Bolingbrook, IL 60440",GO FIRST,RESIDENTIAL - DO NOT ROUTE,NO,Residential property and previously blocked,2026-09-21
+Truck Service Point - Trailer Shop,"110 Anton Dr, Romeoville, IL 60446",GO FIRST,COMMERCIAL - ROUTE OK,YES,Truck/trailer service business location verified,2026-09-21
+Will County Trailer Repair,"1337 N Abbott Rd, Romeoville, IL 60446",GO FIRST,COMMERCIAL - ROUTE OK,YES,Exact address verified in active commercial trucking use; no residential evidence,2026-09-21
+BestDrive Commercial Tire Center,"595 E S Frontage Rd, Bolingbrook, IL 60440",GO FIRST,COMMERCIAL - ROUTE OK,YES,Commercial tire business location verified,2026-09-21
+Central Fleet Repair,"675 Phelps Ave, Romeoville, IL 60446",GO FIRST,COMMERCIAL - ROUTE OK,YES,Official truck repair business address verified,2026-09-21
+Valhalla Fleet Service LLC,"208 Belmont Dr, Romeoville, IL 60446",GO FIRST,RESIDENTIAL - DO NOT ROUTE,NO,Single-family residential property,2026-09-21
+Go Neal Logistics Inc,"1352 Enterprise Dr Unit A, Romeoville, IL 60446",GO FIRST,COMMERCIAL - ROUTE OK,YES,Exact business address verified,2026-09-21
+TRANS QUALITY INC,"465 Crossroads Pkwy, Bolingbrook, IL 60440",GO FIRST,COMMERCIAL - ROUTE OK,YES,Exact carrier/business address verified,2026-09-21
+SELECT ONE INC,"215 Remington Blvd Suite C, Bolingbrook, IL 60440",GO FIRST,COMMERCIAL - ROUTE OK,YES,Exact current carrier address verified,2026-09-21
+USA LOGISTICS INC,"3550 Hobson Rd Ste 104, Woodridge, IL 60517",GO FIRST,COMMERCIAL - ROUTE OK,YES,Exact carrier/business address verified,2026-09-21
+INNOVATIVE INTERMODAL INC,"940 S Frontage Rd Suite 2000, Woodridge, IL 60517",GO FIRST,COMMERCIAL - ROUTE OK,YES,Exact carrier/business address verified,2026-09-21
+ALTEX TRANSPORTATION INC,"11295 Lemont Rd, Lemont, IL 60439",GO FIRST,COMMERCIAL - ROUTE OK,YES,Official/current business address verified,2026-09-21
+AMERO LINE LLC,"13769 Main St Suite 102, Lemont, IL 60439",GO FIRST,COMMERCIAL - ROUTE OK,YES,Exact carrier/business address verified,2026-09-21
+ASAP TRANS CORP,"15120 E 127th St, Lemont, IL 60439",GO FIRST,COMMERCIAL - ROUTE OK,YES,Exact carrier/business address verified,2026-09-21
+MARK-IT EXPRESS LOGISTICS LLC,"13555 Main St, Lemont, IL 60439",GO FIRST,COMMERCIAL - ROUTE OK,YES,Current FMCSA business address verified,2026-09-21
+BENTOS INC,"400 N Schmidt Rd Suite 206, Bolingbrook, IL 60440",GO FIRST,COMMERCIAL - ROUTE OK,YES,Exact current business/carrier address verified,2026-09-21
+HEGELMANN USA,"1124 Windham Pkwy, Romeoville, IL 60446",GO FIRST,COMMERCIAL - ROUTE OK,YES,Official company location verified,2026-09-21
+INDIGO LOGISTICS LLC,"1799 Helen Dr, Romeoville, IL 60446",GO FIRST,RESIDENTIAL - DO NOT ROUTE,NO,Residential-address audit; carrier registration alone does not make home address routeable,2026-09-21
+KOROL TRUCKING INC,"1336 Enterprise Dr Unit 107, Romeoville, IL 60446",GO FIRST,COMMERCIAL - ROUTE OK,YES,Commercial industrial business address verified,2026-09-21
+DAB TRUCKING SERVICES COMPANY,"1407 Caton Farm Rd, Lockport, IL 60441",GO FIRST,COMMERCIAL - ROUTE OK,YES,Official company and FMCSA address verified,2026-09-21
+SEVEN CORNERS LOGISTICS INC,"1763 Rudolph Ct, Romeoville, IL 60446",GO FIRST,RESIDENTIAL - DO NOT ROUTE,NO,Residential house property,2026-09-21
+Roland Machinery,"220 E S Frontage Rd, Bolingbrook, IL 60440",GO FIRST,COMMERCIAL - ROUTE OK,YES,Heavy equipment business location verified,2026-09-21
+JRV Logistics,"1000 S Hamilton St Ste G, Lockport, IL 60441",GO FIRST,COMMERCIAL - ROUTE OK,YES,Exact business location verified,2026-09-21
+Classic Heavy Duty Towing,"10119 Clow Creek Rd B, Plainfield, IL 60585",GO FIRST,COMMERCIAL - ROUTE OK,YES,Towing business location verified,2026-09-21
+KARGOMITTEN INC,"1373 Lily Cache Ln, Bolingbrook, IL 60490",GO FIRST,RESIDENTIAL - DO NOT ROUTE,NO,Single-family residential property,2026-09-21
+WOLFDOM EXPRESS INC,"1999 75th St Unit 200, Woodridge, IL 60517",GO FIRST,COMMERCIAL - ROUTE OK,YES,Exact business location verified,2026-09-21
+EDWARD DON & COMPANY LLC,"9801 Adam Don Pkwy, Woodridge, IL 60517",GO FIRST,COMMERCIAL - ROUTE OK,YES,Commercial corporate/distribution location verified,2026-09-21
+Flyway Service LLC,"19464 W Arpt Rd, Romeoville, IL 60446",VERIFIED PROSPECTS,COMMERCIAL - ROUTE OK,YES,Official truck service location verified,2026-09-21
+LNG Holding / Load N Go Inc,"534 Territorial Dr Ste B, Bolingbrook, IL 60440",VERIFIED PROSPECTS,COMMERCIAL - ROUTE OK,YES,Exact trucking business address verified,2026-09-21
+U K A Transportation LLC,"125 W Boughton Rd, Bolingbrook, IL 60440",VERIFIED PROSPECTS,COMMERCIAL - ROUTE OK,YES,Exact business address verified,2026-09-21
+Prestige Hauling,"13769 Main St #110, Lemont, IL 60439",VERIFIED PROSPECTS,COMMERCIAL - ROUTE OK,YES,Exact business address verified,2026-09-21
+TForce Worldwide,"1000 Windham Pkwy, Romeoville, IL 60446",VERIFIED PROSPECTS,COMMERCIAL - ROUTE OK,YES,Freight business/terminal location verified,2026-09-21
+F & T Transport Corp,"101 Royce Rd #18, Bolingbrook, IL 60440",VERIFIED PROSPECTS,COMMERCIAL - ROUTE OK,YES,Official company address verified,2026-09-21
+DIJ Corp,"1300 Lakeview Dr, Romeoville, IL 60446",VERIFIED PROSPECTS,COMMERCIAL - ROUTE OK,YES,Transportation business address verified,2026-09-21
+Aldon Mega Inc,"648 Aspen Dr, Romeoville, IL 60446",VERIFIED PROSPECTS,RESIDENTIAL - DO NOT ROUTE,NO,Residential townhome property,2026-09-21
+SDE Transport Inc,"288 Heritage Pkwy, Romeoville, IL 60446",VERIFIED PROSPECTS,RESIDENTIAL - DO NOT ROUTE,NO,Single-family residential property,2026-09-21
+Great Dane Chicago,"699 E S Frontage Rd, Bolingbrook, IL 60440",VERIFIED PROSPECTS,COMMERCIAL - ROUTE OK,YES,Official trailer/truck body business location verified,2026-09-21
+Hursthouse Landscape,"751 N Bolingbrook Dr #21, Bolingbrook, IL 60440",VERIFIED PROSPECTS,COMMERCIAL - ROUTE OK,YES,Official company business address verified,2026-09-21
