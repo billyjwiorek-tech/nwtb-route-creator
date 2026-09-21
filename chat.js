@@ -7,6 +7,19 @@
   const when=s=>{const d=new Date(s);return isNaN(d)?'':d.toLocaleString()};
   let chatTimer=null;
   const visitMap=new Map();
+  const RESIDENTIAL_ADDRESS_PARTS=[
+    '1381 LILY CACHE LN',
+    '1373 LILY CACHE LN',
+    '2044 KENTLAND DR',
+    '208 BELMONT DR',
+    '1763 RUDOLPH CT',
+    '288 HERITAGE PKWY',
+    '648 ASPEN DR',
+    '104 WILLIAMSBURG LN',
+    '1799 HELEN DR'
+  ];
+  const isVerifiedResidential=a=>RESIDENTIAL_ADDRESS_PARTS.some(x=>String(a?.address||'').toUpperCase().includes(x));
+  function enforceResidentialBlocks(){try{accounts.forEach(a=>{if(isVerifiedResidential(a)){a.routeEligible=false;a.locationVerification='RESIDENTIAL — DO NOT ROUTE'}})}catch{}}
 
   const css=`
   button[onclick="openRouteXLAllStops()"]{display:none!important}
@@ -35,15 +48,15 @@
   function accountKey(a){const cn=String(a?.customerNumber||'').trim();return cn?'CUST:'+cn:'ADDR:'+String(a?.name||'').trim().toUpperCase()+'|'+String(a?.address||'').trim().toUpperCase()}
   function statusLabel(s){return s==='FOLLOW_UP'?'VISITED — FOLLOW UP':s==='DO_NOT_ROUTE'?'VISITED — DO NOT ROUTE':s==='NOT_A_FIT'?'NOT A FIT / DO NOT CALL':'NOT VISITED'}
   function statusClass(s){return s==='FOLLOW_UP'?'vs-follow':(s==='DO_NOT_ROUTE'||s==='NOT_A_FIT')?'vs-stop':'vs-not'}
-  async function refreshVisitMap(){try{const j=await call('visit_list');visitMap.clear();(j.statuses||[]).forEach(x=>visitMap.set(x.account_key,x.status));accounts.forEach(a=>a.visitStatus=visitMap.get(accountKey(a))||'NOT_VISITED')}catch(e){console.warn(e)}}
-  setTimeout(refreshVisitMap,500);
+  async function refreshVisitMap(){try{const j=await call('visit_list');visitMap.clear();(j.statuses||[]).forEach(x=>visitMap.set(x.account_key,x.status));accounts.forEach(a=>a.visitStatus=visitMap.get(accountKey(a))||'NOT_VISITED');enforceResidentialBlocks()}catch(e){console.warn(e)}}
+  setTimeout(()=>{enforceResidentialBlocks();refreshVisitMap()},500);
 
   if(!document.getElementById('includeFollowUps')){const div=document.createElement('div');div.className='follow-toggle';div.innerHTML='<label><input id="includeFollowUps" type="checkbox"> Include VISITED — FOLLOW UP prospects</label>';$('routeType')?.closest('.panel')?.appendChild(div)}
 
   window.buildRoute=async function(){
     const out=$('output'),t=$('routeType').value,r=+$('radius').value,includeFollow=$('includeFollowUps')?.checked;
     let n=Math.max(1,Math.min(25,+$('stopCount').value||10));
-    let cand=accounts.filter(a=>a.routeEligible).filter(filterFn(t)).filter(a=>r>=999||miles(depot,a)<=r);
+    let cand=accounts.filter(a=>a.routeEligible).filter(a=>!isVerifiedResidential(a)).filter(filterFn(t)).filter(a=>r>=999||miles(depot,a)<=r);
     cand=cand.filter(a=>{if(a.broadType!=='PROSPECT')return true;const s=visitMap.get(accountKey(a))||'NOT_VISITED';if(s==='DO_NOT_ROUTE'||s==='NOT_A_FIT')return false;if((t==='new_business'||t==='prospects_regular')&&s==='FOLLOW_UP'&&!includeFollow)return false;return true});
     if(!cand.length){alert('No eligible accounts matched.');return}
     n=Math.min(n,cand.length);const sel=t==='mixed'?selectMixed(cand,n):selectCluster(cand,n,t);
