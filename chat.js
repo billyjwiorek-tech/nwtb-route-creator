@@ -58,7 +58,7 @@
   async function refreshVisitMap(){try{const j=await call('visit_list');visitMap.clear();(j.statuses||[]).forEach(x=>visitMap.set(x.account_key,x.status));if(Array.isArray(window.accounts))window.accounts.forEach(a=>a.visitStatus=visitMap.get(accountKey(a))||'NOT_VISITED')}catch(e){console.warn('Visit status load failed',e)}}
   window.nwtbRefreshVisitMap=refreshVisitMap;
 
-  function addFollowToggle(){const routePanel=document.querySelector('.panel h2');if(document.getElementById('includeFollowUps'))return;const rt=document.getElementById('routeType');if(!rt)return;const p=rt.closest('.panel');if(!p)return;const div=document.createElement('div');div.className='follow-toggle';div.innerHTML='<label style="font-weight:700"><input id="includeFollowUps" type="checkbox"> Include VISITED — FOLLOW UP prospects</label>';p.appendChild(div)}
+  function addFollowToggle(){if(document.getElementById('includeFollowUps'))return;const rt=document.getElementById('routeType');if(!rt)return;const p=rt.closest('.panel');if(!p)return;const div=document.createElement('div');div.className='follow-toggle';div.innerHTML='<label style="font-weight:700"><input id="includeFollowUps" type="checkbox"> Include VISITED — FOLLOW UP prospects</label>';p.appendChild(div)}
   addFollowToggle();
 
   const oldBuild=window.buildRoute;
@@ -71,7 +71,38 @@
   if(typeof oldRender==='function')window.renderRoute=function(order,meta={}){order.forEach(a=>a.visitStatus=visitMap.get(accountKey(a))||a.visitStatus||'NOT_VISITED');oldRender(order,meta);const table=document.querySelector('#output table');if(!table)return;const rows=table.querySelectorAll('tr');if(rows[0]){const th=document.createElement('th');th.textContent='Visit Status';rows[0].insertBefore(th,rows[0].lastElementChild)}order.forEach((a,i)=>{const tr=rows[i+1];if(!tr)return;const td=document.createElement('td');const s=a.visitStatus||'NOT_VISITED';td.innerHTML=`<span class="visitstatus ${statusClass(s)}">${h(statusLabel(s))}</span>`;tr.insertBefore(td,tr.lastElementChild)})};
 
   const oldShowCard=window.showCard;
-  if(typeof oldShowCard==='function')window.showCard=async function(i){oldShowCard(i);const a=currentRoute[i];if(!a||a.broadType!=='PROSPECT')return;const key=accountKey(a);let v=null;try{if(token()){const j=await call('visit_get',{account_key:key});v=j.visit}}catch{}const s=v?.status||visitMap.get(key)||'NOT_VISITED';const body=document.querySelector('#modal .modal-body');if(!body)return;const old=body.querySelector('.visitbox');if(old)old.remove();const box=document.createElement('div');box.className='visitbox';box.innerHTML=`<h3>VISIT STATUS</h3><div><span id="cardVisitStatus" class="visitstatus ${statusClass(s)}">${h(statusLabel(s))}</span></div><div class="visit-note" id="cardVisitMeta">${v?.updated_by_name?`Last changed by ${h(v.updated_by_name)} • ${h(when(v.updated_at))}`:'No visit recorded yet.'}${v?.note?`<br><b>Note:</b> ${h(v.note)}`:''}</div><div class="visit-actions"><button data-vs="NOT_VISITED">NOT VISITED</button><button data-vs="FOLLOW_UP">FOLLOW UP</button><button data-vs="DO_NOT_ROUTE">DO NOT ROUTE</button><button data-vs="NOT_A_FIT">NOT A FIT</button></div><div class="small" style="margin-top:8px">Changing this requires employee login through CHAT.</div>`;body.insertBefore(box,body.firstChild.nextSibling);box.querySelectorAll('[data-vs]').forEach(b=>b.addEventListener('click',async()=>{if(!token()){alert('Open CHAT and enter your 4-digit employee number first.');return}const ns=b.getAttribute('data-vs');const note=prompt('Optional visit note:',v?.note||'');if(note===null)return;try{const j=await call('visit_set',{account_key:key,name:a.name,address:a.address,status:ns,note});visitMap.set(key,ns);a.visitStatus=ns;v=j.visit;document.getElementById('cardVisitStatus').className='visitstatus '+statusClass(ns);document.getElementById('cardVisitStatus').textContent=statusLabel(ns);document.getElementById('cardVisitMeta').innerHTML=`Last changed by ${h(v.updated_by_name)} • ${h(when(v.updated_at))}${v.note?`<br><b>Note:</b> ${h(v.note)}`:''}`;if(ns==='DO_NOT_ROUTE'||ns==='NOT_A_FIT')alert('Saved. This prospect will be excluded from future routes.');else if(ns==='FOLLOW_UP')alert('Saved. This prospect is now FOLLOW UP and will not appear in normal New Business routes unless Include Follow-Up Prospects is checked.');else alert('Saved. This prospect is eligible for normal New Business routing again.');if(typeof renderRoute==='function')renderRoute(currentRoute,{shared:false})}catch(e){alert(e.message)}}))};
+  if(typeof oldShowCard==='function')window.showCard=async function(i){
+    oldShowCard(i);
+    const a=currentRoute[i];if(!a||a.broadType!=='PROSPECT')return;
+    const key=accountKey(a);let v=null;
+    try{const j=await call('visit_get',{account_key:key});v=j.visit}catch{}
+    const s=v?.status||visitMap.get(key)||'NOT_VISITED';const body=document.querySelector('#modal .modal-body');if(!body)return;
+    const old=body.querySelector('.visitbox');if(old)old.remove();
+    const box=document.createElement('div');box.className='visitbox';
+    box.innerHTML=`<h3>VISIT STATUS</h3><div><span id="cardVisitStatus" class="visitstatus ${statusClass(s)}">${h(statusLabel(s))}</span></div><div class="visit-note" id="cardVisitMeta">${v?.updated_by_name?`Last changed by ${h(v.updated_by_name)} • ${h(when(v.updated_at))}`:'No visit recorded yet.'}${v?.note?`<br><b>Note:</b> ${h(v.note)}`:''}</div><div class="visit-actions"><button data-vs="NOT_VISITED">NOT VISITED</button><button data-vs="FOLLOW_UP">FOLLOW UP</button><button data-vs="DO_NOT_ROUTE">DO NOT ROUTE</button><button data-vs="NOT_A_FIT">NOT A FIT</button></div><div class="small" style="margin-top:8px">Employee number is optional. If you are signed into CHAT, your name is recorded automatically.</div>`;
+    body.insertBefore(box,body.firstChild.nextSibling);
+    box.querySelectorAll('[data-vs]').forEach(b=>b.addEventListener('click',async()=>{
+      const ns=b.getAttribute('data-vs');
+      let optionalEmployee='';
+      if(!token()){
+        const entered=prompt('Optional 4-digit employee number. Leave blank to save without a name:','');
+        if(entered===null)return;
+        optionalEmployee=entered.trim();
+        if(optionalEmployee&&!/^\d{4}$/.test(optionalEmployee)){alert('Employee number must be 4 digits, or leave it blank.');return}
+      }
+      const note=prompt('Optional visit note:',v?.note||'');if(note===null)return;
+      try{
+        const j=await call('visit_set',{account_key:key,name:a.name,address:a.address,status:ns,note,employee_number:optionalEmployee});
+        visitMap.set(key,ns);a.visitStatus=ns;v=j.visit;
+        document.getElementById('cardVisitStatus').className='visitstatus '+statusClass(ns);document.getElementById('cardVisitStatus').textContent=statusLabel(ns);
+        document.getElementById('cardVisitMeta').innerHTML=`Last changed by ${h(v.updated_by_name)} • ${h(when(v.updated_at))}${v.note?`<br><b>Note:</b> ${h(v.note)}`:''}`;
+        if(ns==='DO_NOT_ROUTE'||ns==='NOT_A_FIT')alert('Saved. This prospect will be excluded from future routes.');
+        else if(ns==='FOLLOW_UP')alert('Saved. This prospect is now FOLLOW UP and will not appear in normal New Business routes unless Include Follow-Up Prospects is checked.');
+        else alert('Saved. This prospect is eligible for normal New Business routing again.');
+        if(typeof renderRoute==='function')renderRoute(currentRoute,{shared:false});
+      }catch(e){alert(e.message)}
+    }))
+  };
 
   setTimeout(refreshVisitMap,800);
 })();
