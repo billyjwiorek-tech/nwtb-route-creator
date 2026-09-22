@@ -13,16 +13,17 @@ window.useResult=async function(i,saved){
  const sourceType=r.source_type||((document.getElementById('dirKind')?.value)==='VENDOR'?'VENDOR':'CUSTOMER');
  const sourceRef=r.source_ref||r.customer_number||r.vendor_id||'';
  const rawAddress=r.address||[r.addr1,r.addr2,r.city,r.state].filter(Boolean).join(', ');
+ const savedId=saved?(r.id||''):'';
  document.getElementById('stopName').value=r.name||'';
  document.getElementById('sourceRef').value=sourceRef;
  document.getElementById('address').value=rawAddress;
  document.getElementById('phone').value=r.phone||r.phone_work||r.phone_home||'';
  document.getElementById('sourceType').value=sourceType;
- document.getElementById('savedLocationId').value=saved?(r.id||''):'';
+ document.getElementById('savedLocationId').value=savedId;
  document.getElementById('lat').value='';document.getElementById('lon').value='';
  try{
   showBanner('addMsg','Loading verified physical location…','info');
-  const j=await post(LOCATION_RESOLVER,{source_type:sourceType,source_ref:sourceRef,name:r.name||'',address:rawAddress});
+  const j=await post(LOCATION_RESOLVER,{source_type:sourceType,source_ref:sourceRef,saved_location_id:savedId,name:r.name||'',address:rawAddress});
   document.getElementById('address').value=j.address||rawAddress;
   document.getElementById('lat').value=j.lat??'';document.getElementById('lon').value=j.lon??'';
   if(j.saved_location_id)document.getElementById('savedLocationId').value=j.saved_location_id;
@@ -33,7 +34,7 @@ window.resolveFormCoords=async function(){
  const address=document.getElementById('address').value.trim(),lat=document.getElementById('lat').value,lon=document.getElementById('lon').value;
  if(validCoord(lat,lon))return {lat:Number(lat),lon:Number(lon)};
  if(!address)throw Error('Enter a physical route address first.');
- const j=await post(LOCATION_RESOLVER,{source_type:document.getElementById('sourceType').value||'OTHER',source_ref:document.getElementById('sourceRef').value||'',name:document.getElementById('stopName').value||'',address});
+ const j=await post(LOCATION_RESOLVER,{source_type:document.getElementById('sourceType').value||'OTHER',source_ref:document.getElementById('sourceRef').value||'',saved_location_id:document.getElementById('savedLocationId').value||'',name:document.getElementById('stopName').value||'',address});
  document.getElementById('address').value=j.address||address;document.getElementById('lat').value=j.lat;document.getElementById('lon').value=j.lon;if(j.saved_location_id)document.getElementById('savedLocationId').value=j.saved_location_id;
  if(!validCoord(j.lat,j.lon))throw Error('The physical address could not be located. Verify the address before adding the stop.');
  return {lat:Number(j.lat),lon:Number(j.lon)};
