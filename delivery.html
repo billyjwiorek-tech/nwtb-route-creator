@@ -28,12 +28,34 @@ button.active{background:var(--ink);color:#fff;border-color:var(--ink)}
 <iframe id="fTracker" class="frame" src="tracker.html" title="NWTB Live Driver Tracker"></iframe>
 <iframe id="fDriver" class="frame" src="driver.html" title="NWTB Driver Phone View"></iframe>
 <script>
+const MATRIX='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-route-matrix';
+const KEY='sb_publishable_EqF-iooqhmngSG5BbzOxfQ_Vnf9Altc';
 function show(which){
  const map={dispatch:['fDispatch','bDispatch'],tracker:['fTracker','bTracker'],driver:['fDriver','bDriver']};
  Object.values(map).forEach(([f,b])=>{document.getElementById(f).classList.remove('active');document.getElementById(b).classList.remove('active')});
  const [f,b]=map[which];document.getElementById(f).classList.add('active');document.getElementById(b).classList.add('active');
  history.replaceState(null,'','#'+which);
 }
+function installRouteMatrixFix(){
+ const frame=document.getElementById('fDispatch');
+ try{
+  const w=frame.contentWindow;
+  if(!w)return;
+  w.roadMatrix=async function(points){
+   const token=localStorage.getItem('nwtb_delivery_token')||'';
+   const r=await fetch(MATRIX,{method:'POST',headers:{'content-type':'application/json','apikey':KEY,'x-nwtb-session':token},body:JSON.stringify({points})});
+   const j=await r.json().catch(()=>({error:'Invalid routing response'}));
+   if(!r.ok)throw Error(j.error||'Routing service failed');
+   if(!Array.isArray(j.durations)||!Array.isArray(j.distances))throw Error('Routing matrix unavailable');
+   if(j.warning){
+    const box=w.document.getElementById('routeResult');
+    if(box)box.innerHTML='<span style="color:#9a6500;font-weight:700">'+j.warning+'</span>';
+   }
+   return j;
+  };
+ }catch(e){console.error('Route matrix patch failed',e)}
+}
+document.getElementById('fDispatch').addEventListener('load',installRouteMatrixFix);
 const h=location.hash.replace('#','');if(['dispatch','tracker','driver'].includes(h))show(h);
 </script>
 </body>
