@@ -18,7 +18,7 @@ button.active{background:var(--ink);color:#fff;border-color:var(--ink)}
 </style>
 </head>
 <body>
-<header><div><h1>NWTB DELIVERY + PICKUP MANAGER</h1><div class="sub">Dispatch • Pickups • Live Drivers • Delivery/Pickup Chat</div></div><span class="badge">OFFICE</span></header>
+<header><div><h1>NWTB DELIVERY + PICKUP MANAGER</h1><div class="sub">Dispatch • Pickups • Live Drivers • Delivery/Pickup Chat • All routes return to Bolingbrook</div></div><span class="badge">OFFICE</span></header>
 <div class="tabs">
 <button id="bDispatch" class="active" onclick="show('dispatch')">DISPATCH / PICKUP MANAGER</button>
 <button id="bTracker" onclick="show('tracker')">LIVE DRIVER TRACKER</button>
@@ -30,13 +30,14 @@ button.active{background:var(--ink);color:#fff;border-color:var(--ink)}
 <script>
 const MATRIX='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-route-matrix';
 const KEY='sb_publishable_EqF-iooqhmngSG5BbzOxfQ_Vnf9Altc';
+const BOLINGBROOK={name:'Northwest Trucks - Bolingbrook',address:'201 S W Frontage Rd, Bolingbrook, IL 60440',lat:41.682487,lon:-88.072262};
 function show(which){
  const map={dispatch:['fDispatch','bDispatch'],tracker:['fTracker','bTracker'],driver:['fDriver','bDriver']};
  Object.values(map).forEach(([f,b])=>{document.getElementById(f).classList.remove('active');document.getElementById(b).classList.remove('active')});
  const [f,b]=map[which];document.getElementById(f).classList.add('active');document.getElementById(b).classList.add('active');
  history.replaceState(null,'','#'+which);
 }
-function installRouteMatrixFix(){
+function installDispatchFixes(){
  const frame=document.getElementById('fDispatch');
  try{
   const w=frame.contentWindow;
@@ -47,15 +48,30 @@ function installRouteMatrixFix(){
    const j=await r.json().catch(()=>({error:'Invalid routing response'}));
    if(!r.ok)throw Error(j.error||'Routing service failed');
    if(!Array.isArray(j.durations)||!Array.isArray(j.distances))throw Error('Routing matrix unavailable');
-   if(j.warning){
-    const box=w.document.getElementById('routeResult');
-    if(box)box.innerHTML='<span style="color:#9a6500;font-weight:700">'+j.warning+'</span>';
-   }
+   if(j.warning){const box=w.document.getElementById('routeResult');if(box)box.innerHTML='<span style="color:#9a6500;font-weight:700">'+j.warning+'</span>'}
    return j;
   };
- }catch(e){console.error('Route matrix patch failed',e)}
+  const forceBolingbrook=()=>{
+   const depot=w.document.getElementById('depot');
+   if(!depot)return;
+   depot.innerHTML='<option value="BOLINGBROOK">NW Trucks Bolingbrook — START + RETURN</option>';
+   depot.value='BOLINGBROOK';
+   depot.disabled=true;
+   const label=depot.parentElement&&depot.parentElement.querySelector('label');
+   if(label)label.textContent='Start / Return Depot';
+  };
+  forceBolingbrook();
+  if(typeof w.optimizeAssign==='function'){
+   const originalOptimize=w.optimizeAssign.bind(w);
+   w.optimizeAssign=async function(){forceBolingbrook();return originalOptimize()};
+  }
+  if(typeof w.mapsLinks==='function'){
+   const originalMaps=w.mapsLinks.bind(w);
+   w.mapsLinks=function(seq,_depot){return originalMaps(seq,BOLINGBROOK)};
+  }
+ }catch(e){console.error('Dispatch patch failed',e)}
 }
-document.getElementById('fDispatch').addEventListener('load',installRouteMatrixFix);
+document.getElementById('fDispatch').addEventListener('load',installDispatchFixes);
 const h=location.hash.replace('#','');if(['dispatch','tracker','driver'].includes(h))show(h);
 </script>
 </body>
