@@ -1,6 +1,111 @@
 (() => {
   const $=id=>document.getElementById(id);
   const isPhone=()=>/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)||window.matchMedia('(max-width: 760px)').matches;
+
+  // 2026-09-22 MASTER RECONCILIATION.
+  // These corrections are applied at runtime so the source customer/prospect audit history stays preserved.
+  // Verified salesperson routing addresses are intentionally retained; billing/master addresses do not overwrite them.
+  function masterNorm(s){return String(s||'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim().replace(/\s+/g,' ')}
+  function appendNote(a,note){
+    const old=String(a?.notes||'').trim();
+    if(!old.includes(note))a.notes=old?old+' | '+note:note;
+  }
+  function refreshReconciledStats(){
+    try{
+      const usable=accounts.filter(a=>a.routeEligible);
+      const go=usable.filter(a=>a.layer==='GO FIRST');
+      const goExist=go.filter(a=>a.broadType==='EXISTING CUSTOMER').length;
+      const goPros=go.filter(a=>a.broadType==='PROSPECT').length;
+      if($('statGo'))$('statGo').textContent=go.length;
+      if($('statGoSub'))$('statGoSub').textContent=`${goExist} existing • ${goPros} new potential`;
+      if($('statPros'))$('statPros').textContent=usable.filter(a=>a.layer==='VERIFIED PROSPECTS').length;
+      if($('statWin'))$('statWin').textContent=usable.filter(a=>a.layer==='WIN-BACK CUSTOMERS').length;
+      if($('statActive'))$('statActive').textContent=usable.filter(a=>a.layer==='ACTIVE CUSTOMERS').length;
+      if($('statTotal'))$('statTotal').textContent=usable.length;
+    }catch(e){console.warn('NWTB reconciliation stats:',e)}
+  }
+  function applyMasterReconciliation(){
+    try{
+      if(!Array.isArray(accounts)||!accounts.length)return false;
+
+      // BSL Express: confirmed NWTB customer #18812. Current service activity exists,
+      // while the 12-month parts analysis found no positive parts sale. Treat as active-service
+      // with a parts cross-sell opportunity, not as a brand-new prospect.
+      const bsl=accounts.find(a=>a.broadType==='PROSPECT'&&masterNorm(a.name)==='BSL EXPRESS TRUCKING INC');
+      if(bsl){
+        bsl.originalProspectName=bsl.originalProspectName||bsl.name;
+        bsl.customerNumber='18812';
+        bsl.billCusId='18812';
+        bsl.broadType='EXISTING CUSTOMER';
+        bsl.layer='ACTIVE CUSTOMERS';
+        bsl.accountType='ACTIVE CUSTOMER — SERVICE ACTIVITY / PARTS OPPORTUNITY';
+        bsl.badge='blue';
+        bsl.priority='BLUE - ACTIVE SERVICE / PARTS OPPORTUNITY';
+        bsl.routeEligible=true;
+        bsl.masterReconciled='2026-09-22';
+        appendNote(bsl,'MASTER RECONCILED 09-22-2026: Existing customer #18812. Service activity found; no positive parts purchase found in the 12-month parts analysis. Keep verified Romeoville route address; Willowbrook is the updated billing/master address.');
+      }
+
+      // USA Logistics: confirmed existing customer #14176. The current prospect phone matches
+      // the FMCSA phone tied to that NWTB customer identity. No current parts/service sale match
+      // was found in the reviewed reports, so this is a recovery account rather than new business.
+      const usa=accounts.find(a=>a.broadType==='PROSPECT'&&masterNorm(a.name)==='USA LOGISTICS INC');
+      if(usa){
+        usa.customerNumber='14176';
+        usa.billCusId='15160';
+        usa.broadType='EXISTING CUSTOMER';
+        usa.layer='WIN-BACK CUSTOMERS';
+        usa.accountType='WIN-BACK CUSTOMER';
+        usa.badge='orange';
+        usa.priority='ORANGE - WIN-BACK RESEARCH';
+        usa.routeEligible=true;
+        usa.masterReconciled='2026-09-22';
+        appendNote(usa,'MASTER RECONCILED 09-22-2026: Existing NWTB customer #14176; current BillCusId 15160. Current prospect phone matches the carrier identity. Keep verified Woodridge operating address.');
+      }
+
+      // Load N Go: confirmed existing customer #15291 by exact legal-name/location evidence.
+      // No current positive sales match was found in the reviewed reports, so move to Win-Back.
+      const lng=accounts.find(a=>a.broadType==='PROSPECT'&&masterNorm(a.name)==='LNG HOLDING LOAD N GO INC');
+      if(lng){
+        lng.customerNumber='15291';
+        lng.billCusId='15291';
+        lng.broadType='EXISTING CUSTOMER';
+        lng.layer='WIN-BACK CUSTOMERS';
+        lng.accountType='WIN-BACK CUSTOMER';
+        lng.badge='orange';
+        lng.priority='ORANGE - WIN-BACK RESEARCH';
+        lng.routeEligible=true;
+        lng.masterReconciled='2026-09-22';
+        appendNote(lng,'MASTER RECONCILED 09-22-2026: Existing customer #15291 LOAD N GO. Bolingbrook operating location confirmed; keep 534 Territorial Dr Ste B as route address.');
+      }
+
+      // Great Dane Chicago prospect is a duplicate of existing customer #13577 GREAT DANE,
+      // which is already correctly represented as a Win-Back customer in the working data.
+      const gdPros=accounts.find(a=>a.broadType==='PROSPECT'&&masterNorm(a.name)==='GREAT DANE CHICAGO');
+      if(gdPros){
+        gdPros.routeEligible=false;
+        gdPros.broadType='SUPPRESSED DUPLICATE';
+        gdPros.layer='DUPLICATE SUPPRESSED';
+        gdPros.accountType='DUPLICATE OF CUSTOMER #13577';
+        gdPros.masterReconciled='2026-09-22';
+        appendNote(gdPros,'MASTER RECONCILED 09-22-2026: Duplicate of existing GREAT DANE customer #13577. Do not route as a prospect.');
+      }
+      const gdExisting=accounts.find(a=>String(a.customerNumber||'')==='13577');
+      if(gdExisting){
+        gdExisting.masterReconciled='2026-09-22';
+        appendNote(gdExisting,'MASTER RECONCILED 09-22-2026: Confirmed existing customer. No positive parts purchase found in 12-month analysis and no service-ranking match; keep as Win-Back.');
+      }
+
+      refreshReconciledStats();
+      return true;
+    }catch(e){console.warn('NWTB master reconciliation:',e);return false}
+  }
+  function waitForReconciliation(tries=0){
+    if(applyMasterReconciliation())return;
+    if(tries<80)setTimeout(()=>waitForReconciliation(tries+1),100);
+  }
+  waitForReconciliation();
+
   const encPlace=x=>{
     const name=String(x?.name||'').trim(),address=String(x?.address||'').trim();
     if(name&&address)return encodeURIComponent(`${name}, ${address}`);
@@ -68,6 +173,7 @@
   const baseBuild=window.buildRoute;
   if(typeof baseBuild==='function'){
     window.buildRoute=async function(){
+      applyMasterReconciliation();
       const desktop=!isPhone();
       let mapTab=null;
       if(desktop){
@@ -81,6 +187,7 @@
       }
       try{
         await baseBuild.apply(this,arguments);
+        applyMasterReconciliation();
         addNavigationPanel();
         if(desktop&&mapTab){
           const first=currentMapLinks?.[0]?.url;
