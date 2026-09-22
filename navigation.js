@@ -28,9 +28,6 @@
     try{
       if(!Array.isArray(accounts)||!accounts.length)return false;
 
-      // BSL Express: confirmed NWTB customer #18812. Current service activity exists,
-      // while the 12-month parts analysis found no positive parts sale. Treat as active-service
-      // with a parts cross-sell opportunity, not as a brand-new prospect.
       const bsl=accounts.find(a=>a.broadType==='PROSPECT'&&masterNorm(a.name)==='BSL EXPRESS TRUCKING INC');
       if(bsl){
         bsl.originalProspectName=bsl.originalProspectName||bsl.name;
@@ -46,9 +43,6 @@
         appendNote(bsl,'MASTER RECONCILED 09-22-2026: Existing customer #18812. Service activity found; no positive parts purchase found in the 12-month parts analysis. Keep verified Romeoville route address; Willowbrook is the updated billing/master address.');
       }
 
-      // USA Logistics: confirmed existing customer #14176. The current prospect phone matches
-      // the FMCSA phone tied to that NWTB customer identity. No current parts/service sale match
-      // was found in the reviewed reports, so this is a recovery account rather than new business.
       const usa=accounts.find(a=>a.broadType==='PROSPECT'&&masterNorm(a.name)==='USA LOGISTICS INC');
       if(usa){
         usa.customerNumber='14176';
@@ -63,8 +57,6 @@
         appendNote(usa,'MASTER RECONCILED 09-22-2026: Existing NWTB customer #14176; current BillCusId 15160. Current prospect phone matches the carrier identity. Keep verified Woodridge operating address.');
       }
 
-      // Load N Go: confirmed existing customer #15291 by exact legal-name/location evidence.
-      // No current positive sales match was found in the reviewed reports, so move to Win-Back.
       const lng=accounts.find(a=>a.broadType==='PROSPECT'&&masterNorm(a.name)==='LNG HOLDING LOAD N GO INC');
       if(lng){
         lng.customerNumber='15291';
@@ -79,8 +71,6 @@
         appendNote(lng,'MASTER RECONCILED 09-22-2026: Existing customer #15291 LOAD N GO. Bolingbrook operating location confirmed; keep 534 Territorial Dr Ste B as route address.');
       }
 
-      // Great Dane Chicago prospect is a duplicate of existing customer #13577 GREAT DANE,
-      // which is already correctly represented as a Win-Back customer in the working data.
       const gdPros=accounts.find(a=>a.broadType==='PROSPECT'&&masterNorm(a.name)==='GREAT DANE CHICAGO');
       if(gdPros){
         gdPros.routeEligible=false;
@@ -100,11 +90,98 @@
       return true;
     }catch(e){console.warn('NWTB master reconciliation:',e);return false}
   }
+
+  // FINAL 2026-09-22 GO FIRST HOLD AUDIT.
+  // The former four HOLD records are now resolved:
+  // 11060 commercial/route OK; 10803 + 28280 residential/do-not-route;
+  // 24956 stale duplicate of the canonical Highboost #28369 and suppressed.
+  function applyHoldAudit(){
+    try{
+      if(!Array.isArray(accounts)||!accounts.length)return false;
+
+      const iron=accounts.find(a=>String(a.customerNumber||'')==='11060');
+      if(iron){
+        if(!iron.originalAddress)iron.originalAddress=iron.address;
+        iron.address='2605 W 22nd St, Suite 32, Oak Brook, IL 60523';
+        // Routing point centered on the 2603/2607 W 22nd St office complex.
+        iron.lat=41.845455;
+        iron.lon=-87.980871;
+        iron.routeEligible=true;
+        iron.locationVerification='COMMERCIAL — ROUTE OK';
+        iron.auditAddressCorrected=true;
+        iron.auditLocationNote='FINAL HOLD AUDIT 09-22-2026: current Oak Brook commercial office; route approved.';
+        iron.holdAuditStatus='COMMERCIAL_ROUTE_OK';
+        appendNote(iron,'FINAL HOLD AUDIT 09-22-2026: Iron Way Transportation #11060 moved from the old Naperville residential address to the verified commercial office at 2605 W 22nd St Suite 32, Oak Brook.');
+      }
+
+      const high=accounts.find(a=>String(a.customerNumber||'')==='24956');
+      if(high){
+        high.routeEligible=false;
+        high.holdAuditStatus='STALE_DUPLICATE_SUPPRESSED';
+        high.accountType='STALE RECORD — USE HIGHBOOST #28369';
+        high.locationVerification='STALE/DUPLICATE — DO NOT ROUTE';
+        appendNote(high,'FINAL HOLD AUDIT 09-22-2026: stale High Boost record. Do not route #24956; canonical current Highboost record is #28369 at 5 Territorial Ct, Bolingbrook.');
+      }
+
+      const four=accounts.find(a=>String(a.customerNumber||'')==='10803');
+      if(four){
+        four.routeEligible=false;
+        four.holdAuditStatus='RESIDENTIAL_DO_NOT_ROUTE';
+        four.locationVerification='RESIDENTIAL — DO NOT ROUTE';
+        appendNote(four,'FINAL HOLD AUDIT 09-22-2026: active carrier but current verified company address is residential. Keep account; do not route until a commercial office/yard is verified.');
+      }
+
+      const ssmuz=accounts.find(a=>String(a.customerNumber||'')==='28280');
+      if(ssmuz){
+        ssmuz.routeEligible=false;
+        ssmuz.holdAuditStatus='RESIDENTIAL_DO_NOT_ROUTE';
+        ssmuz.locationVerification='RESIDENTIAL — DO NOT ROUTE';
+        appendNote(ssmuz,'FINAL HOLD AUDIT 09-22-2026: active carrier but current verified address is an apartment/residential location. Keep account; do not route until a commercial office/yard is verified.');
+      }
+
+      refreshReconciledStats();
+      setFinalSafetyNotice();
+      return true;
+    }catch(e){console.warn('NWTB hold audit:',e);return false}
+  }
+
+  function setFinalSafetyNotice(){
+    try{
+      const n=$('safetyNotice');
+      if(!n)return;
+      const html='<b>LOCATION SAFETY GATE:</b> Prospects: 29 commercial approved • 8 residential blocked • 0 hold. GO FIRST existing audit: 31 commercial approved • 14 residential blocked • 0 hold. 4 stale/duplicate customer records stay suppressed. <b>Only audited commercial records in these groups can route.</b>';
+      if(n.innerHTML!==html)n.innerHTML=html;
+    }catch{}
+  }
+
+  function applyAllReconciliation(){
+    const a=applyMasterReconciliation();
+    const b=applyHoldAudit();
+    refreshReconciledStats();
+    setFinalSafetyNotice();
+    return a||b;
+  }
+
   function waitForReconciliation(tries=0){
-    if(applyMasterReconciliation())return;
+    if(applyAllReconciliation())return;
     if(tries<80)setTimeout(()=>waitForReconciliation(tries+1),100);
   }
   waitForReconciliation();
+
+  // If the older safety gate refreshes itself later (for example after visit-status loading),
+  // immediately re-apply the completed 09-22 hold decisions and the final counts.
+  setTimeout(()=>{
+    const n=$('safetyNotice');
+    if(n){
+      const obs=new MutationObserver(()=>{
+        applyMasterReconciliation();
+        applyHoldAudit();
+        refreshReconciledStats();
+        setFinalSafetyNotice();
+      });
+      obs.observe(n,{childList:true,subtree:true,characterData:true});
+    }
+  },800);
 
   const encPlace=x=>{
     const name=String(x?.name||'').trim(),address=String(x?.address||'').trim();
@@ -170,33 +247,120 @@
     };
   }
 
-  const baseBuild=window.buildRoute;
-  if(typeof baseBuild==='function'){
-    window.buildRoute=async function(){
-      applyMasterReconciliation();
-      const desktop=!isPhone();
-      let mapTab=null;
-      if(desktop){
-        try{
-          mapTab=window.open('about:blank','nwtb_google_maps_route');
-          if(mapTab){
-            mapTab.document.title='NWTB Route — Loading';
-            mapTab.document.body.innerHTML='<div style="font-family:Arial;padding:30px"><h2>NWTB Route</h2><p>Optimizing route and opening Google Maps...</p></div>';
+  function applySubFilterFinal(cand,t){
+    const sub=$('routeSubFilter')?.value||'';
+    if(t==='new_business'){
+      if(sub==='go_first_prospects')return cand.filter(a=>a.broadType==='PROSPECT'&&a.layer==='GO FIRST');
+      if(sub==='regular_prospects')return cand.filter(a=>a.broadType==='PROSPECT'&&a.layer==='VERIFIED PROSPECTS');
+      return cand.filter(a=>a.broadType==='PROSPECT');
+    }
+    if(t==='existing'){
+      if(sub==='go_first_existing')return cand.filter(a=>a.broadType==='EXISTING CUSTOMER'&&a.layer==='GO FIRST');
+      if(sub==='winback_existing')return cand.filter(a=>a.broadType==='EXISTING CUSTOMER'&&a.layer==='WIN-BACK CUSTOMERS');
+      if(sub==='active_existing')return cand.filter(a=>a.broadType==='EXISTING CUSTOMER'&&a.layer==='ACTIVE CUSTOMERS');
+      return cand.filter(a=>a.broadType==='EXISTING CUSTOMER');
+    }
+    return cand;
+  }
+
+  async function selectEfficientNewBusinessFinal(cand,n){
+    if(cand.length<=n)return cand.slice();
+    try{
+      const pts=[depot,...cand];
+      const coords=pts.map(p=>`${p.lon},${p.lat}`).join(';');
+      const matrix=await osrm(`https://router.project-osrm.org/table/v1/driving/${coords}?annotations=duration`);
+      if(matrix.code!=='Ok'||!matrix.durations)throw new Error('Road matrix unavailable');
+      const m=matrix.durations,remaining=new Set(Array.from({length:cand.length},(_,i)=>i+1));
+      const tour=[0,0];
+      while(tour.length-2<n&&remaining.size){
+        let bestIdx=null,bestPos=null,bestDelta=Infinity;
+        for(const idx of remaining){
+          for(let pos=0;pos<tour.length-1;pos++){
+            const a=tour[pos],b=tour[pos+1],ab=m[a]?.[b],ai=m[a]?.[idx],ib=m[idx]?.[b];
+            if(ab==null||ai==null||ib==null)continue;
+            const delta=ai+ib-ab;
+            if(delta<bestDelta){bestDelta=delta;bestIdx=idx;bestPos=pos+1}
           }
-        }catch{}
-      }
-      try{
-        await baseBuild.apply(this,arguments);
-        applyMasterReconciliation();
-        addNavigationPanel();
-        if(desktop&&mapTab){
-          const first=currentMapLinks?.[0]?.url;
-          if(first)mapTab.location.href=first;else mapTab.close();
         }
-      }catch(e){
-        if(mapTab)try{mapTab.close()}catch{}
-        throw e;
+        if(bestIdx==null)break;
+        tour.splice(bestPos,0,bestIdx);
+        remaining.delete(bestIdx);
       }
+      const chosen=tour.slice(1,-1).map(i=>cand[i-1]);
+      if(chosen.length===n)return chosen;
+    }catch(e){console.warn('Efficiency-first selection fallback:',e)}
+    return cand.slice().sort((a,b)=>miles(depot,a)-miles(depot,b)).slice(0,n);
+  }
+
+  // Final route builder uses routeEligible as the completed safety decision.
+  // This lets Iron Way #11060 route at its corrected Oak Brook commercial office while
+  // preserving all residential / duplicate blocks and all master-reconciliation changes.
+  async function buildFinalAuditedRoute(){
+    applyAllReconciliation();
+    const out=$('output'),t=$('routeType').value,r=+$('radius').value,includeFollow=$('includeFollowUps')?.checked;
+    let n=Math.max(1,Math.min(25,+$('stopCount').value||10));
+    let cand=accounts.filter(a=>a.routeEligible)
+      .filter(filterFn(t))
+      .filter(a=>r>=999||miles(depot,a)<=r);
+    cand=applySubFilterFinal(cand,t);
+    cand=cand.filter(a=>{
+      if(a.broadType!=='PROSPECT')return true;
+      const s=a.visitStatus||'NOT_VISITED';
+      if(s==='DO_NOT_ROUTE'||s==='NOT_A_FIT')return false;
+      if(t==='new_business'&&s==='FOLLOW_UP'&&!includeFollow)return false;
+      return true;
+    });
+    if(!cand.length){alert('No eligible audited-commercial accounts matched these filters.');return}
+    n=Math.min(n,cand.length);
+    out.style.display='block';out.innerHTML='<b>Choosing the most efficient customer group and optimizing the road route...</b>';
+    try{
+      let sel;
+      if(t==='new_business')sel=await selectEfficientNewBusinessFinal(cand,n);
+      else if(t==='mixed')sel=selectMixed(cand,n);
+      else sel=selectCluster(cand,n,t);
+      const j=await optimize(sel);
+      renderRoute(j.order.map(i=>sel[i]),{miles:j.miles,minutes:j.minutes,efficiencyFirst:t==='new_business'});
+    }catch(e){out.innerHTML=`<div class="notice"><b>ROUTE NOT CREATED:</b> ${esc(e.message||e)}</div>`}
+  }
+
+  window.buildRoute=async function(){
+    const desktop=!isPhone();
+    let mapTab=null;
+    if(desktop){
+      try{
+        mapTab=window.open('about:blank','nwtb_google_maps_route');
+        if(mapTab){
+          mapTab.document.title='NWTB Route — Loading';
+          mapTab.document.body.innerHTML='<div style="font-family:Arial;padding:30px"><h2>NWTB Route</h2><p>Optimizing route and opening Google Maps...</p></div>';
+        }
+      }catch{}
+    }
+    try{
+      await buildFinalAuditedRoute();
+      applyAllReconciliation();
+      addNavigationPanel();
+      if(desktop&&mapTab){
+        const first=currentMapLinks?.[0]?.url;
+        if(first)mapTab.location.href=first;else mapTab.close();
+      }
+    }catch(e){
+      if(mapTab)try{mapTab.close()}catch{}
+      throw e;
+    }
+  };
+
+  const baseShow=window.showCard;
+  if(typeof baseShow==='function'){
+    window.showCard=async function(i){
+      const r=await baseShow(i);
+      try{
+        const a=currentRoute?.[i];
+        if(String(a?.customerNumber||'')==='11060'){
+          const box=document.querySelector('#modal .locationbox');
+          if(box)box.innerHTML='<h3>LOCATION VERIFICATION</h3><span class="locationstatus loc-ok">COMMERCIAL — ROUTE OK</span><div class="visit-note"><b>Address corrected:</b> 1821 S Washington Street, Apt #3, Naperville → 2605 W 22nd St, Suite 32, Oak Brook, IL 60523</div><div class="visit-note">FINAL HOLD AUDIT 09-22-2026: verified current commercial office.</div>';
+        }
+      }catch{}
+      return r;
     };
   }
 })();
