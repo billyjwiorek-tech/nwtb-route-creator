@@ -1,120 +1,69 @@
 (function(){
 'use strict';
 const RESOLVER='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-location-resolver';
-let customCoords=null;
-let lastLocatedAddress='';
-const byId=id=>document.getElementById(id);
-const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+const DELIVERY_API='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-delivery';
+let staged=[];
+let located=null;
+let locatedAddress='';
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#039;'}[m]));
+function validCoord(lat,lon){lat=Number(lat);lon=Number(lon);return Number.isFinite(lat)&&Number.isFinite(lon)&&lat>=20&&lat<=60&&lon>=-135&&lon<=-55}
+function msg(text,type='info'){const e=$('customRouteMsg');if(!e)return;e.textContent=text||'';e.className='customMsg'+(text?' show '+type:'')}
 
-function ensureStyles(){
- if(byId('customRouteStyles'))return;
- const s=document.createElement('style');
- s.id='customRouteStyles';
- s.textContent=`
- .customRouteLaunch{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:12px 0 4px;padding:12px 14px;border:1px solid #c7d7fe;background:#f7f9ff;border-radius:12px}
- .customRouteLaunch b{display:block;font-size:12px;color:#182230}.customRouteLaunch span{display:block;font-size:10px;color:#667085;margin-top:3px}
- .customRouteBtn{border:0;border-radius:9px;padding:10px 14px;background:#1d4ed8;color:white;font-weight:900;font-size:11px;cursor:pointer;white-space:nowrap}
- .customRouteBtn:hover{background:#1e40af}.customModalBack{position:fixed;inset:0;background:rgba(15,23,42,.58);display:none;align-items:center;justify-content:center;z-index:2200;padding:18px}.customModalBack.show{display:flex}
- .customModal{width:min(820px,97vw);max-height:90vh;overflow:auto;background:#fff;border-radius:18px;box-shadow:0 30px 90px rgba(15,23,42,.3);border:1px solid #e4e7ec;padding:20px}.customModalHead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}.customModalHead h2{margin:0;font-size:19px}.customModalHead p{margin:5px 0 0;color:#667085;font-size:11px}
- .customGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.customWide{grid-column:1/-1}.customField label{display:block;font-size:10px;font-weight:850;margin:0 0 6px;color:#344054}.customField input,.customField select,.customField textarea{width:100%;box-sizing:border-box;border:1px solid #d0d5dd;border-radius:9px;padding:10px 11px;font:inherit;background:#fff}.customField textarea{min-height:80px;resize:vertical}.customField input:focus,.customField select:focus,.customField textarea:focus{outline:2px solid #dbeafe;border-color:#84adff}
- .customActions{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}.customAction{border:0;border-radius:9px;padding:10px 14px;font-weight:900;cursor:pointer}.customLocate{background:#eef4ff;color:#1d4ed8;border:1px solid #c7d7fe}.customAdd{background:#087a43;color:white}.customClose{background:#f2f4f7;color:#344054}.customMsg{display:none;margin-top:12px;border-radius:10px;padding:10px 12px;font-size:11px;font-weight:700}.customMsg.show{display:block}.customMsg.info{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}.customMsg.ok{background:#ecfdf3;color:#067647;border:1px solid #abefc6}.customMsg.err{background:#fff1f0;color:#b42318;border:1px solid #fecdca}.customFound{margin-top:8px;font-size:10px;color:#475467}.customCheck{display:flex;align-items:center;gap:8px;font-size:11px;color:#475467;margin-top:8px}.customCheck input{width:auto}
- @media(max-width:680px){.customGrid{grid-template-columns:1fr}.customWide{grid-column:auto}.customRouteLaunch{align-items:flex-start;flex-direction:column}.customRouteBtn{width:100%}}
- `;
+function styles(){
+ if($('customRouteStyles'))return;
+ const s=document.createElement('style');s.id='customRouteStyles';s.textContent=`
+.customRouteLaunch{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:12px 0 4px;padding:13px 14px;border:1px solid #c7d7fe;background:#f7f9ff;border-radius:12px}.customRouteLaunch b{display:block;font-size:12px;color:#182230}.customRouteLaunch span{display:block;font-size:10px;color:#667085;margin-top:3px}.customRouteBtn{border:0;border-radius:9px;padding:10px 14px;background:#1d4ed8;color:#fff;font-weight:900;font-size:11px;cursor:pointer;white-space:nowrap}.customRouteBtn:hover{background:#1e40af}
+.customModalBack{position:fixed;inset:0;background:rgba(15,23,42,.58);display:none;align-items:center;justify-content:center;z-index:2200;padding:18px}.customModalBack.show{display:flex}.customModal{width:min(1040px,98vw);max-height:92vh;overflow:auto;background:#fff;border-radius:18px;box-shadow:0 30px 90px rgba(15,23,42,.3);border:1px solid #e4e7ec;padding:20px}.customModalHead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}.customModalHead h2{margin:0;font-size:20px}.customModalHead p{margin:5px 0 0;color:#667085;font-size:11px}
+.customBuilder{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(360px,.95fr);gap:16px}.customCard{border:1px solid #e4e7ec;border-radius:14px;padding:15px;background:#fff}.customCard h3{font-size:13px;margin:0 0 4px}.customCardSub{font-size:10px;color:#667085;margin-bottom:12px}.customGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.customWide{grid-column:1/-1}.customField label{display:block;font-size:10px;font-weight:850;margin:0 0 5px;color:#344054}.customField input,.customField select,.customField textarea{width:100%;box-sizing:border-box;border:1px solid #d0d5dd;border-radius:9px;padding:9px 10px;font:inherit;background:#fff}.customField textarea{min-height:66px;resize:vertical}.customField input:focus,.customField select:focus,.customField textarea:focus{outline:2px solid #dbeafe;border-color:#84adff}.customFound{font-size:10px;color:#475467;margin-top:5px}.customCheck{display:flex;align-items:center;gap:7px;font-size:10px;color:#475467;margin-top:8px}.customCheck input{width:auto}
+.customActions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.customAction{border:0;border-radius:9px;padding:10px 13px;font-weight:900;font-size:11px;cursor:pointer}.customLocate{background:#eef4ff;color:#1d4ed8;border:1px solid #c7d7fe}.customStage{background:#087a43;color:#fff}.customPlanner{background:#2563eb;color:#fff}.customExact{background:#101828;color:#fff}.customClose{background:#f2f4f7;color:#344054}.customClear{background:#fff1f0;color:#b42318;border:1px solid #fecdca}.customAction:disabled{opacity:.45;cursor:not-allowed}
+.customList{display:flex;flex-direction:column;gap:8px;min-height:120px}.customEmpty{border:1px dashed #d0d5dd;border-radius:10px;padding:28px 12px;text-align:center;color:#98a2b3;font-size:11px}.customStop{border:1px solid #e4e7ec;border-radius:11px;padding:11px;background:#fafbfc;display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:9px;align-items:start}.customNum{width:30px;height:30px;border-radius:9px;background:#101828;color:#fff;display:grid;place-items:center;font-size:11px;font-weight:900}.customStop b{display:block;font-size:11px;color:#182230}.customStop span{display:block;font-size:10px;color:#667085;margin-top:3px;line-height:1.35}.customStopBtns{display:flex;gap:4px}.customMini{border:1px solid #d0d5dd;background:#fff;border-radius:7px;padding:5px 7px;font-weight:900;font-size:10px;cursor:pointer}.customMini.danger{color:#b42318}.customSummary{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:10px}.customMetric{border:1px solid #e4e7ec;border-radius:9px;padding:9px;background:#fff}.customMetric span{display:block;font-size:9px;color:#667085;text-transform:uppercase;font-weight:850}.customMetric b{display:block;font-size:14px;margin-top:3px}.customRouteInfo{font-size:10px;color:#475467;border:1px solid #e4e7ec;background:#f8fafc;border-radius:9px;padding:9px 10px;margin-top:10px}.customMsg{display:none;margin-top:12px;border-radius:10px;padding:10px 12px;font-size:11px;font-weight:700}.customMsg.show{display:block}.customMsg.info{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}.customMsg.ok{background:#ecfdf3;color:#067647;border:1px solid #abefc6}.customMsg.err{background:#fff1f0;color:#b42318;border:1px solid #fecdca}
+@media(max-width:820px){.customBuilder{grid-template-columns:1fr}.customGrid{grid-template-columns:1fr}.customWide{grid-column:auto}.customRouteLaunch{align-items:flex-start;flex-direction:column}.customRouteBtn{width:100%}}
+`;
  document.head.appendChild(s);
 }
-
-function findCreateHeading(){
- return Array.from(document.querySelectorAll('h1,h2,h3,h4')).find(x=>x.textContent.trim().toLowerCase()==='create new stop');
-}
-
-function injectLauncher(){
- if(byId('customRouteLauncher'))return true;
- const heading=findCreateHeading();
- if(!heading)return false;
- const box=document.createElement('div');
- box.id='customRouteLauncher';
- box.className='customRouteLaunch';
- box.innerHTML='<div><b>Need a stop that is not in Customer or Vendor Master?</b><span>Paste a street address from Google Maps and add it directly to the dispatch queue.</span></div><button type="button" class="customRouteBtn" onclick="openCustomRoute()">CUSTOM ROUTE / ADDRESS</button>';
- const subtitle=heading.nextElementSibling;
- if(subtitle) subtitle.insertAdjacentElement('afterend',box); else heading.insertAdjacentElement('afterend',box);
- return true;
-}
-
-function injectModal(){
- if(byId('customRouteModal'))return;
- const m=document.createElement('div');
- m.id='customRouteModal';
- m.className='customModalBack';
- m.innerHTML=`<div class="customModal" role="dialog" aria-modal="true" aria-labelledby="customRouteTitle">
-  <div class="customModalHead"><div><h2 id="customRouteTitle">Custom Route / Manual Address</h2><p>Use this for deliveries, pickups, or one-time locations that are not in the NWTB master lists.</p></div><button type="button" class="customAction customClose" onclick="closeCustomRoute()">CLOSE</button></div>
+function findHeading(){return Array.from(document.querySelectorAll('h1,h2,h3,h4')).find(x=>x.textContent.trim().toLowerCase()==='create new stop')}
+function launcher(){if($('customRouteLauncher'))return true;const h=findHeading();if(!h)return false;const b=document.createElement('div');b.id='customRouteLauncher';b.className='customRouteLaunch';b.innerHTML='<div><b>Build a route from locations that are not in the master lists</b><span>Add multiple Google addresses, arrange them, then optimize them or create the route in your exact order.</span></div><button type="button" class="customRouteBtn" onclick="openCustomRoute()">CUSTOM ROUTE BUILDER</button>';const sub=h.nextElementSibling;if(sub)sub.insertAdjacentElement('afterend',b);else h.insertAdjacentElement('afterend',b);return true}
+function modal(){if($('customRouteModal'))return;const m=document.createElement('div');m.id='customRouteModal';m.className='customModalBack';m.innerHTML=`<div class="customModal" role="dialog" aria-modal="true">
+<div class="customModalHead"><div><h2>Custom Route Builder</h2><p>Add as many one-time stops as needed. Every finished route still starts and returns to Northwest Trucks — Bolingbrook.</p></div><button class="customAction customClose" onclick="closeCustomRoute()">CLOSE</button></div>
+<div class="customBuilder">
+ <div class="customCard"><h3>Add a Stop</h3><div class="customCardSub">Paste the full physical address shown in Google Maps. The address is live-geocoded before it can be staged.</div>
   <div class="customGrid">
    <div class="customField"><label>STOP NAME</label><input id="customName" placeholder="Example: FleetPride Joliet"></div>
    <div class="customField"><label>STOP TYPE</label><select id="customType"><option value="OTHER">Other / One-Time Stop</option><option value="CUSTOMER_DELIVERY">Customer Delivery</option><option value="CUSTOMER_PICKUP">Customer Pickup</option><option value="VENDOR_PICKUP">Vendor Pickup</option><option value="CORE_RETURN_PICKUP">Core Return Pickup</option></select></div>
-   <div class="customField customWide"><label>GOOGLE / PHYSICAL STREET ADDRESS</label><input id="customAddress" placeholder="Paste the full street address shown in Google Maps"><div class="customFound" id="customFound">Paste the address itself, not a shortened Google share link.</div></div>
-   <div class="customField"><label>PHONE (OPTIONAL)</label><input id="customPhone" placeholder="Phone number"></div>
-   <div class="customField"><label>PIECES</label><input id="customPieces" type="number" min="0" max="9999" value="1"></div>
-   <div class="customField"><label>SALES ORDER # (OPTIONAL)</label><input id="customSalesOrder"></div>
-   <div class="customField"><label>PO / REFERENCE # (OPTIONAL)</label><input id="customReference"></div>
-   <div class="customField"><label>PRIORITY</label><select id="customPriority"><option value="NORMAL">NORMAL</option><option value="PRIORITY">PRIORITY</option><option value="HOT_SHOT">HOT SHOT</option></select></div>
-   <div class="customField"><label>PROMISED BY (OPTIONAL)</label><input id="customPromised" type="datetime-local"></div>
-   <div class="customField customWide"><label>DRIVER / PICKUP NOTES</label><textarea id="customNotes" placeholder="Dock instructions, contact name, what to pick up, etc."></textarea></div>
+   <div class="customField customWide"><label>GOOGLE / PHYSICAL STREET ADDRESS</label><input id="customAddress" placeholder="Paste the complete street address"><div class="customFound" id="customFound">Paste the address itself, not a shortened Google share link.</div></div>
+   <div class="customField"><label>PHONE (OPTIONAL)</label><input id="customPhone"></div><div class="customField"><label>PIECES</label><input id="customPieces" type="number" min="0" max="9999" value="1"></div>
+   <div class="customField"><label>SALES ORDER #</label><input id="customSalesOrder"></div><div class="customField"><label>PO / REFERENCE #</label><input id="customReference"></div>
+   <div class="customField"><label>PRIORITY</label><select id="customPriority"><option value="NORMAL">NORMAL</option><option value="PRIORITY">PRIORITY</option><option value="HOT_SHOT">HOT SHOT</option></select></div><div class="customField"><label>PROMISED BY</label><input id="customPromised" type="datetime-local"></div>
+   <div class="customField customWide"><label>DRIVER / PICKUP NOTES</label><textarea id="customNotes"></textarea></div>
   </div>
-  <label class="customCheck"><input id="customSaveFrequent" type="checkbox"> Save this as a Frequent Location for future use</label>
-  <div class="customActions"><button type="button" class="customAction customLocate" onclick="locateCustomAddress()">LOCATE ADDRESS</button><button type="button" class="customAction customAdd" onclick="addCustomStop()">ADD TO DISPATCH QUEUE</button></div>
-  <div id="customRouteMsg" class="customMsg"></div>
- </div>`;
- m.addEventListener('click',e=>{if(e.target===m)closeCustomRoute()});
- document.body.appendChild(m);
- byId('customAddress').addEventListener('input',()=>{customCoords=null;lastLocatedAddress='';setCustomMsg('', '');byId('customFound').textContent='Address changed — click LOCATE ADDRESS or ADD TO DISPATCH QUEUE to geocode it.'});
+  <label class="customCheck"><input id="customSaveFrequent" type="checkbox"> Save this individual stop as a Frequent Location after it is created</label>
+  <div class="customActions"><button class="customAction customLocate" onclick="locateCustomAddress()">LOCATE ADDRESS</button><button class="customAction customStage" onclick="stageCustomStop()">ADD STOP TO CUSTOM ROUTE</button></div>
+ </div>
+ <div class="customCard"><h3>Custom Route Stops</h3><div class="customCardSub">Use ↑ and ↓ to set a manual route order. Or send all stops to the normal optimizer.</div>
+  <div class="customSummary"><div class="customMetric"><span>Stops</span><b id="customCount">0</b></div><div class="customMetric"><span>Pieces</span><b id="customPiecesTotal">0</b></div><div class="customMetric"><span>Mode</span><b>CUSTOM</b></div></div>
+  <div id="customStopList" class="customList"></div>
+  <div class="customRouteInfo" id="customRouteInfo">For <b>CREATE ROUTE IN THIS ORDER</b>, first choose the Driver, Wave and Route Date in the main Route Planning section.</div>
+  <div class="customActions"><button id="customPlannerBtn" class="customAction customPlanner" onclick="sendCustomToPlanner()" disabled>SEND TO ROUTE PLANNER</button><button id="customExactBtn" class="customAction customExact" onclick="createExactCustomRoute()" disabled>CREATE ROUTE IN THIS ORDER</button><button id="customClearBtn" class="customAction customClear" onclick="clearCustomRoute()" disabled>CLEAR ALL</button></div>
+ </div>
+</div><div id="customRouteMsg" class="customMsg"></div></div>`;m.onclick=e=>{if(e.target===m)closeCustomRoute()};document.body.appendChild(m);
+ $('customAddress').addEventListener('input',()=>{located=null;locatedAddress='';$('customFound').textContent='Address changed — it must be located again before staging.'});renderStaged();
 }
-
-function setCustomMsg(text,type){const el=byId('customRouteMsg');if(!el)return;el.textContent=text||'';el.className='customMsg'+(text?' show '+(type||'info'):'');}
-function validCoord(lat,lon){lat=Number(lat);lon=Number(lon);return Number.isFinite(lat)&&Number.isFinite(lon)&&lat>=20&&lat<=60&&lon>=-135&&lon<=-55;}
-
-window.openCustomRoute=function(){ensureStyles();injectModal();setCustomMsg('','');byId('customRouteModal').classList.add('show');setTimeout(()=>byId('customName')?.focus(),50)};
-window.closeCustomRoute=function(){byId('customRouteModal')?.classList.remove('show')};
-
-window.locateCustomAddress=async function(){
- const name=byId('customName').value.trim()||'Custom Stop';
- const address=byId('customAddress').value.trim();
- if(!address){setCustomMsg('Paste the full physical street address first.','err');return null}
- setCustomMsg('Live geocoding address…','info');
- try{
-  const j=await post(RESOLVER,{source_type:'OTHER',source_ref:'',name,address});
-  if(!validCoord(j.lat,j.lon))throw Error('The address was returned without usable coordinates.');
-  customCoords={lat:Number(j.lat),lon:Number(j.lon)};
-  lastLocatedAddress=address;
-  if(j.address)byId('customAddress').value=j.address;
-  if(j.matched_address)byId('customFound').textContent='Located: '+j.matched_address;
-  else byId('customFound').textContent='Address located successfully.';
-  setCustomMsg('Address located and ready to add.','ok');
-  return customCoords;
- }catch(e){customCoords=null;lastLocatedAddress='';setCustomMsg(e.message||'Address could not be located.','err');return null}
-};
-
-window.addCustomStop=async function(){
- const name=byId('customName').value.trim();
- let address=byId('customAddress').value.trim();
- if(!name){setCustomMsg('Enter a stop name so the driver knows where they are going.','err');return}
- if(!address){setCustomMsg('Paste the full physical street address first.','err');return}
- try{
-  if(!customCoords||lastLocatedAddress!==address){const c=await locateCustomAddress();if(!c)return;address=byId('customAddress').value.trim()}
-  setCustomMsg('Adding custom stop to the AVAILABLE queue…','info');
-  const payload={action:'order_create',customer_name:name,address,lat:customCoords.lat,lon:customCoords.lon,phone:byId('customPhone').value.trim(),pieces:Number(byId('customPieces').value||1),priority:byId('customPriority').value,promised_by:byId('customPromised').value||null,notes:byId('customNotes').value.trim(),sales_order_no:byId('customSalesOrder').value.trim(),reference_no:byId('customReference').value.trim(),stop_type:byId('customType').value,source_type:'OTHER',source_ref:null};
-  await post(API,payload);
-  if(byId('customSaveFrequent').checked){
-   await post(API,{action:'saved_location_create',source_type:'OTHER',name,address,phone:byId('customPhone').value.trim(),lat:customCoords.lat,lon:customCoords.lon,instructions:byId('customNotes').value.trim(),frequent:true,verified:true});
-  }
-  setCustomMsg('Custom stop added successfully.','ok');
-  if(typeof refreshAll==='function')await refreshAll();
-  if(typeof setQueue==='function'){const b=document.querySelector('.filter[data-q="AVAILABLE"]');setQueue('AVAILABLE',b)}
-  if(typeof showBanner==='function'&&byId('addMsg'))showBanner('addMsg','Custom address added to the AVAILABLE dispatch queue.','ok');
-  setTimeout(()=>{closeCustomRoute();resetCustomForm()},850);
- }catch(e){setCustomMsg(e.message||'Could not add custom stop.','err')}
-};
-
-function resetCustomForm(){['customName','customAddress','customPhone','customSalesOrder','customReference','customPromised','customNotes'].forEach(id=>{if(byId(id))byId(id).value=''});if(byId('customPieces'))byId('customPieces').value='1';if(byId('customPriority'))byId('customPriority').value='NORMAL';if(byId('customType'))byId('customType').value='OTHER';if(byId('customSaveFrequent'))byId('customSaveFrequent').checked=false;if(byId('customFound'))byId('customFound').textContent='Paste the address itself, not a shortened Google share link.';customCoords=null;lastLocatedAddress='';setCustomMsg('','')}
-
-function bootCustom(){ensureStyles();injectModal();if(injectLauncher())return;let tries=0;const t=setInterval(()=>{tries++;if(injectLauncher()||tries>30)clearInterval(t)},250)}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bootCustom);else bootCustom();
+function routePlanInfo(){const d=$('driver'),w=$('wave'),dt=$('routeDate');const driverName=d&&d.value?d.options[d.selectedIndex]?.text:'No driver selected';return {driver:d?.value||'',driverName,wave:w?.value||'CUSTOM',date:dt?.value||new Date().toISOString().slice(0,10)}}
+function currentForm(){return {name:$('customName').value.trim(),address:$('customAddress').value.trim(),stop_type:$('customType').value,phone:$('customPhone').value.trim(),pieces:Math.max(0,Number($('customPieces').value||1)),sales_order_no:$('customSalesOrder').value.trim(),reference_no:$('customReference').value.trim(),priority:$('customPriority').value,promised_by:$('customPromised').value||null,notes:$('customNotes').value.trim(),save_frequent:$('customSaveFrequent').checked}}
+function resetEntry(){['customName','customAddress','customPhone','customSalesOrder','customReference','customPromised','customNotes'].forEach(id=>{if($(id))$(id).value=''});$('customPieces').value='1';$('customType').value='OTHER';$('customPriority').value='NORMAL';$('customSaveFrequent').checked=false;$('customFound').textContent='Paste the address itself, not a shortened Google share link.';located=null;locatedAddress='';setTimeout(()=>$('customName')?.focus(),30)}
+function renderStaged(){if(!$('customStopList'))return;$('customCount').textContent=staged.length;$('customPiecesTotal').textContent=staged.reduce((a,s)=>a+(Number(s.pieces)||0),0);const disabled=staged.length===0;['customPlannerBtn','customExactBtn','customClearBtn'].forEach(id=>{$(id).disabled=disabled});$('customStopList').innerHTML=disabled?'<div class="customEmpty">No custom stops added yet.<br>Add the first address on the left.</div>':staged.map((s,i)=>`<div class="customStop"><div class="customNum">${i+1}</div><div><b>${esc(s.name)}</b><span>${esc(s.address)}</span><span>${esc(s.stop_type.replaceAll('_',' '))} • ${Number(s.pieces)||0} piece${Number(s.pieces)===1?'':'s'} • ${esc(s.priority)}</span></div><div class="customStopBtns"><button class="customMini" onclick="moveCustomStop(${i},-1)" ${i===0?'disabled':''}>↑</button><button class="customMini" onclick="moveCustomStop(${i},1)" ${i===staged.length-1?'disabled':''}>↓</button><button class="customMini danger" onclick="removeCustomStop(${i})">×</button></div></div>`).join('');const p=routePlanInfo();$('customRouteInfo').innerHTML=`Exact-order route settings: <b>${esc(p.driverName)}</b> • <b>${esc(p.wave)}</b> • <b>${esc(p.date)}</b>. Every route starts and returns to NWTB Bolingbrook.`}
+window.openCustomRoute=function(){styles();modal();msg('');renderStaged();$('customRouteModal').classList.add('show');setTimeout(()=>$('customName')?.focus(),40)};
+window.closeCustomRoute=function(){$('customRouteModal')?.classList.remove('show')};
+window.locateCustomAddress=async function(){const f=currentForm();if(!f.address){msg('Paste the full physical street address first.','err');return null}msg('Live geocoding this address…','info');try{const j=await post(RESOLVER,{source_type:'OTHER',source_ref:'',name:f.name||'Custom Stop',address:f.address});if(!validCoord(j.lat,j.lon))throw Error('The address did not return usable coordinates.');located={lat:Number(j.lat),lon:Number(j.lon)};locatedAddress=j.address||f.address;$('customAddress').value=locatedAddress;$('customFound').textContent=j.matched_address?'Located: '+j.matched_address:'Address located successfully.';msg('Address located. You can add this stop to the custom route.','ok');return located}catch(e){located=null;locatedAddress='';msg(e.message||'Address could not be located.','err');return null}};
+window.stageCustomStop=async function(){let f=currentForm();if(!f.name){msg('Enter a stop name so the driver knows where they are going.','err');return}if(!f.address){msg('Paste the full physical address first.','err');return}if(!located||locatedAddress!==f.address){const c=await locateCustomAddress();if(!c)return;f=currentForm()}f.lat=located.lat;f.lon=located.lon;f.address=locatedAddress;staged.push(f);renderStaged();msg(`Stop ${staged.length} added to the custom route. Add another address or finish the route.`, 'ok');resetEntry()};
+window.moveCustomStop=function(i,delta){const j=i+delta;if(j<0||j>=staged.length)return;[staged[i],staged[j]]=[staged[j],staged[i]];renderStaged()};
+window.removeCustomStop=function(i){staged.splice(i,1);renderStaged();msg(staged.length?'Stop removed.':'Custom route is empty.','info')};
+window.clearCustomRoute=function(){staged=[];renderStaged();msg('Custom route cleared.','info')};
+async function createOrders(){const created=[];for(let i=0;i<staged.length;i++){const s=staged[i];msg(`Creating custom stop ${i+1} of ${staged.length}: ${s.name}…`,'info');const j=await post(DELIVERY_API,{action:'order_create',customer_name:s.name,address:s.address,lat:s.lat,lon:s.lon,phone:s.phone,pieces:s.pieces,priority:s.priority,promised_by:s.promised_by,notes:s.notes,sales_order_no:s.sales_order_no,reference_no:s.reference_no,stop_type:s.stop_type,source_type:'OTHER',source_ref:null});if(!j?.order?.id)throw Error(`Stop ${i+1} was not created correctly.`);created.push(j.order);if(s.save_frequent){await post(DELIVERY_API,{action:'saved_location_create',source_type:'OTHER',name:s.name,address:s.address,phone:s.phone,lat:s.lat,lon:s.lon,instructions:s.notes,frequent:true,verified:true})}}return created}
+async function selectCreated(ids){if(typeof refreshAll==='function')await refreshAll();if(typeof setQueue==='function'){const b=document.querySelector('.filter[data-q="AVAILABLE"]');setQueue('AVAILABLE',b)}await new Promise(r=>setTimeout(r,120));ids.forEach(id=>{const c=document.querySelector(`.pick[value="${CSS.escape(String(id))}"]`);if(c)c.checked=true});if(typeof updateSelected==='function')updateSelected()}
+window.sendCustomToPlanner=async function(){if(!staged.length)return;const count=staged.length;try{$('customPlannerBtn').disabled=true;$('customExactBtn').disabled=true;const created=await createOrders();await selectCreated(created.map(o=>o.id));staged=[];renderStaged();msg(`${count} custom stops were added to AVAILABLE and selected. Use OPTIMIZE + ASSIGN in Route Planning.`, 'ok');if(typeof showBanner==='function'&&$('routeMsg'))showBanner('routeMsg',`${count} custom stops are selected. Choose the driver and click OPTIMIZE + ASSIGN.`,'ok');setTimeout(()=>closeCustomRoute(),1100)}catch(e){msg((e.message||'Could not create the custom stops.')+' Any stops already created remain in AVAILABLE.','err');renderStaged()}};
+window.createExactCustomRoute=async function(){if(!staged.length)return;const p=routePlanInfo();if(!p.driver){msg('Choose a Driver in the main Route Planning section before creating an exact-order custom route.','err');return}const count=staged.length;try{$('customPlannerBtn').disabled=true;$('customExactBtn').disabled=true;const created=await createOrders();msg('Creating the route in your exact stop order…','info');const j=await post(DELIVERY_API,{action:'route_create',driver_employee_number:p.driver,depot:'BOLINGBROOK',wave:p.wave||'CUSTOM',route_date:p.date,orders:created.map(o=>({id:o.id})),route_note:'Custom manual route created from Custom Route Builder. Stop order preserved.'});if(!j?.route?.id)throw Error('The stops were created, but the route could not be assigned. They remain in AVAILABLE.');staged=[];renderStaged();if(typeof refreshAll==='function')await refreshAll();msg(`${count}-stop custom route created for ${p.driverName} in the exact order shown.`, 'ok');if(typeof showBanner==='function'&&$('routeMsg'))showBanner('routeMsg',`Custom ${count}-stop route created for ${p.driverName}. Manual stop order preserved.`,'ok');setTimeout(()=>closeCustomRoute(),1200)}catch(e){msg((e.message||'Could not create the custom route.')+' If the stops were already created, they remain available for dispatch.','err');renderStaged()}};
+function boot(){styles();modal();if(launcher())return;let n=0;const t=setInterval(()=>{n++;if(launcher()||n>40)clearInterval(t)},250)}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();
