@@ -1,7 +1,7 @@
 (()=>{
 const NAV='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-driver-navigation';
 const HOME_NAV={name:'Northwest Trucks - Bolingbrook',address:'201 S W Frontage Rd, Bolingbrook, IL 60440',lat:41.682487,lon:-88.072262};
-const NEAR_STOP_M=152.4,ARRIVAL_M=3.048;
+const NEAR_STOP_M=152.4,ARRIVAL_M=6.096;
 let navMap=null,navLine=null,navPos=null,navGlow=null,navDest=null,navWatch=null,navTarget=null,navSteps=[],navStepIndex=0,navRouteCoords=[],navLastReroute=0,navLastSpoken='',navRouteId='',navRouteMeta=null,baseFinish=null,arrivalFor='';
 
 const hav=(a,b)=>{const R=6371008.8,p=Math.PI/180,dLat=(b.lat-a.lat)*p,dLon=(b.lon-a.lon)*p,x=Math.sin(dLat/2)**2+Math.cos(a.lat*p)*Math.cos(b.lat*p)*Math.sin(dLon/2)**2;return 2*R*Math.asin(Math.sqrt(x))};
@@ -57,7 +57,6 @@ function initMap(lat,lon){const p=ensurePanel();p.classList.add('show');if(!wind
 function drawRoute(current){if(!navMap||!window.L)return;if(navLine)navMap.removeLayer(navLine);if(navRouteCoords.length){const ll=navRouteCoords.map(c=>[c[1],c[0]]);navLine=L.polyline(ll,{weight:7,opacity:.8}).addTo(navMap);const b=navLine.getBounds();if(b.isValid())navMap.fitBounds(b,{padding:[28,28],maxZoom:16})}clearNearGlow();if(navPos)navMap.removeLayer(navPos);navPos=L.circleMarker([current.lat,current.lon],{radius:9,weight:4,fillOpacity:1}).addTo(navMap).bindTooltip('You',{permanent:false});if(navDest)navMap.removeLayer(navDest);navDest=L.marker([navTarget.lat,navTarget.lon]).addTo(navMap).bindPopup(navTarget.name||'Destination')}
 async function navPost(payload){const h={'content-type':'application/json','apikey':KEY,'x-nwtb-session':token};const r=await fetch(NAV,{method:'POST',headers:h,body:JSON.stringify(payload)}),j=await r.json().catch(()=>({error:'Navigation response error'}));if(!r.ok)throw Error(j.error||'Navigation failed');return j}
 function currentStep(){return navSteps[Math.min(navStepIndex,Math.max(0,navSteps.length-1))]||null}
-
 function updateDisplay(pos,forceSpeak=false){
  const step=currentStep();if(!step)return;const loc=step?.maneuver?.location||[],mpos=loc.length===2?{lat:Number(loc[1]),lon:Number(loc[0])}:navTarget;let d=haversine(pos,mpos);
  while(d<28&&navStepIndex<navSteps.length-1){navStepIndex++;const n=currentStep(),nl=n?.maneuver?.location||[];if(nl.length===2)d=haversine(pos,{lat:Number(nl[1]),lon:Number(nl[0])});else break}
