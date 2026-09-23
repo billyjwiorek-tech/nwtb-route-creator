@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>NWTB Driver — Standard</title>
+<style>
+:root{--nav:#101828;--ink:#182230;--muted:#667085;--line:#dfe3e8;--page:#f4f6f8;--blue:#2563eb;--green:#15803d;--red:#b42318;--amber:#b54708;--soft:0 5px 18px rgba(16,24,40,.07)}
+*{box-sizing:border-box}body{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;margin:0;background:var(--page);color:var(--ink)}header{background:linear-gradient(135deg,#101828,#1d2939);color:#fff;padding:18px 18px 16px;position:sticky;top:0;z-index:50;box-shadow:0 5px 18px rgba(16,24,40,.18)}header h1{font-size:20px;margin:0}.headSub{font-size:11px;color:#cbd5e1;margin-top:5px}.wrap{max-width:850px;margin:16px auto;padding:0 12px 30px}.panel,.stop{background:#fff;border:1px solid var(--line);border-radius:14px;padding:15px;margin-bottom:12px;box-shadow:var(--soft)}.panelTitle{font-size:15px;font-weight:900}.btn{border:0;border-radius:9px;padding:11px 14px;font-weight:800;cursor:pointer;background:#17202a;color:#fff;text-decoration:none;display:inline-block;margin-top:7px}.btn:disabled{opacity:.45;cursor:not-allowed}.blue{background:var(--blue)}.green{background:var(--green)}.red{background:var(--red)}.amber{background:var(--amber)}.ghost{background:#eef1f4;color:#17202a}.return{background:#0b8043}.small{font-size:12px;color:var(--muted)}.warn{color:#a33;font-weight:750}.ok{color:#176b3a;font-weight:750}.pill{display:inline-block;border-radius:999px;padding:4px 8px;background:#eef1f4;font-size:10px;font-weight:800}.status{display:inline-block;border-radius:999px;padding:5px 9px;font-size:10px;font-weight:900;margin-top:6px}.status.planned{background:#eef4ff;color:#1d4ed8}.status.active{background:#ecfdf3;color:#067647}.status.paused{background:#fff4e5;color:#b54708}.alertbar{display:none;position:sticky;top:82px;z-index:999;padding:14px 16px;text-align:center;font-size:17px;font-weight:900;color:#fff;box-shadow:0 5px 20px rgba(0,0,0,.24)}.alertbar.show{display:block}.alertbar.add{background:#067647}.alertbar.remove{background:#b42318}.alertbar .sub{font-size:12px;font-weight:700;margin-top:4px}.alertstatus{margin-top:10px;padding:10px 12px;border-radius:9px;background:#f8fafc;border:1px solid #d9dee4}.stop.changed{outline:3px solid #f79009}.stopHead{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.stopName{font-size:15px;font-weight:900}.address{margin-top:6px;font-size:13px}.notes{margin-top:6px}.actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}select,textarea{width:100%;padding:12px;border:1px solid #bbc4cc;border-radius:9px;font:inherit;font-size:16px;background:#fff}.routeMeta{margin-top:10px;padding:10px 12px;border-radius:10px;background:#f8fafc;border:1px solid #e4e7ec;font-size:12px}.pauseBox{margin-top:12px;padding:12px;border:1px solid #f6c344;background:#fff8e8;border-radius:10px}.pauseBox.paused{border-color:#f79009;background:#fff4e5}.pauseReason{margin-top:6px;font-size:12px;color:#7a2e0e;font-weight:750}.pauseOverlay{position:fixed;inset:0;background:rgba(15,23,42,.58);display:none;align-items:center;justify-content:center;z-index:5000;padding:16px}.pauseOverlay.show{display:flex}.pauseModal{width:min(520px,96vw);background:#fff;border-radius:16px;padding:18px;box-shadow:0 30px 80px rgba(0,0,0,.3)}.pauseModal h2{margin:0 0 6px}.pauseActions{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}.disabledNote{margin-top:8px;padding:9px 10px;border-radius:9px;background:#fff4e5;color:#92400e;font-size:11px;font-weight:750}
+@media(max-width:600px){header{padding-top:calc(14px + env(safe-area-inset-top))}.alertbar{top:76px}.wrap{margin-top:12px}.btn{padding:12px 13px}.actions .btn{flex:1;text-align:center}.stopName{font-size:14px}}
+</style>
+</head>
+<body>
+<div id="routeAlert" class="alertbar"></div>
+<header><h1>NWTB DRIVER</h1><div class="headSub">No PIN required • Route status syncs with Dispatch • Follow the route assigned by the Delivery Desk</div></header>
+<div class="wrap">
+ <div id="boot" class="panel">Opening driver page…</div>
+ <div id="app" style="display:none">
+  <div class="panel">
+   <div class="panelTitle">Driver</div>
+   <div class="small" style="margin:4px 0 8px">Select your name. This device will remember your selection.</div>
+   <select id="driver" onchange="driverChanged()"></select>
+   <button class="btn" onclick="loadRoutes()">LOAD MY ROUTES</button>
+   <button id="alertsBtn" class="btn amber" onclick="enableAlerts(true)">ENABLE DRIVER ALERTS</button>
+   <div id="alertStatus" class="alertstatus small">Route-change alerts are not enabled on this page yet.</div>
+  </div>
+  <div id="routes"></div>
+ </div>
+</div>
+<div id="pauseOverlay" class="pauseOverlay" onclick="if(event.target===this)closePauseModal()">
+ <div class="pauseModal">
+  <h2>PAUSE ROUTE</h2>
+  <div class="small" style="margin-bottom:10px">Tell Dispatch why you are pausing. A reason is required and will be sent with your driver identity.</div>
+  <textarea id="pauseReasonInput" placeholder="Type the reason for pausing the route..."></textarea>
+  <div id="pauseMsg" class="small" style="margin-top:8px"></div>
+  <div class="pauseActions"><button class="btn ghost" onclick="closePauseModal()">CANCEL</button><button class="btn amber" onclick="submitPause()">PAUSE ROUTE + NOTIFY DISPATCH</button></div>
+ </div>
+</div>
+<script>
+const CHAT='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-chat';
+const API='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-delivery';
+const ROUTE_API='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-delivery-tracking';
+const KEY='sb_publishable_EqF-iooqhmngSG5BbzOxfQ_Vnf9Altc';
+const HOME={name:'Northwest Trucks - Bolingbrook',address:'201 S W Frontage Rd, Bolingbrook, IL 60440'};
+let token='',drivers=[],driver='',route='',changeTimer=null,audioCtx=null,alertsReady=false,currentPaused=false,currentRouteState=null;
+const $=x=>document.getElementById(x);
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+async function post(url,p,auth=true){const h={'content-type':'application/json','apikey':KEY};if(auth)h['x-nwtb-session']=token;const r=await fetch(url,{method:'POST',headers:h,body:JSON.stringify(p)}),j=await r.json().catch(()=>({error:'Bad response'}));if(!r.ok)throw Error(j.error||'Request failed');return j}
+const enc=x=>encodeURIComponent(`${x.name||'Location'}, ${x.address||''}`);
+function routeEndpoints(r,pts){
+ if(r?.route_mode!=='CUSTOM')return{start:HOME,final:HOME,label:'START / RETURN',startText:HOME.name,endText:HOME.name};
+ const start={name:r.start_name||'Custom Start',address:r.start_address||''};
+ const mode=r.end_mode||'SAME_AS_START';
+ if(mode==='LAST_STOP')return{start,final:pts[pts.length-1]||start,label:'CUSTOM ROUTE',startText:start.name,endText:'Last Stop'};
+ if(mode==='SAME_AS_START')return{start,final:start,label:'CUSTOM ROUTE',startText:start.name,endText:'Same as Start'};
+ const final={name:r.end_name||'Custom End',address:r.end_address||''};
+ return{start,final,label:'CUSTOM ROUTE',startText:start.name,endText:final.name};
+}
+function routeLinks(r,stops){
+ const pts=stops.map(s=>{const o=s.delivery_orders||{};return{name:o.customer_name||'Stop',address:o.address||''}});if(!pts.length)return[];
+ const ep=routeEndpoints(r,pts),lastStopMode=r?.route_mode==='CUSTOM'&&r?.end_mode==='LAST_STOP';
+ const waypointStops=lastStopMode?pts.slice(0,-1):pts.slice();
+ const out=[];
+ if(waypointStops.length<=9){out.push({label:r?.route_mode==='CUSTOM'?(lastStopMode?'OPEN CUSTOM ROUTE — END AT LAST STOP':'OPEN FULL CUSTOM ROUTE'):'OPEN FULL ROUTE + RETURN TO NWTB BOLINGBROOK',url:`https://www.google.com/maps/dir/?api=1&origin=${enc(ep.start)}&destination=${enc(ep.final)}&travelmode=driving&dir_action=navigate${waypointStops.length?'&waypoints='+waypointStops.map(enc).join('%7C'):''}`});return out}
+ let current=ep.start,i=0,part=1;
+ while(i<waypointStops.length){const remaining=waypointStops.slice(i),isLast=remaining.length<=9,chunk=remaining.slice(0,isLast?9:10),dest=isLast?ep.final:chunk[chunk.length-1],wps=isLast?chunk:chunk.slice(0,-1);out.push({label:`ROUTE PART ${part}${isLast?' — FINAL':''}`,url:`https://www.google.com/maps/dir/?api=1&origin=${enc(current)}&destination=${enc(dest)}&travelmode=driving&dir_action=navigate${wps.length?'&waypoints='+wps.map(enc).join('%7C'):''}`});current=dest;i+=chunk.length;part++}
+ return out;
+}
+async function boot(){
+ try{
+  token=localStorage.getItem('nwtb_delivery_token')||'';
+  if(!token){const j=await post(CHAT,{action:'delivery_guest_start'},false);token=j.token;localStorage.setItem('nwtb_delivery_token',token)}
+  const d=await post(API,{action:'drivers'});drivers=(d.drivers||[]).filter(x=>x.employee_number!=='9998');
+  $('driver').innerHTML='<option value="">-- Select Driver --</option>'+drivers.map(x=>`<option value="${esc(x.employee_number)}">${esc(x.display_name)} (${esc(x.employee_number)})</option>`).join('');
+  const saved=localStorage.getItem('nwtb_delivery_driver')||'';if(saved&&drivers.some(x=>x.employee_number===saved)){$('driver').value=saved;driver=saved}
+  $('boot').style.display='none';$('app').style.display='block';updateAlertStatus();if(driver)loadRoutes();
+ }catch(e){$('boot').innerHTML='<span class="warn">'+esc(e.message)+'</span>'}
+}
+function driverChanged(){driver=$('driver').value;localStorage.setItem('nwtb_delivery_driver',driver);stopChangePolling();route='';currentPaused=false;currentRouteState=null;loadRoutes()}
+function updateAlertStatus(){const n=('Notification'in window)?Notification.permission:'unsupported';$('alertStatus').innerHTML=alertsReady?'<span class="ok">DRIVER ALERTS ON</span> • sound + vibration enabled'+(n==='granted'?' • browser notifications allowed':''):'Route-change alerts are not enabled on this page yet. Tap <b>ENABLE DRIVER ALERTS</b> or start the route.';$('alertsBtn').textContent=alertsReady?'DRIVER ALERTS ON':'ENABLE DRIVER ALERTS';$('alertsBtn').className='btn '+(alertsReady?'green':'amber')}
+async function enableAlerts(test=false){try{const AC=window.AudioContext||window.webkitAudioContext;if(AC){if(!audioCtx)audioCtx=new AC();if(audioCtx.state==='suspended')await audioCtx.resume()}alertsReady=true;localStorage.setItem('nwtb_driver_alerts','1');if('Notification'in window&&Notification.permission==='default'){try{await Notification.requestPermission()}catch{}}updateAlertStatus();if(test)playAlertTone(false)}catch{alertsReady=true;updateAlertStatus()}}
+function playAlertTone(urgent=true){if(!alertsReady)return;try{if(!audioCtx){const AC=window.AudioContext||window.webkitAudioContext;if(AC)audioCtx=new AC()}if(!audioCtx)return;const t=audioCtx.currentTime;[[0,880,.18],[.24,urgent?1100:660,.22]].forEach(([off,f,d])=>{const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.frequency.value=f;o.type='square';g.gain.setValueAtTime(.0001,t+off);g.gain.exponentialRampToValueAtTime(.22,t+off+.01);g.gain.exponentialRampToValueAtTime(.0001,t+off+d);o.connect(g);g.connect(audioCtx.destination);o.start(t+off);o.stop(t+off+d+.02)})}catch{}}
+function showRouteAlert(ev){const added=ev.event_type==='STOP_ADDED_ACTIVE',bar=$('routeAlert');bar.className='alertbar show '+(added?'add':'remove');bar.innerHTML=(added?'STOP ADDED TO YOUR ROUTE':'STOP REMOVED FROM YOUR ROUTE')+'<div class="sub">'+esc(ev.note||'Your route was updated by Dispatch.')+'</div>';playAlertTone(true);if(navigator.vibrate)navigator.vibrate(added?[250,120,250,120,450]:[500,180,500]);if('Notification'in window&&Notification.permission==='granted'){try{new Notification(added?'NWTB — STOP ADDED':'NWTB — STOP REMOVED',{body:ev.note||'Dispatch changed your route.',tag:'nwtb-route-'+route,renotify:true})}catch{}}setTimeout(()=>{bar.className='alertbar'},9000)}
+async function loadRoutes(){stopChangePolling();if(!driver){$('routes').innerHTML='<div class="panel warn">Select your name first.</div>';return}try{const j=await post(ROUTE_API,{action:'driver_routes',driver_employee_number:driver});$('routes').innerHTML=(j.routes||[]).map(r=>`<div class="panel"><b>${esc(r.route_date)} • ${esc(r.wave||'ROUTE')}</b><br><span class="status ${String(r.status||'').toLowerCase()}">${esc(r.status||'PLANNED')}</span>${r.estimated_miles?` <span class="small">• ${Number(r.estimated_miles).toFixed(1)} mi</span>`:''}<br><button class="btn blue" onclick="openRoute('${r.id}')">OPEN ROUTE</button></div>`).join('')||'<div class="panel">No planned or active route assigned.</div>'}catch(e){$('routes').innerHTML='<div class="panel warn">'+esc(e.message)+'</div>'}}
+async function openRoute(id,fromChange=false){
+ route=id;
+ try{
+  const [j,stateResp]=await Promise.all([post(API,{action:'route_get',route_id:id}),post(ROUTE_API,{action:'driver_route_state',route_id:id,driver_employee_number:driver}).catch(()=>({route:null}))]);
+  const stops=j.stops||[],r=j.route||{},state=stateResp.route||r||{};currentRouteState=state;currentPaused=!!state.paused;
+  const links=routeLinks(r,stops),pts=stops.map(s=>s.delivery_orders||{}),ep=routeEndpoints(r,pts.map(o=>({name:o.customer_name||'Stop',address:o.address||''})));
+  const status=String(state.status||r.status||'PLANNED').toUpperCase();
+  let controls=`<button class="btn ghost" onclick="loadRoutes()">← BACK</button>`;
+  if(status==='PLANNED')controls+=` <button class="btn green" onclick="startRoute('${id}')">START ROUTE</button>`;
+  if(status==='ACTIVE'&&!currentPaused)controls+=` <button class="btn amber" onclick="openPauseModal()">PAUSE ROUTE</button>`;
+  if(currentPaused)controls+=` <button class="btn green" onclick="resumePausedRoute()">RESUME ROUTE</button>`;
+  const routeStatus=currentPaused?'PAUSED':status;
+  let top=`<div class="panel">${controls}<div class="routeMeta"><b>${esc(ep.label)}:</b> ${esc(ep.startText)}${r.route_mode==='CUSTOM'?`<br><b>END:</b> ${esc(ep.endText)}`:'<br><span class="small">201 S W Frontage Rd, Bolingbrook, IL 60440</span>'}<br><span class="status ${routeStatus.toLowerCase()}">${esc(routeStatus)}</span></div><div style="margin-top:10px">${links.map(x=>`<a class="btn return" target="_blank" rel="noopener" href="${x.url}" style="margin:4px 4px 4px 0">${x.label}</a>`).join('')}</div>${currentPaused?`<div class="pauseBox paused"><b>ROUTE PAUSED</b><div class="pauseReason">${esc(state.pause_reason||'Reason sent to Dispatch.')}</div><div class="small" style="margin-top:5px">Stop completion is disabled until the route is resumed.</div></div>`:''}</div>`;
+  const stopHtml=stops.map(s=>{const o=s.delivery_orders||{},nav='https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent((o.customer_name||'')+', '+(o.address||''))+'&travelmode=driving&dir_action=navigate',pending=s.status==='PENDING';let completion='';if(pending&&currentPaused)completion='<div class="disabledNote">Route is paused. Resume before completing this stop.</div>';else if(pending)completion=`<div class="actions"><button class="btn green" onclick="finish('${s.id}','DELIVERED')">COMPLETE</button><button class="btn red" onclick="finish('${s.id}','NOT_DELIVERED')">NOT COMPLETED</button></div>`;else completion=`<div style="margin-top:9px"><b>${esc(s.status)}</b></div>`;return `<div class="stop"><div class="stopHead"><div><div class="stopName">STOP ${esc(s.stop_sequence)}: ${esc(o.customer_name||'Stop')}</div><span class="pill">${esc(o.stop_type||'STOP')}</span></div></div><div class="address">${esc(o.address||'')}</div>${o.notes?`<div class="notes small">${esc(o.notes)}</div>`:''}<div class="actions"><a class="btn blue" target="_blank" rel="noopener" href="${nav}">NAVIGATE</a></div>${completion}</div>`}).join('');
+  $('routes').innerHTML=top+stopHtml;
+  startChangePolling(id);
+  if(!fromChange&&localStorage.getItem('nwtb_driver_alerts')==='1')$('alertStatus').innerHTML='Tap <b>ENABLE DRIVER ALERTS</b> once on this page to restore sound after reopening the browser.';
+ }catch(e){alert(e.message)}
+}
+async function startRoute(id){await enableAlerts(false);try{await post(ROUTE_API,{action:'route_start_driver',route_id:id,driver_employee_number:driver});route=id;await openRoute(id)}catch(e){alert(e.message)}}
+async function finish(id,status){if(currentPaused){alert('This route is paused. Resume the route before completing stops.');return}let note='';if(status==='NOT_DELIVERED')note=prompt('Reason / note:')||'';try{await post(ROUTE_API,{action:'stop_status_driver',driver_employee_number:driver,stop_id:id,status,note});openRoute(route)}catch(e){alert(e.message)}}
+function startChangePolling(id){stopChangePolling();changeTimer=setInterval(()=>checkRouteChanges(id),5000);checkRouteChanges(id)}
+function stopChangePolling(){if(changeTimer){clearInterval(changeTimer);changeTimer=null}}
+async function checkRouteChanges(id){if(!id||id!==route||!driver)return;const key='nwtb_route_event_'+id,last=Number(localStorage.getItem(key)||0);try{const j=await post(ROUTE_API,{action:'route_changes',driver_employee_number:driver,route_id:id,after_id:last}),events=j.events||[];if(!events.length)return;for(const ev of events){showRouteAlert(ev);localStorage.setItem(key,String(ev.id))}await openRoute(id,true)}catch(e){console.warn('Route change check failed',e)}}
+function openPauseModal(){$('pauseReasonInput').value='';$('pauseMsg').textContent='';$('pauseOverlay').classList.add('show');setTimeout(()=>$('pauseReasonInput').focus(),50)}
+function closePauseModal(){$('pauseOverlay').classList.remove('show')}
+async function submitPause(){const reason=($('pauseReasonInput').value||'').trim();if(reason.length<3){$('pauseMsg').innerHTML='<span class="warn">A reason is required.</span>';return}try{$('pauseMsg').textContent='Notifying Dispatch…';await post(ROUTE_API,{action:'route_pause_driver',route_id:route,driver_employee_number:driver,reason});closePauseModal();await openRoute(route,true);alert('Route paused. Dispatch was notified.')}catch(e){$('pauseMsg').innerHTML='<span class="warn">'+esc(e.message)+'</span>'}}
+async function resumePausedRoute(){if(!confirm('Resume this route now?'))return;try{await post(ROUTE_API,{action:'route_resume_driver',route_id:route,driver_employee_number:driver});await openRoute(route,true)}catch(e){alert(e.message)}}
+boot();
+</script>
+</body>
+</html>
