@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NWTB Delivery Operations — Standard</title>
+<style>
+:root{--nav:#0f172a;--nav2:#0b1220;--ink:#182230;--muted:#667085;--line:#e4e7ec;--page:#f4f6f8;--card:#fff;--blue:#2563eb;--shadow:0 12px 34px rgba(16,24,40,.08);--soft:0 4px 16px rgba(16,24,40,.06)}
+*{box-sizing:border-box}html,body{height:100%;margin:0;font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;color:var(--ink);background:var(--page)}
+button{font:inherit}.app{min-height:100vh;display:grid;grid-template-columns:230px minmax(0,1fr)}.sidebar{background:linear-gradient(180deg,var(--nav),var(--nav2));color:#fff;padding:22px 14px;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;z-index:20}
+.brand{display:flex;gap:11px;align-items:center;padding:4px 8px 24px}.mark{width:42px;height:42px;border-radius:11px;background:linear-gradient(135deg,#fff,#dbeafe);color:#0f172a;display:grid;place-items:center;font-size:13px;font-weight:950;box-shadow:0 8px 22px rgba(0,0,0,.2)}.brand b{font-size:15px;display:block}.brand span{font-size:10px;color:#9aa6b5;display:block;margin-top:3px}
+.navlabel{font-size:9px;letter-spacing:1.3px;font-weight:850;color:#66758a;padding:0 12px;margin:9px 0 5px}.navbtn{width:100%;display:flex;align-items:center;gap:11px;background:transparent;border:0;color:#cdd6e1;padding:11px 12px;border-radius:10px;text-align:left;font-weight:750;cursor:pointer;margin:2px 0}.navbtn:hover{background:rgba(255,255,255,.07);color:#fff}.navbtn.active{background:#fff;color:#101828;box-shadow:0 8px 20px rgba(0,0,0,.16)}.ico{width:20px;text-align:center}.sidefoot{margin-top:auto;border-top:1px solid rgba(255,255,255,.09);padding:15px 10px 0}.online{display:flex;align-items:center;gap:8px;font-size:11px;color:#c9d2df}.dot{width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 4px rgba(34,197,94,.12)}.hub{font-size:10px;color:#718096;margin-top:8px}
+.main{min-width:0}.topbar{height:76px;background:rgba(255,255,255,.96);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 26px;position:sticky;top:0;z-index:10;backdrop-filter:blur(10px)}.crumb{font-size:10px;font-weight:850;color:#667085;letter-spacing:.5px}.title{font-size:21px;font-weight:900;margin-top:3px}.topright{display:flex;align-items:center;gap:10px}.clock{text-align:right;margin-right:4px}.clock b{font-size:13px;display:block}.clock span{font-size:10px;color:#667085}.office,.edition{border-radius:999px;padding:7px 10px;font-size:10px;font-weight:900}.office{border:1px solid #c7d7fe;background:#eef4ff;color:#1d4ed8}.edition{border:1px solid #d0d5dd;background:#f8fafc;color:#344054}
+.content{padding:24px;max-width:1720px;margin:0 auto}.view{display:none}.view.active{display:block}.hero{background:linear-gradient(135deg,#101828,#1d2939);color:#fff;border-radius:20px;padding:28px 30px;box-shadow:var(--shadow);display:flex;justify-content:space-between;align-items:center;gap:24px}.hero h1{font-size:28px;margin:0 0 7px}.hero p{font-size:12px;color:#cbd5e1;margin:0;max-width:760px}.heroBadge{border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.07);border-radius:14px;padding:14px 16px;min-width:220px}.heroBadge b{display:block;font-size:12px}.heroBadge span{display:block;font-size:10px;color:#aab4c5;margin-top:4px}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:18px 0}.kpi{background:#fff;border:1px solid var(--line);border-radius:14px;padding:17px 18px;box-shadow:var(--soft);text-align:left;color:var(--ink);cursor:pointer;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease}.kpi:hover{transform:translateY(-1px);border-color:#9db8ff;box-shadow:0 10px 26px rgba(16,24,40,.10)}.kpi:focus-visible{outline:3px solid rgba(37,99,235,.20);outline-offset:2px}.kpiLabel{font-size:10px;text-transform:uppercase;letter-spacing:.55px;color:#667085;font-weight:850}.kpi strong{display:block;font-size:30px;margin-top:10px}.kpi small{display:block;color:#98a2b3;margin-top:5px;font-size:10px}
+.grid2{display:grid;grid-template-columns:1.1fr .9fr;gap:16px}.card{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--soft);padding:20px}.card h3{margin:0;font-size:15px}.card p{margin:5px 0 0;color:#667085;font-size:11px}.actions{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:15px}.action{border:1px solid var(--line);background:#fff;border-radius:12px;padding:14px;text-align:left;cursor:pointer}.action:hover{border-color:#9db8ff;box-shadow:var(--soft)}.action b{display:block;font-size:12px}.action span{display:block;font-size:10px;color:#667085;margin-top:4px}.rule{display:flex;gap:10px;padding:11px 0;border-bottom:1px solid #f0f2f5}.rule:last-child{border-bottom:0}.check{width:24px;height:24px;border-radius:8px;background:#ecfdf3;color:#067647;display:grid;place-items:center;font-weight:950;flex:0 0 24px}.rule b{display:block;font-size:11px}.rule span{display:block;font-size:10px;color:#667085;margin-top:3px}
+.pageIntro{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;margin-bottom:12px}.pageIntro h2{margin:0;font-size:20px}.pageIntro p{margin:4px 0 0;font-size:11px;color:#667085}.chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 10px;font-size:10px;color:#475467;font-weight:850}.frameWrap{height:calc(100vh - 126px);background:#fff;border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:var(--soft)}iframe{width:100%;height:100%;border:0;background:#fff}
+@media(max-width:900px){.app{grid-template-columns:190px minmax(0,1fr)}.brand b{font-size:13px}.brand span{display:none}.kpis{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}}
+@media(max-width:720px){.app{display:block}.sidebar{height:auto;position:sticky;top:0;display:flex;flex-direction:row;padding:8px;overflow:auto}.brand,.navlabel,.sidefoot{display:none}.navbtn{width:auto;min-width:54px;margin:0 3px;justify-content:center}.navbtn span:not(.ico){display:none}.topbar{height:64px;padding:0 14px}.clock,.edition{display:none}.content{padding:12px}.hero{display:block;padding:20px}.heroBadge{margin-top:15px}.kpis{grid-template-columns:1fr 1fr;gap:10px}.grid2{grid-template-columns:1fr}.actions{grid-template-columns:1fr}.frameWrap{height:calc(100vh - 105px)}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+ <div class="brand"><div class="mark">NWTB</div><div><b>Delivery Operations</b><span>Standard Edition</span></div></div>
+ <div class="navlabel">OPERATIONS</div>
+ <button class="navbtn active" data-view="dashboard" onclick="openView('dashboard')"><span class="ico">▦</span><span>Dashboard</span></button>
+ <button class="navbtn" data-view="dispatch" onclick="openView('dispatch')"><span class="ico">↗</span><span>Dispatch</span></button>
+ <button class="navbtn" data-view="driver" onclick="openView('driver')"><span class="ico">▰</span><span>Driver View</span></button>
+ <div class="navlabel">COMMUNICATION</div>
+ <button class="navbtn" data-view="chat" onclick="openView('chat')"><span class="ico">◌</span><span>Chat</span></button>
+ <div class="navlabel">SYSTEM</div>
+ <button class="navbtn" data-view="admin" onclick="openView('admin')"><span class="ico">⚙</span><span>Admin</span></button>
+ <div class="sidefoot"><div class="online"><span class="dot"></span><span>System Online</span></div><div class="hub">Bolingbrook Operations Center</div></div>
+</aside>
+<main class="main">
+ <header class="topbar"><div><div class="crumb">NWTB / DELIVERY OPERATIONS</div><div class="title" id="pageTitle">Operations Dashboard</div></div><div class="topright"><div class="clock"><b id="clockTime"></b><span id="clockDate"></span></div><span class="edition">STANDARD EDITION</span><span class="office">BOLINGBROOK OFFICE</span></div></header>
+ <div class="content">
+  <section id="dashboard" class="view active">
+   <div class="hero"><div><h1>NWTB Delivery Operations Center</h1><p>Dispatch deliveries and vendor pickups, manage driver routes, communicate with the pickup desk, and control daily operations from one workspace.</p></div><div class="heroBadge"><b>Northwest Trucks — Bolingbrook</b><span>Standard routes start and return to the Bolingbrook depot.</span></div></div>
+   <div class="kpis">
+    <button class="kpi" onclick="openDispatchQueue('AVAILABLE')"><span class="kpiLabel">Available Stops</span><strong id="kUn">—</strong><small>Click to open waiting stops</small></button>
+    <button class="kpi" onclick="openDispatchQueue('ROUTED')"><span class="kpiLabel">Routed</span><strong id="kRt">—</strong><small>Click to open assigned stops</small></button>
+    <button class="kpi" onclick="openDispatchQueue('OUT')"><span class="kpiLabel">Stops Out</span><strong id="kOut">—</strong><small>Click to open stops on the road</small></button>
+    <button class="kpi" onclick="openDispatchQueue('COMPLETED')"><span class="kpiLabel">Completed</span><strong id="kDone">—</strong><small>Click to open completed history</small></button>
+   </div>
+   <div class="grid2">
+    <div class="card"><h3>Quick Actions</h3><p>Jump directly into the most common office workflows.</p><div class="actions">
+     <button class="action" onclick="openView('dispatch')"><b>Create / Assign Route</b><span>Add stops, optimize and assign a driver.</span></button>
+     <button class="action" onclick="openView('driver')"><b>Open Driver View</b><span>Preview the mobile route workflow used in the field.</span></button>
+     <button class="action" onclick="openView('chat')"><b>Delivery / Pickup Chat</b><span>Open the operations-only chat channel.</span></button>
+     <button class="action" onclick="openView('admin')"><b>Master Data</b><span>Maintain customer and vendor directories.</span></button>
+    </div></div>
+    <div class="card"><h3>Operating Standards</h3><p>Rules enforced by the Delivery system.</p>
+     <div class="rule"><span class="check">✓</span><div><b>Bolingbrook standard routing</b><span>Standard routes begin and end at Northwest Trucks — Bolingbrook. Custom routes may use their own start/end points.</span></div></div>
+     <div class="rule"><span class="check">✓</span><div><b>Verified physical locations</b><span>Pickup addresses stay separate from billing addresses.</span></div></div>
+     <div class="rule"><span class="check">✓</span><div><b>Road-route optimization</b><span>Invalid or missing coordinates are repaired before assignment.</span></div></div>
+     <div class="rule"><span class="check">✓</span><div><b>Dedicated operations chat</b><span>Delivery / Pickup chat remains separate from Sales.</span></div></div>
+    </div>
+   </div>
+  </section>
+  <section id="dispatch" class="view"><div class="pageIntro"><div><h2>Dispatch</h2><p>Create stops, optimize routes and assign drivers.</p></div><span class="chip">STANDARD: BOLINGBROOK START + RETURN</span></div><div class="frameWrap"><iframe id="fDispatch" src="dispatch.html?v=20260923-0825" title="Dispatch"></iframe></div></section>
+  <section id="driver" class="view"><div class="pageIntro"><div><h2>Driver View</h2><p>Preview the mobile route experience used in the field.</p></div><span class="chip">MOBILE WORKFLOW</span></div><div class="frameWrap"><iframe id="fDriver" src="driver-standard.html" title="Driver View"></iframe></div></section>
+  <section id="chat" class="view"><div class="pageIntro"><div><h2>Delivery / Pickup Chat</h2><p>Operations-only messaging.</p></div><span class="chip">SEPARATE FROM SALES</span></div><div class="frameWrap"><iframe id="fChat" src="dispatch.html?v=20260923-0825#chat" title="Delivery Pickup Chat"></iframe></div></section>
+  <section id="admin" class="view"><div class="pageIntro"><div><h2>Administration</h2><p>Manage Delivery customer and vendor master data.</p></div><span class="chip">MASTER DATA</span></div><div class="frameWrap"><iframe id="fAdmin" src="dispatch.html?v=20260923-0825#data" title="Master Data"></iframe></div></section>
+ </div>
+</main>
+</div>
+<script>
+const titles={dashboard:'Operations Dashboard',dispatch:'Dispatch',driver:'Driver View',chat:'Delivery / Pickup Chat',admin:'Administration'};
+function openView(name){
+ document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id===name));
+ document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('active',b.dataset.view===name));
+ document.getElementById('pageTitle').textContent=titles[name]||'Delivery Operations';
+ history.replaceState(null,'','#'+name);
+ if(name==='dispatch')activateChild('fDispatch','dispatch');
+ if(name==='chat')activateChild('fChat','chat');
+ if(name==='admin')activateChild('fAdmin','data');
+ if(name==='dashboard')syncKpis();
+}
+function activateChild(id,tab){const f=document.getElementById(id);try{const w=f.contentWindow;if(w&&typeof w.showTab==='function')w.showTab(tab)}catch{}}
+function openDispatchQueue(mode){
+ openView('dispatch');
+ const f=document.getElementById('fDispatch');
+ const go=()=>{try{const w=f.contentWindow;if(w&&typeof w.nwtbQueueView==='function')w.nwtbQueueView(mode);else if(w&&typeof w.setQueue==='function'&&mode!=='COMPLETED'){const b=w.document.querySelector('.filter[data-q="'+mode+'"]');w.setQueue(mode,b)}}catch{}};
+ setTimeout(go,120);setTimeout(go,650);
+}
+function clock(){const d=new Date();document.getElementById('clockTime').textContent=d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});document.getElementById('clockDate').textContent=d.toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'})}clock();setInterval(clock,30000);
+function getDispatchDoc(){try{return document.getElementById('fDispatch').contentWindow.document}catch{return null}}
+function syncKpis(){const d=getDispatchDoc();if(!d)return;const map={kUn:'stUn',kRt:'stRt',kOut:'stOut',kDone:'stDone'};Object.entries(map).forEach(([out,inside])=>{const v=d.getElementById(inside),t=document.getElementById(out);if(v&&t)t.textContent=v.textContent.trim()||'0'})}
+[['fDispatch','dispatch'],['fChat','chat'],['fAdmin','data']].forEach(([id,tab])=>document.getElementById(id).addEventListener('load',()=>{setTimeout(()=>activateChild(id,tab),80);setTimeout(syncKpis,600)}));
+setInterval(syncKpis,5000);
+const initial=location.hash.replace('#','');if(titles[initial])openView(initial);else openView('dashboard');
+</script>
+</body>
+</html>
