@@ -8,9 +8,9 @@
   let chatTimer=null;
   const visitMap=new Map();
 
-  // FINAL 2026-09-21 FAIL-CLOSED LOCATION AUDIT.
+  // FINAL 2026-09-23 FAIL-CLOSED LOCATION AUDIT.
   // Prospects keep the completed prospect audit gate.
-  // GO FIRST existing customers use the completed 42-account audit.
+  // GO FIRST existing customers use the completed final audit.
   const auditNorm=s=>String(s||'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim().replace(/\s+/g,' ');
   const auditKey=a=>auditNorm(a?.name)+'|'+auditNorm(a?.address);
 
@@ -65,6 +65,7 @@
     '25846':{address:'4699 Auvergne Ave, Unit 7, Lisle, IL 60532',lat:41.8019244,lon:-88.0604841,note:'UBN LOGISTICS corrected commercial location'},
     '11935':{address:'850 Windham Pkwy, Bolingbrook, IL 60440',note:'ROADRUNNER current Chicago service center'},
     '22663':{address:'721 Parkwood Ave, Suite D, Romeoville, IL 60446',lat:41.656179,lon:-88.075574,note:'ROAD KING canonical route stop'},
+    '11060':{address:'2605 W 22nd St, Suite 32, Oak Brook, IL 60523',lat:41.845455,lon:-87.980871,note:'IRON WAY final audited commercial office'},
     '27727':{address:'10S530 Thames Dr, Downers Grove, IL 60516',note:'UZB current residential registration'},
     '11771':{address:'1024 Brentwood Cir, Buffalo Grove, IL 60089',note:'PJ TWINS current residential registration'},
     '18153':{address:'2451 Sharon Ct, Naperville, IL 60565',note:'AFF TRANS current residential registration'},
@@ -79,13 +80,13 @@
   const COMMERCIAL_GO_FIRST_EXISTING_IDS=new Set([
     '21267','17772','11058','28276','28369','22663','20779','15491','20507','23325',
     '16350','27388','18091','20672','26334','19079','10366','11914','25846','26781',
-    '11179','11935','24881','15474','11395','15096','12389','26423','11218','21986'
+    '11179','11935','24881','15474','11395','15096','12389','26423','11218','21986','11060'
   ]);
   const RESIDENTIAL_GO_FIRST_EXISTING_IDS=new Set([
-    '27727','11771','23016','18153','11252','26145','17219','16106','25606','12635','25909','25817'
+    '27727','11771','23016','18153','11252','26145','17219','16106','25606','12635','25909','25817','10803','28280'
   ]);
   const HOLD_GO_FIRST_EXISTING_IDS=new Set();
-  const DUPLICATE_SUPPRESS_IDS=new Set(['25941','12038','12039']);
+  const DUPLICATE_SUPPRESS_IDS=new Set(['25941','12038','12039','24956']);
 
   function applyAddressOverrides(){
     try{
