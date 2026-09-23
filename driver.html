@@ -5,7 +5,7 @@
   const r=await fetch(base,{cache:'no-store'});
   if(!r.ok)throw Error('Could not load Driver Route.');
   let html=await r.text();
-  html=html.replace('</body>','<script src="driver-custom-route.js?v=20260922-1925"><\/script></body>');
+  html=html.replace('</body>','<script src="driver-custom-route.js?v=20260923-0835"><\/script><script src="driver-pause.js?v=20260923-0835"><\/script></body>');
   document.open();document.write(html);document.close();
  }catch(e){document.body.innerHTML='<div style="font-family:Arial,sans-serif;padding:24px;color:#b42318"><b>Driver Route failed to load.</b><br>'+e.message+'</div>'}
 })();
