@@ -5,7 +5,7 @@
   const r=await fetch(base,{cache:'no-store'});
   if(!r.ok)throw Error('Could not load Dispatch workspace.');
   let html=await r.text();
-  const extras='<script src="dispatch-patch.js?v=20260922-1810"><\/script><script src="unified-search.js?v=20260922-1810"><\/script><script src="custom-stop.js?v=20260922-1810"><\/script><script src="custom-route-fallback.js?v=20260922-1810"><\/script><script src="custom-master-search.js?v=20260922-1810"><\/script><script src="clear-routes.js?v=20260922-1810"><\/script><script src="back-operations.js?v=20260922-1810"><\/script>';
+  const extras='<script src="dispatch-patch.js?v=20260922-1925"><\/script><script src="unified-search.js?v=20260922-1925"><\/script><script src="custom-stop.js?v=20260922-1925"><\/script><script src="custom-route-fallback.js?v=20260922-1925"><\/script><script src="custom-master-search.js?v=20260922-1925"><\/script><script src="custom-endpoints.js?v=20260922-1925"><\/script><script src="clear-routes.js?v=20260922-1925"><\/script><script src="back-operations.js?v=20260922-1925"><\/script>';
   html=html.replace('</body>',extras+'</body>');
   document.open();document.write(html);document.close();
  }catch(e){document.body.innerHTML='<div style="font-family:Arial,sans-serif;padding:24px;color:#b42318"><b>Dispatch failed to load.</b><br>'+e.message+'</div>'}
