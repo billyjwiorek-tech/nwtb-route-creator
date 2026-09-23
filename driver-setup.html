@@ -20,12 +20,12 @@
 <body>
 <header class="hero"><div class="heroInner"><div class="logoBox"><img src="nwt-logo.svg" alt="Northwest Trucks"></div><div><div class="eyebrow">NORTHWEST TRUCKS</div><h1>NWTB Driver Setup</h1><p>One QR code for NWTB Driver + background GPS on iPhone and Android.</p></div></div></header>
 <main class="wrap">
-<section class="card"><div class="device"><div><b id="deviceTitle">Checking your phone…</b><span id="deviceDetail">Preparing the correct setup.</span></div><div id="devicePill" class="pill">DETECTING</div></div><div class="note ok"><b>Single QR setup.</b> Drivers can find themselves by typing their name or enter their 4-digit employee number. NWTB Driver stays web based; Traccar Client handles background GPS.</div></section>
+<section class="card"><div class="device"><div><b id="deviceTitle">Checking your phone…</b><span id="deviceDetail">Preparing the correct setup.</span></div><div id="devicePill" class="pill">DETECTING</div></div><div class="note ok"><b>Single QR setup.</b> Drivers can find themselves by typing their name or enter their 4-digit employee number. NWTB Driver stays web based; the GPS Routing App handles background GPS.</div></section>
 
 <section class="card">
- <div class="sectionTitle">1. Install Traccar Client</div><div class="sectionSub">This free helper keeps sending GPS while Google Maps is in front or the NWTB browser page is in the background.</div>
- <a id="installTraccar" class="btn green" href="#">INSTALL TRACCAR CLIENT</a>
- <div class="small" style="margin-top:8px">If Traccar is already installed, skip to Step 2.</div>
+ <div class="sectionTitle">1. Install GPS Routing App</div><div class="sectionSub">This free helper keeps sending GPS while Google Maps is in front or the NWTB browser page is in the background.</div>
+ <a id="installTraccar" class="btn green" href="#">INSTALL GPS ROUTING APP</a>
+ <div class="small" style="margin-top:8px">If the GPS Routing App is already installed, skip to Step 2.</div>
 </section>
 
 <section class="card">
@@ -38,11 +38,11 @@
  <div id="selectedDriver" class="selected"></div>
  <button id="configureBtn" class="btn primary" onclick="configureTracking()">CONFIGURE BACKGROUND GPS</button>
  <div id="configStatus" class="status"></div>
- <div class="note">Traccar will open and ask you to confirm the NWTB configuration. Tap <b>OK / Confirm</b>. Then allow the strongest location permission available. On iPhone keep <b>Precise Location</b> on and allow background/Always access when offered. On Android allow background location and keep the tracking notification enabled.</div>
+ <div class="note">The GPS Routing App will open and ask you to confirm the NWTB configuration. Tap <b>OK / Confirm</b>. Then allow the strongest location permission available. On iPhone keep <b>Precise Location</b> on and allow background/Always access when offered. On Android allow background location and keep the tracking notification enabled.</div>
 </section>
 
 <section class="card">
- <div class="sectionTitle">3. Start background tracking</div><div class="sectionSub">After configuration, start the Traccar GPS service.</div>
+ <div class="sectionTitle">3. Start background tracking</div><div class="sectionSub">After configuration, start the GPS Routing App service.</div>
  <button class="btn dark" onclick="startTraccar()">START BACKGROUND TRACKING</button>
  <div class="small" style="margin-top:8px">After it starts, Google Maps can stay on screen while NWTB Dispatch continues receiving the location.</div>
 </section>
@@ -53,12 +53,12 @@
  <div class="steps">
   <div class="step"><div class="num">1</div><div><b>Select your driver name</b><span>The Driver View remembers the last selected driver on that phone.</span></div></div>
   <div class="step"><div class="num">2</div><div><b>Start the assigned route</b><span>Live GPS attaches to the driver's current ACTIVE route, or PLANNED route if it has not started yet.</span></div></div>
-  <div class="step"><div class="num">3</div><div><b>Open Google Maps</b><span>Traccar continues sending GPS in the background.</span></div></div>
+  <div class="step"><div class="num">3</div><div><b>Open Google Maps</b><span>The GPS Routing App continues sending GPS in the background.</span></div></div>
   <div class="step"><div class="num">4</div><div><b>Finish the route</b><span>Live Drivers only displays drivers linked to current PLANNED or ACTIVE routes.</span></div></div>
  </div>
 </section>
 
-<section class="card"><div class="sectionTitle">Troubleshooting</div><div class="sectionSub">If the truck becomes STALE, verify Traccar tracking is ON, location permissions are still enabled, battery optimization is not blocking the app, and the route is still PLANNED or ACTIVE.</div><div class="note"><b>Permanent QR destination:</b> this page stays the one QR target. We can change setup behavior later without reprinting the QR code.</div></section>
+<section class="card"><div class="sectionTitle">Troubleshooting</div><div class="sectionSub">If the truck becomes STALE, verify GPS Routing App tracking is ON, location permissions are still enabled, battery optimization is not blocking the app, and the route is still PLANNED or ACTIVE.</div><div class="note"><b>Permanent QR destination:</b> this page stays the one QR target. We can change setup behavior later without reprinting the QR code.</div></section>
 </main>
 <footer class="footer">NWTB Delivery Operations • Bolingbrook Operations Center</footer>
 <script>
@@ -72,7 +72,7 @@ function detect(){const ua=navigator.userAgent||'',platform=navigator.platform||
 const device=detect();
 function show(id,text,type='info'){const e=document.getElementById(id);e.textContent=text;e.className='status show '+type}
 function escapeHtml(v){return String(v||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
-function init(){const title=document.getElementById('deviceTitle'),detail=document.getElementById('deviceDetail'),pill=document.getElementById('devicePill'),install=document.getElementById('installTraccar');if(device==='ios'){title.textContent='iPhone / iPad detected';detail.textContent='Background GPS will use Traccar Client for iOS.';pill.textContent='APPLE iOS';install.href=IOS}else if(device==='android'){title.textContent='Android detected';detail.textContent='Background GPS will use Traccar Client for Android.';pill.textContent='ANDROID';install.href=ANDROID}else{title.textContent='Desktop / other device detected';detail.textContent='Scan this same QR with the driver phone for setup.';pill.textContent='WEB';install.href=ANDROID}}
+function init(){const title=document.getElementById('deviceTitle'),detail=document.getElementById('deviceDetail'),pill=document.getElementById('devicePill'),install=document.getElementById('installTraccar');if(device==='ios'){title.textContent='iPhone / iPad detected';detail.textContent='Background GPS will use the GPS Routing App for iOS.';pill.textContent='APPLE iOS';install.href=IOS}else if(device==='android'){title.textContent='Android detected';detail.textContent='Background GPS will use the GPS Routing App for Android.';pill.textContent='ANDROID';install.href=ANDROID}else{title.textContent='Desktop / other device detected';detail.textContent='Scan this same QR with the driver phone for setup.';pill.textContent='WEB';install.href=ANDROID}}
 async function getDeskToken(){let token=localStorage.getItem('nwtb_delivery_token')||'';if(token)return token;const r=await fetch(CHAT,{method:'POST',headers:{'content-type':'application/json','apikey':KEY},body:JSON.stringify({action:'delivery_guest_start'})});const j=await r.json();if(!r.ok)throw Error(j.error||'Could not start Delivery session');token=j.token;localStorage.setItem('nwtb_delivery_token',token);return token}
 async function callProvision(body){const token=await getDeskToken();let r=await fetch(PROVISION,{method:'POST',headers:{'content-type':'application/json','apikey':KEY,'x-nwtb-session':token},body:JSON.stringify(body)});let j=await r.json().catch(()=>({}));if(r.status===401){localStorage.removeItem('nwtb_delivery_token');const fresh=await getDeskToken();r=await fetch(PROVISION,{method:'POST',headers:{'content-type':'application/json','apikey':KEY,'x-nwtb-session':fresh},body:JSON.stringify(body)});j=await r.json().catch(()=>({}))}if(!r.ok)throw Error(j.error||'NWTB setup request failed');return j}
 function clearSelection(){selectedDriver=null;const box=document.getElementById('selectedDriver');box.className='selected';box.textContent=''}
@@ -83,7 +83,7 @@ const input=document.getElementById('driverSearch');
 input.addEventListener('input',()=>{clearSelection();const q=input.value.trim();if(searchTimer)clearTimeout(searchTimer);if(!q){renderResults([]);return}if(/^\d{4}$/.test(q)){selectedDriver={employee_number:q,display_name:''};const box=document.getElementById('selectedDriver');box.textContent='Employee #'+q+' entered. NWTB will verify it when you configure.';box.className='selected show'}searchTimer=setTimeout(()=>searchDrivers(q),180)});
 input.addEventListener('keydown',e=>{const box=document.getElementById('driverResults');if(!box.classList.contains('show')||!currentResults.length)return;if(e.key==='ArrowDown'){e.preventDefault();activeIndex=Math.min(activeIndex+1,currentResults.length-1)}else if(e.key==='ArrowUp'){e.preventDefault();activeIndex=Math.max(activeIndex-1,0)}else if(e.key==='Enter'&&activeIndex>=0){e.preventDefault();const d=currentResults[activeIndex];chooseDriver(d.employee_number,d.display_name);return}else if(e.key==='Escape'){box.className='results';return}else return;box.querySelectorAll('.result').forEach((b,i)=>b.classList.toggle('active',i===activeIndex));box.querySelectorAll('.result')[activeIndex]?.scrollIntoView({block:'nearest'})});
 document.addEventListener('click',e=>{if(!e.target.closest('.field'))document.getElementById('driverResults').className='results'});
-window.configureTracking=async function(){const raw=input.value.trim(),btn=document.getElementById('configureBtn');let driver=selectedDriver?.employee_number||(/^\d{4}$/.test(raw)?raw:'');if(!/^\d{4}$/.test(driver)){show('configStatus','Start typing your name and select it, or enter your 4-digit employee number.','warn');return}try{btn.disabled=true;show('configStatus','Creating secure NWTB tracking setup…','info');const j=await callProvision({action:'provision',driver_employee_number:driver,label:(device==='ios'?'iPhone':device==='android'?'Android':'Driver phone')});chooseDriver(j.driver_employee_number,j.driver_name);show('configStatus','Ready for '+j.driver_name+'. Opening Traccar configuration…','ok');setTimeout(()=>{location.href=j.deep_link},350)}catch(e){show('configStatus',String(e.message||e),'err')}finally{btn.disabled=false}};
+window.configureTracking=async function(){const raw=input.value.trim(),btn=document.getElementById('configureBtn');let driver=selectedDriver?.employee_number||(/^\d{4}$/.test(raw)?raw:'');if(!/^\d{4}$/.test(driver)){show('configStatus','Start typing your name and select it, or enter your 4-digit employee number.','warn');return}try{btn.disabled=true;show('configStatus','Creating secure NWTB tracking setup…','info');const j=await callProvision({action:'provision',driver_employee_number:driver,label:(device==='ios'?'iPhone':device==='android'?'Android':'Driver phone')});chooseDriver(j.driver_employee_number,j.driver_name);show('configStatus','Ready for '+j.driver_name+'. Opening GPS Routing App configuration…','ok');setTimeout(()=>{location.href=j.deep_link},350)}catch(e){show('configStatus',String(e.message||e),'err')}finally{btn.disabled=false}};
 window.startTraccar=function(){location.href='org.traccar.client://action/start'};
 init();
 </script>
