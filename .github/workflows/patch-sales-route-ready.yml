@@ -1,0 +1,77 @@
+name: Patch Sales Route Creator Ready
+
+on:
+  push:
+    paths:
+      - '.github/workflows/patch-sales-route-ready.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch sales route creator
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def patch_html(path):
+              p=Path(path)
+              if not p.exists():
+                  return
+              s=p.read_text(encoding='utf-8')
+              s=s.replace('VERSION 2026-09-21L','VERSION 2026-09-23 READY')
+              s=s.replace('Working Map Total</div>','Route Database Total<div class="small">My Maps view: 425</div></div>')
+              s=s.replace('WORKING MAP FILTER:','ROUTE DATABASE FILTER:')
+              s=s.replace('WORKING MAP + ROUTE CREATOR:','ROUTE DATABASE:')
+              s=s.replace('Only route-eligible working-map accounts can be selected.','Only route-eligible route-database accounts can be selected.')
+              s=s.replace('"25941","11060","24956"','"25941","24956"')
+              s=s.replace('accounts.json?v=20260921L','accounts.json?v=20260923READY')
+              s=s.replace('chat.js?v=20260921L','chat.js?v=20260923READY')
+              if 'navigation.js?v=20260923READY' not in s:
+                  s=s.replace('<script src="./chat.js?v=20260923READY"></script></body></html>', '<script src="./chat.js?v=20260923READY"></script><script src="./navigation.js?v=20260923READY"></script></body></html>')
+              p.write_text(s,encoding='utf-8')
+
+          patch_html('index.html')
+          patch_html('app.html')
+
+          p=Path('chat.js')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace('// FINAL 2026-09-21 FAIL-CLOSED LOCATION AUDIT.','// FINAL 2026-09-23 FAIL-CLOSED LOCATION AUDIT.')
+          s=s.replace('// GO FIRST existing customers use the completed 42-account audit.','// GO FIRST existing customers use the completed final audit.')
+          if "'11060':{address:'2605 W 22nd St, Suite 32, Oak Brook, IL 60523'" not in s:
+              s=s.replace("    '27727':{address:'10S530 Thames Dr, Downers Grove, IL 60516'", "    '11060':{address:'2605 W 22nd St, Suite 32, Oak Brook, IL 60523',lat:41.845455,lon:-87.980871,note:'IRON WAY final audited commercial office'},\n    '27727':{address:'10S530 Thames Dr, Downers Grove, IL 60516'")
+          s=s.replace("'11179','11935','24881','15474','11395','15096','12389','26423','11218','21986'\n  ]);", "'11179','11935','24881','15474','11395','15096','12389','26423','11218','21986','11060'\n  ]);")
+          s=s.replace("'27727','11771','23016','18153','11252','26145','17219','16106','25606','12635','25909','25817'\n  ]);", "'27727','11771','23016','18153','11252','26145','17219','16106','25606','12635','25909','25817','10803','28280'\n  ]);")
+          s=s.replace("const DUPLICATE_SUPPRESS_IDS=new Set(['25941','12038','12039']);", "const DUPLICATE_SUPPRESS_IDS=new Set(['25941','12038','12039','24956']);")
+          p.write_text(s,encoding='utf-8')
+
+          # Fail the workflow if the production wiring is not present.
+          idx=Path('index.html').read_text(encoding='utf-8')
+          chat=Path('chat.js').read_text(encoding='utf-8')
+          assert 'VERSION 2026-09-23 READY' in idx
+          assert 'navigation.js?v=20260923READY' in idx
+          assert 'accounts.json?v=20260923READY' in idx
+          assert '"25941","11060","24956"' not in idx
+          assert "'21986','11060'" in chat
+          assert "'25817','10803','28280'" in chat
+          assert "'12039','24956'" in chat
+          assert "'11060':{address:'2605 W 22nd St, Suite 32, Oak Brook, IL 60523'" in chat
+          print('Sales Route Creator production patch checks passed.')
+          PY
+      - name: Commit production patch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html app.html chat.js
+          if git diff --cached --quiet; then
+            echo "No changes needed"
+            exit 0
+          fi
+          git commit -m "Finalize Sales Route Creator for 2026-09-23"
+          git push
