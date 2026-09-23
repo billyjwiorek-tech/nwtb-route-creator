@@ -1,7 +1,7 @@
 (function(){
 'use strict';
 const $=id=>document.getElementById(id);
-let rebuilding=false;
+let installed=false;
 function addStyles(){
  if($('routeToolbarCleanupStyles'))return;
  const s=document.createElement('style');s.id='routeToolbarCleanupStyles';s.textContent=`
@@ -29,32 +29,28 @@ function syncDeleteSelected(){const b=$('deleteSelectedBtn');if(!b)return;const 
 function closeMenu(){$('routeToolsMenu')?.classList.remove('show')}
 window.toggleRouteTools=function(e){if(e)e.stopPropagation();$('routeToolsMenu')?.classList.toggle('show')};
 function ready(){return $('selectedCount')&&$('optBtn')&&$('deleteSelectedBtn')&&$('manageRoutesBtn')&&$('clearAllRoutesBtn')&&$('clearAvailableStopsBtn')&&routeToolbar()}
-function rebuild(){
- if(rebuilding||!ready())return false;rebuilding=true;
- try{
-  addStyles();
-  const toolbar=routeToolbar(),count=$('selectedCount'),del=$('deleteSelectedBtn'),opt=$('optBtn'),manage=$('manageRoutesBtn'),clearRoutes=$('clearAllRoutesBtn'),clearAvail=$('clearAvailableStopsBtn');
-  const refresh=Array.from(toolbar.querySelectorAll('button')).find(b=>b.textContent.trim().toUpperCase()==='REFRESH')||Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim().toUpperCase()==='REFRESH');
-  if(!refresh)return false;
-  toolbar.id='routeCleanBar';toolbar.classList.add('routeCleanBar');
-  let selection=$('routeCleanSelection');if(!selection){selection=document.createElement('div');selection.id='routeCleanSelection';selection.className='routeCleanSelection'}
-  let primary=$('routeCleanPrimary');if(!primary){primary=document.createElement('div');primary.id='routeCleanPrimary';primary.className='routeCleanPrimary'}
-  let secondary=$('routeCleanSecondary');if(!secondary){secondary=document.createElement('div');secondary.id='routeCleanSecondary';secondary.className='routeCleanSecondary'}
-  let tools=$('routeToolsWrap');if(!tools){tools=document.createElement('div');tools.id='routeToolsWrap';tools.className='routeToolsWrap'}
-  let toolsBtn=$('routeToolsBtn');if(!toolsBtn){toolsBtn=document.createElement('button');toolsBtn.type='button';toolsBtn.id='routeToolsBtn';toolsBtn.className='btn routeToolsBtn';toolsBtn.textContent='MORE ROUTE TOOLS ▾';toolsBtn.onclick=window.toggleRouteTools}
-  let menu=$('routeToolsMenu');if(!menu){menu=document.createElement('div');menu.id='routeToolsMenu';menu.className='routeToolsMenu'}
-  let title=$('routeToolsTitle');if(!title){title=document.createElement('div');title.id='routeToolsTitle';title.className='routeToolsTitle';title.textContent='Cleanup / Maintenance'}
-  selection.replaceChildren(count,del);
-  primary.replaceChildren(opt);
-  menu.replaceChildren(title,clearRoutes,clearAvail);
-  tools.replaceChildren(toolsBtn,menu);
-  secondary.replaceChildren(refresh,manage,tools);
-  toolbar.replaceChildren(selection,primary,secondary);
-  syncDeleteSelected();
-  return true;
- }finally{rebuilding=false}
+function install(){
+ if(installed||!ready())return installed;
+ addStyles();
+ const toolbar=routeToolbar(),count=$('selectedCount'),del=$('deleteSelectedBtn'),opt=$('optBtn'),manage=$('manageRoutesBtn'),clearRoutes=$('clearAllRoutesBtn'),clearAvail=$('clearAvailableStopsBtn');
+ const refresh=Array.from(toolbar.querySelectorAll('button')).find(b=>b.textContent.trim().toUpperCase()==='REFRESH')||Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim().toUpperCase()==='REFRESH');
+ if(!refresh)return false;
+ toolbar.id='routeCleanBar';toolbar.classList.add('routeCleanBar');
+ const selection=document.createElement('div');selection.id='routeCleanSelection';selection.className='routeCleanSelection';selection.append(count,del);
+ const primary=document.createElement('div');primary.id='routeCleanPrimary';primary.className='routeCleanPrimary';primary.append(opt);
+ const secondary=document.createElement('div');secondary.id='routeCleanSecondary';secondary.className='routeCleanSecondary';
+ const tools=document.createElement('div');tools.id='routeToolsWrap';tools.className='routeToolsWrap';
+ const toolsBtn=document.createElement('button');toolsBtn.type='button';toolsBtn.id='routeToolsBtn';toolsBtn.className='btn routeToolsBtn';toolsBtn.textContent='MORE ROUTE TOOLS ▾';toolsBtn.onclick=window.toggleRouteTools;
+ const menu=document.createElement('div');menu.id='routeToolsMenu';menu.className='routeToolsMenu';
+ const title=document.createElement('div');title.id='routeToolsTitle';title.className='routeToolsTitle';title.textContent='Cleanup / Maintenance';
+ menu.append(title,clearRoutes,clearAvail);tools.append(toolsBtn,menu);secondary.append(refresh,manage,tools);
+ toolbar.replaceChildren(selection,primary,secondary);
+ opt.onclick=function(){if(typeof window.optimizeAssign==='function')window.optimizeAssign()};
+ syncDeleteSelected();
+ installed=true;
+ return true;
 }
-const prevUpdate=window.updateSelected;window.updateSelected=function(){if(typeof prevUpdate==='function')prevUpdate.apply(this,arguments);syncDeleteSelected();setTimeout(rebuild,0)};
-function boot(){addStyles();let tries=0;const t=setInterval(()=>{tries++;if(rebuild()||tries>100)clearInterval(t)},100);const obs=new MutationObserver(()=>{if(!rebuilding&&ready())setTimeout(rebuild,0)});obs.observe(document.body,{childList:true,subtree:true});document.addEventListener('click',e=>{if(!$('routeToolsWrap')?.contains(e.target))closeMenu()});}
+const prevUpdate=window.updateSelected;window.updateSelected=function(){if(typeof prevUpdate==='function')prevUpdate.apply(this,arguments);syncDeleteSelected()};
+function boot(){addStyles();let tries=0;const t=setInterval(()=>{tries++;if(install()||tries>120)clearInterval(t)},100);document.addEventListener('click',e=>{if(!$('routeToolsWrap')?.contains(e.target))closeMenu()});}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();
