@@ -4,7 +4,7 @@
  try{
   const r=await fetch(base,{cache:'no-store'});if(!r.ok)throw Error('Could not load Live Driver Tracker.');
   let html=await r.text();
-  html=html.replace('</body>','<script src="tracker-add-stop.js?v=20260923-0835"><\/script><script src="office-pause-alerts.js?v=20260923-0835"><\/script></body>');
+  html=html.replace('</body>','<script src="tracker-add-stop.js?v=20260922-2050"><\/script><script src="office-pause-alerts.js?v=20260922-2050"><\/script><script src="tracker-route-filter.js?v=20260922-2050"><\/script></body>');
   document.open();document.write(html);document.close();
  }catch(e){document.body.innerHTML='<div style="font-family:Arial,sans-serif;padding:24px;color:#b42318"><b>Live Driver Tracker failed to load.</b><br>'+e.message+'</div>'}
 })();
