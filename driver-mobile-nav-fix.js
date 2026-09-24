@@ -48,14 +48,14 @@ function safeInvalidate(){
  if(!el)return;
  const r=el.getBoundingClientRect();
  if(r.width<100||r.height<100)return;
- try{map.invalidateSize({pan:false,animate:false})}catch{try{map.invalidateSize()}catch{}}
+ try{map.invalidateSize({pan:true,animate:false,debounceMoveend:true})}catch{try{map.invalidateSize(false)}catch{}}
 }
 function scheduleResize(){
  clearTimeout(resizeTimer);
  resizeTimer=setTimeout(()=>{
    safeInvalidate();
-   setTimeout(safeInvalidate,120);
-   setTimeout(safeInvalidate,350);
+   setTimeout(safeInvalidate,140);
+   setTimeout(safeInvalidate,420);
  },80);
 }
 function watchMapElement(){
@@ -93,7 +93,8 @@ function captureLeaflet(){
  if(L.map.__nwtbSafeWrapped)return true;
  const original=L.map;
  function wrapped(id,opts){
-   const m=original.call(this,id,opts);
+   const finalOpts=Object.assign({zoomAnimation:false,fadeAnimation:false,markerZoomAnimation:false},opts||{});
+   const m=original.call(this,id,finalOpts);
    const el=typeof id==='string'?document.getElementById(id):id;
    if((typeof id==='string'&&id==='nwtbNavMap')||el?.id==='nwtbNavMap'){
      map=m;window.__nwtbNavMapInstance=m;watchMapElement();watchPanel();scheduleResize();
@@ -101,6 +102,19 @@ function captureLeaflet(){
    return m;
  }
  Object.assign(wrapped,original);wrapped.__nwtbSafeWrapped=true;L.map=wrapped;return true;
+}
+function stabilizeTiles(){
+ if(!window.L||typeof L.tileLayer!=='function'||L.tileLayer.__nwtbSafeWrapped)return false;
+ const original=L.tileLayer;
+ function wrapped(url,opts){
+   let u=url,o=Object.assign({},opts||{});
+   if(String(url).includes('tile.openstreetmap.org')){
+     u='https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+     o=Object.assign({updateWhenIdle:true,updateWhenZooming:false,keepBuffer:3},o);
+   }
+   return original.call(this,u,o);
+ }
+ Object.assign(wrapped,original);wrapped.__nwtbSafeWrapped=true;L.tileLayer=wrapped;return true;
 }
 function lockStart(e){
  const b=e.target?.closest?.('.nwtbFullRouteBtn');if(!b)return;
@@ -119,7 +133,7 @@ function wrapStop(){
 
 injectStyles();
 document.addEventListener('click',lockStart,true);
-let leafTries=0;const leafTimer=setInterval(()=>{if(captureLeaflet()||++leafTries>100)clearInterval(leafTimer)},50);
+let leafTries=0;const leafTimer=setInterval(()=>{const a=captureLeaflet(),b=stabilizeTiles();if((a&&b)||++leafTries>100)clearInterval(leafTimer)},50);
 let panelTries=0;const panelTimer=setInterval(()=>{watchPanel();if(panel()||++panelTries>120)clearInterval(panelTimer)},100);
 let stopTries=0;const stopTimer=setInterval(()=>{if(wrapStop()||++stopTries>120)clearInterval(stopTimer)},100);
 window.addEventListener('resize',scheduleResize,{passive:true});
