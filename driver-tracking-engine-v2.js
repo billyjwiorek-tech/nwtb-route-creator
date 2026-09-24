@@ -2,7 +2,7 @@
 'use strict';
 
 const ENGINE='NWTB BUILT-IN GPS';
-const TRACK_URL='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-delivery-tracking';
+const TRACK_URL='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-live-tracking-v2';
 const CHAT_URL='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-chat';
 const API_KEY='sb_publishable_EqF-iooqhmngSG5BbzOxfQ_Vnf9Altc';
 const QUEUE_KEY='nwtb_builtin_gps_queue_v2';
@@ -29,6 +29,7 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 const rad=x=>x*Math.PI/180;
 function meters(a,b){if(!a||!b)return Infinity;const R=6371008.8,dLat=rad(b.lat-a.lat),dLon=rad(b.lon-a.lon),x=Math.sin(dLat/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dLon/2)**2;return 2*R*Math.asin(Math.sqrt(x))}
+function bearing(a,b){if(!a||!b)return null;const y=Math.sin(rad(b.lon-a.lon))*Math.cos(rad(b.lat));const x=Math.cos(rad(a.lat))*Math.sin(rad(b.lat))-Math.sin(rad(a.lat))*Math.cos(rad(b.lat))*Math.cos(rad(b.lon-a.lon));const v=(Math.atan2(y,x)*180/Math.PI+360)%360;return Number.isFinite(v)?v:null}
 function nowTime(){return new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit',second:'2-digit'})}
 function context(){
  let emp='',rid='',tok='';
@@ -48,7 +49,6 @@ function status(text,kind='info'){
 function queueRead(){try{const q=JSON.parse(localStorage.getItem(QUEUE_KEY)||'[]');return Array.isArray(q)?q:[]}catch{return []}}
 function queueWrite(q){try{localStorage.setItem(QUEUE_KEY,JSON.stringify(q.slice(-MAX_QUEUE)))}catch{}}
 function enqueue(p){const q=queueRead();q.push(p);queueWrite(q)}
-function clearQueue(){try{localStorage.removeItem(QUEUE_KEY)}catch{}}
 async function freshToken(){
  const r=await fetch(CHAT_URL,{method:'POST',headers:{'content-type':'application/json','apikey':API_KEY},body:JSON.stringify({action:'delivery_guest_start'})});
  const j=await r.json().catch(()=>({}));if(!r.ok||!j.token)throw Error(j.error||'Could not refresh delivery session');
@@ -65,7 +65,7 @@ async function upload(payload,allowRefresh=true){
 function makePayload(fix){const c=context();return {action:'location_update',driver_employee_number:c.driver,route_id:c.route,lat:fix.lat,lon:fix.lon,accuracy_m:fix.accuracy,heading_deg:fix.heading,speed_mps:fix.speed,captured_at:fix.captured_at}}
 async function flushQueue(){
  if(sending||!navigator.onLine)return;const ctx=context();if(!ctx.driver||!ctx.route)return;
- let q=queueRead();if(!q.length)return;sending=true;
+ const q=queueRead();if(!q.length)return;sending=true;
  try{
   const keep=[];
   for(let i=0;i<q.length;i++){
@@ -86,7 +86,7 @@ async function sendFix(fix,force=false){
   status(`LIVE • ${nowTime()}${acc}`,'ok');
  }catch(e){enqueue(payload);status(`UPLOAD DELAYED — SAVING GPS • ${queueRead().length} queued`,'warn')}
 }
-function normalizePosition(p){const c=p.coords||{};return {lat:Number(c.latitude),lon:Number(c.longitude),accuracy:Number(c.accuracy),heading:Number.isFinite(Number(c.heading))?Number(c.heading):null,speed:Number.isFinite(Number(c.speed))?Math.max(0,Number(c.speed)):null,captured_at:new Date(p.timestamp||Date.now()).toISOString()}}
+function normalizePosition(p){const c=p.coords||{},lat=Number(c.latitude),lon=Number(c.longitude);let heading=Number.isFinite(Number(c.heading))?Number(c.heading):null;if(heading===null&&lastFix&&Number.isFinite(lat)&&Number.isFinite(lon)&&meters(lastFix,{lat,lon})>=4)heading=bearing(lastFix,{lat,lon});return {lat,lon,accuracy:Number(c.accuracy),heading,speed:Number.isFinite(Number(c.speed))?Math.max(0,Number(c.speed)):null,captured_at:new Date(p.timestamp||Date.now()).toISOString()}}
 function onFix(p){
  const f=normalizePosition(p);if(!Number.isFinite(f.lat)||!Number.isFinite(f.lon))return;
  lastFix=f;lastFixAt=Date.now();recoveries=0;sendFix(f,false);
@@ -127,22 +127,20 @@ function start(){
  if(!navigator.geolocation){status('GPS NOT SUPPORTED','bad');return}
  if(running){getWakeLock();return}
  running=true;lastFixAt=0;recoveries=0;startTimers();startWatch();getWakeLock();
- window.__nwtbBuiltInTracker={engine:ENGINE,running:true};
+ window.__nwtbBuiltInTracker={engine:ENGINE,running:true,receiver:'V2'};
 }
-function stop(){running=false;clearWatch();stopTimers();releaseWakeLock();window.__nwtbBuiltInTracker={engine:ENGINE,running:false};status('OFF','warn')}
+function stop(){running=false;clearWatch();stopTimers();releaseWakeLock();window.__nwtbBuiltInTracker={engine:ENGINE,running:false,receiver:'V2'};status('OFF','warn')}
 
 window.addEventListener('online',()=>{if(running){status('CONNECTION RESTORED — SENDING SAVED GPS','info');flushQueue();if(lastFix)sendFix(lastFix,true)}});
 window.addEventListener('offline',()=>{if(running)status('OFFLINE — GPS WILL BE SAVED','warn')});
 document.addEventListener('visibilitychange',()=>{if(!running)return;if(document.visibilityState==='visible'){getWakeLock();navigator.geolocation?.getCurrentPosition(onFix,()=>scheduleRecovery(0),{enableHighAccuracy:true,maximumAge:0,timeout:12000});if(watch===null)startWatch()}else{releaseWakeLock()}});
 window.addEventListener('pageshow',()=>{if(running){getWakeLock();scheduleRecovery(0)}});
 
-// Replace only the Live Driver page's legacy foreground watcher. Route, stop and navigation logic stay untouched.
 try{if(typeof startTracking==='function')startTracking=start}catch{window.startTracking=start}
 try{if(typeof stopTracking==='function')stopTracking=stop}catch{window.stopTracking=stop}
 window.nwtbStartBuiltInTracking=start;
 window.nwtbStopBuiltInTracking=stop;
 
-// If the driver opens an already ACTIVE route, resume NWTB tracking automatically.
 setInterval(()=>{try{const ctx=context(),txt=$('routes')?.textContent||'';if(!running&&ctx.driver&&ctx.route&&/ACTIVE/i.test(txt))start()}catch{}},5000);
 
 })();
