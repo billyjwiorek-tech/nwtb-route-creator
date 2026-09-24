@@ -12,8 +12,8 @@ function injectStyles(){
  #nwtbNavMap.leaflet-container{width:100%!important;background:#dbe4ea!important}
  #nwtbNavPanel{width:100%!important;box-sizing:border-box!important}
  .navActions button{white-space:normal!important;line-height:1.15!important}
- body.nwtb-nav-active .nwtbFullRouteBtn,body.nwtb-nav-starting .nwtbFullRouteBtn{display:none!important}
- body.nwtb-nav-active #nwtbDriverChatBtn,body.nwtb-nav-starting #nwtbDriverChatBtn{bottom:88px!important}
+ body.nwtb-nav-starting .nwtbFullRouteBtn,body.nwtb-nav-active .nwtbFullRouteBtn{display:none!important}
+ body.nwtb-nav-starting #nwtbDriverChatBtn,body.nwtb-nav-active #nwtbDriverChatBtn{bottom:88px!important}
  @media(max-width:720px){
    body{overflow-x:hidden!important}
    .wrap{max-width:none!important;margin:8px auto!important;padding:0 8px!important}
@@ -39,112 +39,91 @@ function injectStyles(){
  document.head.appendChild(s);
 }
 
-let navMap=null,lastW=0,lastH=0,lastViewport='';
-function navShown(){return !!document.getElementById('nwtbNavPanel')?.classList.contains('show')}
-function redrawTiles(){
- if(!navMap)return;
- try{navMap.eachLayer(layer=>{if(layer&&typeof layer.redraw==='function')layer.redraw()})}catch{}
-}
-function forceResize(redraw=false){
+let map=null,resizeObserver=null,lastW=0,lastH=0,resizeTimer=null,panelObserver=null;
+function panel(){return document.getElementById('nwtbNavPanel')}
+function shown(){return !!panel()?.classList.contains('show')}
+function safeInvalidate(){
+ if(!map||!shown())return;
  const el=document.getElementById('nwtbNavMap');
- if(!el||!navMap||typeof navMap.invalidateSize!=='function')return;
+ if(!el)return;
  const r=el.getBoundingClientRect();
  if(r.width<100||r.height<100)return;
- const w=Math.round(r.width),h=Math.round(r.height);
- lastW=w;lastH=h;
- let center=null,zoom=null;
- try{center=navMap.getCenter();zoom=navMap.getZoom();navMap.stop()}catch{}
- try{navMap.invalidateSize({pan:true,animate:false,debounceMoveend:true})}catch{try{navMap.invalidateSize()}catch{}}
- requestAnimationFrame(()=>{
-   try{if(center&&Number.isFinite(zoom))navMap.setView(center,zoom,{animate:false})}catch{}
-   if(redraw)redrawTiles();
- });
+ try{map.invalidateSize({pan:false,animate:false})}catch{try{map.invalidateSize()}catch{}}
 }
-function settle(redraw=false){
- requestAnimationFrame(()=>requestAnimationFrame(()=>forceResize(redraw)));
- setTimeout(()=>forceResize(redraw),80);
- setTimeout(()=>forceResize(redraw),220);
- setTimeout(()=>forceResize(redraw),500);
- setTimeout(()=>forceResize(redraw),1000);
+function scheduleResize(){
+ clearTimeout(resizeTimer);
+ resizeTimer=setTimeout(()=>{
+   safeInvalidate();
+   setTimeout(safeInvalidate,120);
+   setTimeout(safeInvalidate,350);
+ },80);
 }
-function watchContainer(){
+function watchMapElement(){
  const el=document.getElementById('nwtbNavMap');
- if(!el||el.__nwtbResizeWatched)return;
- el.__nwtbResizeWatched=true;
- if('ResizeObserver' in window){
-  const ro=new ResizeObserver(entries=>{
-   const cr=entries[0]?.contentRect;if(!cr)return;
-   const w=Math.round(cr.width),h=Math.round(cr.height);
-   if(w!==lastW||h!==lastH){lastW=w;lastH=h;settle(true)}
-  });
-  ro.observe(el);
+ if(!el||resizeObserver)return;
+ if('ResizeObserver'in window){
+   resizeObserver=new ResizeObserver(entries=>{
+     const cr=entries[0]?.contentRect;if(!cr)return;
+     const w=Math.round(cr.width),h=Math.round(cr.height);
+     if(w===lastW&&h===lastH)return;
+     lastW=w;lastH=h;scheduleResize();
+   });
+   resizeObserver.observe(el);
  }
- settle(true);
 }
-
+function syncState(){
+ const active=shown();
+ document.body.classList.toggle('nwtb-nav-active',active);
+ if(active){
+   document.body.classList.remove('nwtb-nav-starting');
+   document.querySelectorAll('.nwtbFullRouteBtn').forEach(b=>b.disabled=true);
+   watchMapElement();scheduleResize();
+ }else if(!document.body.classList.contains('nwtb-nav-starting')){
+   document.querySelectorAll('.nwtbFullRouteBtn').forEach(b=>{b.disabled=false;if(b.dataset.nwtbOriginalText)b.textContent=b.dataset.nwtbOriginalText});
+ }
+}
+function watchPanel(){
+ const p=panel();if(!p||panelObserver)return;
+ panelObserver=new MutationObserver(syncState);
+ panelObserver.observe(p,{attributes:true,attributeFilter:['class']});
+ syncState();
+}
 function captureLeaflet(){
  if(!window.L||typeof L.map!=='function')return false;
- if(L.map.__nwtbWrapped)return true;
+ if(L.map.__nwtbSafeWrapped)return true;
  const original=L.map;
  function wrapped(id,opts){
-  const m=original.call(this,id,opts);
-  const el=typeof id==='string'?document.getElementById(id):id;
-  if((typeof id==='string'&&id==='nwtbNavMap')||el?.id==='nwtbNavMap'){
-   navMap=m;
-   window.__nwtbNavMapInstance=m;
-   watchContainer();
-   settle(true);
-   try{
-    m.on('moveend zoomend',()=>setTimeout(()=>forceResize(false),40));
-    m.on('layeradd',()=>setTimeout(()=>forceResize(true),80));
-   }catch{}
-  }
-  return m;
+   const m=original.call(this,id,opts);
+   const el=typeof id==='string'?document.getElementById(id):id;
+   if((typeof id==='string'&&id==='nwtbNavMap')||el?.id==='nwtbNavMap'){
+     map=m;window.__nwtbNavMapInstance=m;watchMapElement();watchPanel();scheduleResize();
+   }
+   return m;
  }
- Object.assign(wrapped,original);
- wrapped.__nwtbWrapped=true;
- L.map=wrapped;
- return true;
+ Object.assign(wrapped,original);wrapped.__nwtbSafeWrapped=true;L.map=wrapped;return true;
 }
-
-function restoreRouteButtons(){
- document.querySelectorAll('.nwtbFullRouteBtn').forEach(b=>{
-   if(b.dataset.nwtbOriginalText)b.textContent=b.dataset.nwtbOriginalText;
-   b.disabled=false;
- });
-}
-function syncNavState(){
- const active=navShown();
- document.body.classList.toggle('nwtb-nav-active',active);
- if(active){document.body.classList.remove('nwtb-nav-starting');document.querySelectorAll('.nwtbFullRouteBtn').forEach(b=>b.disabled=true);settle(true)}
- else if(!document.body.classList.contains('nwtb-nav-starting'))restoreRouteButtons();
-}
-function lockOnStart(e){
+function lockStart(e){
  const b=e.target?.closest?.('.nwtbFullRouteBtn');if(!b)return;
  if(b.disabled){e.preventDefault();e.stopPropagation();return}
  b.dataset.nwtbOriginalText=b.textContent||'ROUTE FULL ROUTE IN NWTB';
- b.disabled=true;b.textContent='STARTING NWTB NAVIGATION…';
- document.body.classList.add('nwtb-nav-starting');
- setTimeout(syncNavState,100);
- setTimeout(()=>{if(!navShown()){document.body.classList.remove('nwtb-nav-starting');restoreRouteButtons()}},15000);
+ b.disabled=true;b.textContent='NWTB GPS STARTING…';document.body.classList.add('nwtb-nav-starting');
+ setTimeout(()=>{watchPanel();syncState()},100);
+ setTimeout(()=>{if(!shown()){document.body.classList.remove('nwtb-nav-starting');syncState()}},15000);
+}
+function wrapStop(){
+ if(typeof window.nwtbStopNavigation!=='function'||window.nwtbStopNavigation.__nwtbWrapped)return false;
+ const old=window.nwtbStopNavigation;
+ const wrapped=function(...args){try{return old.apply(this,args)}finally{document.body.classList.remove('nwtb-nav-active','nwtb-nav-starting');setTimeout(syncState,0)}};
+ wrapped.__nwtbWrapped=true;window.nwtbStopNavigation=wrapped;return true;
 }
 
 injectStyles();
-document.addEventListener('click',lockOnStart,true);
-let tries=0;const t=setInterval(()=>{if(captureLeaflet()||++tries>100)clearInterval(t)},40);
-const mo=new MutationObserver(()=>{watchContainer();syncNavState();if(navShown())settle(false)});
-mo.observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['class','style']});
-window.addEventListener('resize',()=>settle(true),{passive:true});
-window.addEventListener('orientationchange',()=>setTimeout(()=>settle(true),120),{passive:true});
-if(window.visualViewport)window.visualViewport.addEventListener('resize',()=>settle(true),{passive:true});
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')settle(true)});
-setInterval(()=>{
- if(!navShown()||!navMap)return;
- const vv=window.visualViewport,el=document.getElementById('nwtbNavMap'),r=el?.getBoundingClientRect();
- if(!r)return;
- const sig=`${Math.round(r.width)}x${Math.round(r.height)}:${Math.round(vv?.width||innerWidth)}x${Math.round(vv?.height||innerHeight)}`;
- const noTiles=el.querySelectorAll('.leaflet-tile-loaded').length===0;
- if(sig!==lastViewport||noTiles){lastViewport=sig;settle(true)}
-},1500);
-syncNavState();
+document.addEventListener('click',lockStart,true);
+let leafTries=0;const leafTimer=setInterval(()=>{if(captureLeaflet()||++leafTries>100)clearInterval(leafTimer)},50);
+let panelTries=0;const panelTimer=setInterval(()=>{watchPanel();if(panel()||++panelTries>120)clearInterval(panelTimer)},100);
+let stopTries=0;const stopTimer=setInterval(()=>{if(wrapStop()||++stopTries>120)clearInterval(stopTimer)},100);
+window.addEventListener('resize',scheduleResize,{passive:true});
+window.addEventListener('orientationchange',()=>setTimeout(scheduleResize,150),{passive:true});
+if(window.visualViewport)window.visualViewport.addEventListener('resize',scheduleResize,{passive:true});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')scheduleResize()});
 })();
