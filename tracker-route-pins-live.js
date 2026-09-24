@@ -1,0 +1,26 @@
+(()=>{
+'use strict';
+if(window.__nwtbTrackerRoutePinsLive)return;window.__nwtbTrackerRoutePinsLive=true;
+const TRACK='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-live-tracking-v2';
+const API='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-delivery';
+const KEY='sb_publishable_EqF-iooqhmngSG5BbzOxfQ_Vnf9Altc';
+const HOME={name:'Northwest Trucks - Bolingbrook',address:'201 S W Frontage Rd, Bolingbrook, IL 60440',lat:41.682487,lon:-88.072262};
+let routePins=[],depotPin=null,fitOnce=false,control=null;
+const tok=()=>localStorage.getItem('nwtb_delivery_token')||'';
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+const valid=(a,b)=>Number.isFinite(Number(a))&&Number.isFinite(Number(b))&&Math.abs(Number(a))>1&&Math.abs(Number(b))>1;
+async function post(url,body){const r=await fetch(url,{method:'POST',headers:{'content-type':'application/json','apikey':KEY,'x-nwtb-session':tok()},body:JSON.stringify(body)}),j=await r.json().catch(()=>({error:'Route pin response error'}));if(!r.ok)throw Error(j.error||'Route pin request failed');return j}
+function style(){if(document.getElementById('nwtbOfficeRoutePinStyle'))return;const s=document.createElement('style');s.id='nwtbOfficeRoutePinStyle';s.textContent=`
+.nwtbOfficeStopPin{width:28px;height:28px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid #fff;box-shadow:0 2px 7px rgba(15,23,42,.35);display:grid;place-items:center;background:#f58220}.nwtbOfficeStopPin span{transform:rotate(45deg);color:#fff;font:900 11px/1 Arial,sans-serif}.nwtbOfficeStopPin.current{background:#2563eb;box-shadow:0 0 0 4px rgba(37,99,235,.18),0 2px 7px rgba(15,23,42,.35)}.nwtbOfficeStopPin.done{background:#16a34a}.nwtbOfficeStopPin.failed{background:#dc2626}.nwtbOfficeDepot{min-width:40px;height:26px;border-radius:8px;background:#0f172a;color:#fff;border:2px solid #fff;box-shadow:0 2px 7px rgba(15,23,42,.35);display:grid;place-items:center;font:900 9px/1 Arial,sans-serif;padding:0 5px}.nwtbOfficeAllStops{background:#fff;border:2px solid rgba(0,0,0,.2);border-radius:5px}.nwtbOfficeAllStops button{border:0;background:#fff;color:#0f172a;font:900 10px/1 Arial,sans-serif;padding:8px 9px;cursor:pointer}
+`;document.head.appendChild(s)}
+function pinIcon(seq,status,current){style();let cls='';if(current)cls=' current';else if(status==='DELIVERED')cls=' done';else if(status==='NOT_DELIVERED')cls=' failed';return L.divIcon({className:'',html:`<div class="nwtbOfficeStopPin${cls}"><span>${esc(seq)}</span></div>`,iconSize:[32,36],iconAnchor:[16,34],popupAnchor:[0,-32]})}
+function depotIcon(){style();return L.divIcon({className:'',html:'<div class="nwtbOfficeDepot">NWTB</div>',iconSize:[46,30],iconAnchor:[23,15]})}
+function map(){return window.__nwtbTrackerMap||null}
+function clear(){const m=map();if(!m)return;for(const p of routePins){try{m.removeLayer(p)}catch{}}routePins=[];if(depotPin){try{m.removeLayer(depotPin)}catch{}depotPin=null}}
+function addControl(){const m=map();if(!m||control||!window.L)return;control=L.control({position:'topright'});control.onAdd=()=>{const d=L.DomUtil.create('div','nwtbOfficeAllStops');d.innerHTML='<button type="button">ALL ROUTE STOPS</button>';L.DomEvent.disableClickPropagation(d);d.querySelector('button').onclick=()=>fitAll();return d};control.addTo(m)}
+let lastBounds=[];
+function fitAll(){const m=map();if(!m||!window.L||!lastBounds.length)return;const b=L.latLngBounds(lastBounds);if(b.isValid())m.fitBounds(b.pad(.16),{maxZoom:13,padding:[30,30]})}
+async function refresh(){const m=map();if(!m||!window.L||!tok())return;try{const loc=await post(TRACK,{action:'locations_latest'}),drivers=loc.drivers||[],byRoute=new Map();for(const d of drivers){if(d.route_id&&!byRoute.has(d.route_id))byRoute.set(d.route_id,d)}const rows=[];for(const [routeId,d] of byRoute){try{const j=await post(API,{action:'route_get',route_id:routeId});rows.push({driver:d,route:j.route||{},stops:j.stops||[]})}catch(e){console.warn('NWTB office route pins route load:',e)}}clear();addControl();lastBounds=[[HOME.lat,HOME.lon]];depotPin=L.marker([HOME.lat,HOME.lon],{icon:depotIcon(),zIndexOffset:500}).addTo(m).bindPopup(`<b>START / RETURN</b><br>${esc(HOME.name)}<br>${esc(HOME.address)}`);for(const row of rows){const next=row.stops.find(s=>s.status==='PENDING');for(const s of row.stops){const o=s.delivery_orders||{},lat=Number(o.lat),lon=Number(o.lon);if(!valid(lat,lon))continue;const current=!!next&&String(next.id)===String(s.id),mk=L.marker([lat,lon],{icon:pinIcon(s.stop_sequence,s.status,current),zIndexOffset:current?760:560}).addTo(m);mk.bindPopup(`<b>${esc(row.driver.display_name||row.route.driver_name||'Driver')}</b><br><b>STOP ${esc(s.stop_sequence)}: ${esc(o.customer_name||'Stop')}</b><br>${esc(o.address||'')}<br><span style="font-weight:800">${esc(s.status||'PENDING')}</span>`);routePins.push(mk);lastBounds.push([lat,lon])}if(valid(row.driver.lat,row.driver.lon))lastBounds.push([Number(row.driver.lat),Number(row.driver.lon)])}if(!fitOnce&&lastBounds.length>1){fitOnce=true;setTimeout(fitAll,100)}}catch(e){console.warn('NWTB office route pins:',e)}}
+let tries=0;const t=setInterval(()=>{if(map()){clearInterval(t);refresh();setInterval(refresh,10000)}else if(++tries>120)clearInterval(t)},100);
+window.nwtbShowAllOfficeRouteStops=fitAll;
+})();
