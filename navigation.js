@@ -2,6 +2,86 @@
   const $=id=>document.getElementById(id);
   const isPhone=()=>/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)||window.matchMedia('(max-width: 760px)').matches;
 
+
+  // SALES stays separate, but routing now uses the same NWTB road-matrix engine as Delivery.
+  const DELIVERY_MATRIX_URL='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-route-matrix';
+  const DELIVERY_MATRIX_KEY='sb_publishable_EqF-iooqhmngSG5BbzOxfQ_Vnf9Altc';
+
+  async function deliveryRoadMatrix(points){
+    const clean=points.map(p=>({lat:Number(p?.lat),lon:Number(p?.lon)}));
+    if(clean.some(p=>!Number.isFinite(p.lat)||!Number.isFinite(p.lon)))throw new Error('One or more selected sales accounts need valid routing coordinates.');
+    const r=await fetch(DELIVERY_MATRIX_URL,{
+      method:'POST',
+      headers:{'content-type':'application/json','apikey':DELIVERY_MATRIX_KEY,'x-nwtb-sales':'1'},
+      body:JSON.stringify({points:clean})
+    });
+    const j=await r.json().catch(()=>({error:'Invalid routing response'}));
+    if(!r.ok)throw new Error(j.error||'NWTB Delivery routing service failed.');
+    if(!Array.isArray(j.durations)||!Array.isArray(j.distances))throw new Error('NWTB Delivery road matrix is unavailable.');
+    return j;
+  }
+
+  function deliveryRouteCost(order,matrix){
+    const q=[0,...order,0];let total=0;
+    for(let i=0;i<q.length-1;i++){
+      const v=Number(matrix?.[q[i]]?.[q[i+1]]);
+      if(!Number.isFinite(v))return Infinity;
+      total+=v;
+    }
+    return total;
+  }
+
+  function deliveryNearest(matrix,n){
+    const remaining=new Set(Array.from({length:n},(_,i)=>i+1)),order=[];let cur=0;
+    while(remaining.size){
+      let best=null,val=Infinity;
+      for(const j of remaining){
+        const v=Number(matrix?.[cur]?.[j]);
+        if(Number.isFinite(v)&&v<val){val=v;best=j}
+      }
+      if(best==null)best=[...remaining][0];
+      order.push(best);remaining.delete(best);cur=best;
+    }
+    return order;
+  }
+
+  function deliveryTwoOpt(order,matrix){
+    let best=order.slice(),cost=deliveryRouteCost(best,matrix),improved=true,round=0;
+    while(improved&&round++<8){
+      improved=false;
+      for(let i=0;i<best.length-1;i++)for(let k=i+1;k<best.length;k++){
+        const next=best.slice();
+        next.splice(i,k-i+1,...next.slice(i,k+1).reverse());
+        const c=deliveryRouteCost(next,matrix);
+        if(c+1<cost){best=next;cost=c;improved=true}
+      }
+    }
+    return best;
+  }
+
+  async function deliveryOptimizeSales(selected){
+    const pts=[depot,...selected];
+    const matrix=await deliveryRoadMatrix(pts);
+    const order=deliveryTwoOpt(deliveryNearest(matrix.durations,selected.length),matrix.durations);
+    const meters=deliveryRouteCost(order,matrix.distances);
+    const seconds=deliveryRouteCost(order,matrix.durations);
+    if(!Number.isFinite(meters)||!Number.isFinite(seconds))throw new Error('The NWTB Delivery routing engine returned an invalid route.');
+    const routeMiles=Math.round((meters/1609.344)*10)/10;
+    const routeMinutes=Math.round(seconds/60);
+    if(routeMiles>3000||routeMinutes>5000)throw new Error('Route estimate is outside a reasonable range. One or more sales locations need verification.');
+    return {order:order.map(i=>i-1),miles:routeMiles,minutes:routeMinutes,source:matrix.source||'NWTB DELIVERY ROAD MATRIX',warning:matrix.warning||''};
+  }
+
+  function annotateDeliveryEngine(result){
+    try{
+      const out=$('output');
+      const n=out?.querySelector('.notice');
+      if(!n)return;
+      const source=result?.source==='FALLBACK_APPROXIMATE'?'APPROXIMATE FALLBACK':'ROAD MATRIX';
+      n.insertAdjacentHTML('beforeend',`<br><b>ROUTING ENGINE:</b> NWTB Delivery ${source}${result?.warning?` • ${esc(result.warning)}`:''}`);
+    }catch{}
+  }
+
   // 2026-09-22 MASTER RECONCILIATION.
   // These corrections are applied at runtime so the source customer/prospect audit history stays preserved.
   // Verified salesperson routing addresses are intentionally retained; billing/master addresses do not overwrite them.
@@ -232,7 +312,7 @@
         const extra=(currentMapLinks||[]).slice(1).map((x,i)=>`<a class="routebtn" style="display:block;text-align:center;margin:8px 0" href="${x.url}">${i===(currentMapLinks.length-2)?'FINAL PART — RETURN TO NWTB':`CONTINUE — PART ${i+2}`}</a>`).join('');
         panel.innerHTML=`<b>PHONE NAVIGATION</b><br>Build the route here on your phone, then use Google Maps for driving. Part 1 uses your phone's current GPS location. The final part returns to Northwest Trucks – Bolingbrook.<br><button id="nwtbStartNavBtn" class="primary" style="width:100%;font-size:18px;margin-top:10px;padding:15px" onclick="nwtbStartPhoneNavigation()">START NAVIGATION — PART 1</button>${extra}<div class="small" style="margin-top:8px">Google Maps app recommended. If location permission is denied, Google Maps will use the device's current location when available.</div>`;
       }else{
-        panel.innerHTML=`<b>DESKTOP ROUTING</b><br>After you click CREATE + FREE OPTIMIZE, Google Maps Part 1 opens automatically in a new tab. Desktop Google Maps shows the planned route; live turn-by-turn navigation is a phone feature. The final route part returns to Northwest Trucks – Bolingbrook.`;
+        panel.innerHTML=`<b>DESKTOP ROUTING</b><br>After you click CREATE + DELIVERY OPTIMIZE, Google Maps Part 1 opens automatically in a new tab. Desktop Google Maps shows the planned route; live turn-by-turn navigation is a phone feature. The final route part returns to Northwest Trucks – Bolingbrook.`;
       }
       out.insertBefore(panel,out.firstChild);
     }catch(e){console.warn('NWTB navigation panel:',e)}
@@ -267,9 +347,8 @@
     if(cand.length<=n)return cand.slice();
     try{
       const pts=[depot,...cand];
-      const coords=pts.map(p=>`${p.lon},${p.lat}`).join(';');
-      const matrix=await osrm(`https://router.project-osrm.org/table/v1/driving/${coords}?annotations=duration`);
-      if(matrix.code!=='Ok'||!matrix.durations)throw new Error('Road matrix unavailable');
+      const matrix=await deliveryRoadMatrix(pts);
+      if(matrix.code!=='Ok'||!matrix.durations)throw new Error('NWTB Delivery road matrix unavailable');
       const m=matrix.durations,remaining=new Set(Array.from({length:cand.length},(_,i)=>i+1));
       const tour=[0,0];
       while(tour.length-2<n&&remaining.size){
@@ -288,8 +367,7 @@
       }
       const chosen=tour.slice(1,-1).map(i=>cand[i-1]);
       if(chosen.length===n)return chosen;
-    }catch(e){console.warn('Efficiency-first selection fallback:',e)}
-    return cand.slice().sort((a,b)=>miles(depot,a)-miles(depot,b)).slice(0,n);
+    }catch(e){throw new Error('NWTB Delivery routing engine could not select the New Business group: '+(e.message||e))}
   }
 
   // Final route builder uses routeEligible as the completed safety decision.
@@ -312,14 +390,15 @@
     });
     if(!cand.length){alert('No eligible audited-commercial accounts matched these filters.');return}
     n=Math.min(n,cand.length);
-    out.style.display='block';out.innerHTML='<b>Choosing the most efficient customer group and optimizing the road route...</b>';
+    out.style.display='block';out.innerHTML='<b>Choosing the sales stops and optimizing with the NWTB Delivery routing engine...</b>';
     try{
       let sel;
       if(t==='new_business')sel=await selectEfficientNewBusinessFinal(cand,n);
       else if(t==='mixed')sel=selectMixed(cand,n);
       else sel=selectCluster(cand,n,t);
-      const j=await optimize(sel);
+      const j=await deliveryOptimizeSales(sel);
       renderRoute(j.order.map(i=>sel[i]),{miles:j.miles,minutes:j.minutes,efficiencyFirst:t==='new_business'});
+      annotateDeliveryEngine(j);
     }catch(e){out.innerHTML=`<div class="notice"><b>ROUTE NOT CREATED:</b> ${esc(e.message||e)}</div>`}
   }
 
