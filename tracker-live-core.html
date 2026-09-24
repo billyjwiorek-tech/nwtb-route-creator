@@ -5,7 +5,7 @@
   const r=await fetch(base,{cache:'no-store'});if(!r.ok)throw Error('Could not load Live Driver Tracker.');
   let html=await r.text();
   html=html.replaceAll('https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-delivery-tracking','https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-live-tracking-v2');
-  html=html.replace('</body>','<script src="tracker-add-stop.js?v=20260923-2235"><\/script><script src="office-pause-alerts.js?v=20260923-2235"><\/script><script src="tracker-route-filter.js?v=20260923-2235"><\/script><script src="tracker-gps-status.js?v=20260924-0555"><\/script><script src="tracker-live-van.js?v=20260924-0555"><\/script></body>');
+  html=html.replace('</body>','<script src="tracker-add-stop.js?v=20260923-2235"><\/script><script src="office-pause-alerts.js?v=20260923-2235"><\/script><script src="tracker-route-filter.js?v=20260923-2235"><\/script><script src="tracker-gps-status.js?v=20260924-0555"><\/script><script src="tracker-live-van.js?v=20260924-0725"><\/script></body>');
   document.open();document.write(html);document.close();
  }catch(e){document.body.innerHTML='<div style="font-family:Arial,sans-serif;padding:24px;color:#b42318"><b>Live Driver Tracker failed to load.</b><br>'+String(e.message||e)+'</div>'}
 })();
