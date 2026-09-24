@@ -13,21 +13,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Apply Delivery routing engine
-        run: python scripts/upgrade_sales_delivery_routing.py
-      - name: Require route review before Google Maps
-        run: python scripts/require_sales_route_review.py
       - name: Enable built-in Sales turn-by-turn
         run: python scripts/enable_sales_builtin_navigation.py
-      - name: Commit Sales routing updates
+      - name: Commit built-in Sales navigation
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add navigation.js index.html app.html
+          git add index.html app.html
           if git diff --cached --quiet; then
             echo "No changes needed"
             exit 0
           fi
-          git commit -m "Enable built-in turn-by-turn navigation in Sales"
+          git commit -m "Wire built-in turn-by-turn navigation into Sales"
           git push
