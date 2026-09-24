@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>NWTB Driver ↔ Dispatch Chat</title>
+<style>
+:root{--ink:#101828;--muted:#667085;--line:#e4e7ec;--page:#f7f8fa;--blue:#2563eb;--nav:#0f172a;--red:#dc2626}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:var(--page);color:var(--ink)}
+.wrap{padding:14px;height:100vh}.shell{height:100%;display:grid;grid-template-columns:300px minmax(0,1fr);gap:12px}.panel{background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:0 5px 18px rgba(16,24,40,.055)}
+.threads{display:flex;flex-direction:column}.head{padding:15px 16px;border-bottom:1px solid var(--line)}.head h2{font-size:16px;margin:0}.head p{font-size:11px;color:var(--muted);margin:4px 0 0}.threadList{overflow:auto;flex:1;padding:7px}.thread{width:100%;border:0;border-radius:11px;background:#fff;padding:11px;text-align:left;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;cursor:pointer}.thread:hover{background:#f8fafc}.thread.active{background:#eef4ff}.thread b{font-size:12px}.thread small{display:block;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.badge{min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:var(--red);color:#fff;display:grid;place-items:center;font-size:10px;font-weight:900}.empty{padding:26px 14px;text-align:center;color:var(--muted);font-size:12px}
+.convo{display:flex;flex-direction:column}.convHead{padding:15px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px}.convHead b{font-size:16px}.convHead span{display:block;font-size:10px;color:var(--muted);margin-top:4px}.refresh{border:1px solid #d0d5dd;background:#fff;color:#344054;border-radius:9px;padding:8px 11px;font-weight:850;cursor:pointer}.msgs{flex:1;overflow:auto;padding:14px;background:#f8fafc}.msg{max-width:76%;margin:7px 0;padding:10px 12px;border-radius:13px;background:#fff;border:1px solid var(--line);font-size:13px;line-height:1.4}.msg.me{margin-left:auto;background:#dbeafe;border-color:#bfdbfe}.meta{font-size:9px;color:var(--muted);font-weight:850;margin-bottom:4px}.send{display:flex;gap:8px;padding:11px;background:#fff;border-top:1px solid var(--line)}textarea{flex:1;min-height:46px;max-height:100px;resize:none;border:1px solid #d0d5dd;border-radius:10px;padding:11px;font:inherit}.send button{border:0;border-radius:10px;background:var(--blue);color:#fff;font-weight:900;padding:0 18px;cursor:pointer}.send button:disabled,textarea:disabled{opacity:.45}.status{font-size:10px;color:var(--muted);padding:0 12px 10px;background:#fff}.topAlert{display:none;margin:0 14px 10px;padding:10px 12px;border-radius:10px;background:#fef3f2;color:#b42318;border:1px solid #fecdca;font-size:11px;font-weight:800}.topAlert.show{display:block}
+@media(max-width:720px){.wrap{padding:8px;height:100dvh}.shell{grid-template-columns:1fr;grid-template-rows:160px minmax(0,1fr);gap:8px}.panel{border-radius:13px}.threadList{display:flex;overflow-x:auto;overflow-y:hidden}.thread{min-width:220px}.convHead{padding:11px 12px}.msgs{padding:10px}.msg{max-width:88%}.send{padding:8px}.send button{padding:0 14px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+ <div id="alert" class="topAlert"></div>
+ <div class="shell">
+  <section class="panel threads"><div class="head"><h2>Driver Conversations</h2><p>Unread driver messages are shown in red.</p></div><div id="threadList" class="threadList"><div class="empty">Loading conversations…</div></div></section>
+  <section class="panel convo"><div class="convHead"><div><b id="convName">Select a driver</b><span id="convSub">Open a conversation to read or reply.</span></div><button class="refresh" onclick="refreshAll()">REFRESH</button></div><div id="msgs" class="msgs"><div class="empty">No driver selected.</div></div><div class="send"><textarea id="input" maxlength="1000" placeholder="Reply to driver…" disabled></textarea><button id="sendBtn" onclick="sendMessage()" disabled>SEND</button></div><div id="status" class="status"></div></section>
+ </div>
+</div>
+<script>
+const CHAT='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-delivery-chat';
+const LOGIN='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-chat';
+const KEY='sb_publishable_EqF-iooqhmngSG5BbzOxfQ_Vnf9Altc';
+let token='',threads=[],activeDriver='',poll=null;
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+async function req(url,body,auth=true){const h={'content-type':'application/json','apikey':KEY};if(auth)h['x-nwtb-session']=token;const r=await fetch(url,{method:'POST',headers:h,body:JSON.stringify(body)}),j=await r.json().catch(()=>({error:'Invalid chat response'}));if(!r.ok)throw Error(j.error||'Chat request failed');return j}
+async function ensureSession(){token=localStorage.getItem('nwtb_delivery_token')||'';if(token){try{await req(CHAT,{action:'dispatch_unread'});return}catch{}}const j=await req(LOGIN,{action:'delivery_guest_start'},false);token=j.token;localStorage.setItem('nwtb_delivery_token',token)}
+function showError(e){const a=document.getElementById('alert');a.textContent=e?.message||String(e);a.classList.add('show')}
+function clearError(){document.getElementById('alert').classList.remove('show')}
+function renderThreads(){const el=document.getElementById('threadList');if(!threads.length){el.innerHTML='<div class="empty">No driver conversations yet.<br>A conversation appears when a driver sends Dispatch a message.</div>';return}el.innerHTML=threads.map(t=>`<button class="thread ${activeDriver===t.driver_employee_number?'active':''}" onclick="openThread('${esc(t.driver_employee_number)}')"><div><b>${esc(t.driver_name)}</b><small>${esc(t.latest?.body||'No messages yet')}</small></div>${t.unread?`<span class="badge">${t.unread}</span>`:''}</button>`).join('')}
+async function loadThreads(){const j=await req(CHAT,{action:'dispatch_threads'});threads=j.threads||[];renderThreads();if(!activeDriver&&threads.length)await openThread(threads[0].driver_employee_number,false)}
+async function openThread(no,mark=true){activeDriver=no;renderThreads();document.getElementById('input').disabled=false;document.getElementById('sendBtn').disabled=false;const j=await req(CHAT,{action:'dispatch_list',driver_employee_number:no});document.getElementById('convName').textContent=j.driver?.display_name||no;document.getElementById('convSub').textContent=`Driver ${no} • private Dispatch conversation`;const box=document.getElementById('msgs');box.innerHTML=(j.messages||[]).map(m=>`<div class="msg ${m.sender_role==='DISPATCH'?'me':''}"><div class="meta">${esc(m.sender_role==='DISPATCH'?'DISPATCH':m.display_name||'DRIVER')} • ${new Date(m.created_at).toLocaleString()}</div>${esc(m.body)}</div>`).join('')||'<div class="empty">No messages in this conversation yet.</div>';box.scrollTop=box.scrollHeight;if(mark){await req(CHAT,{action:'mark_dispatch_read',driver_employee_number:no});await loadThreads()}}
+async function sendMessage(){const i=document.getElementById('input'),body=i.value.trim();if(!activeDriver){document.getElementById('status').textContent='Select a driver conversation first.';return}if(!body)return;try{document.getElementById('status').textContent='Sending…';await req(CHAT,{action:'dispatch_send',driver_employee_number:activeDriver,body});i.value='';document.getElementById('status').textContent='';await openThread(activeDriver,false);await loadThreads()}catch(e){showError(e)}}
+async function refreshAll(){try{clearError();await loadThreads();if(activeDriver)await openThread(activeDriver,false)}catch(e){showError(e)}}
+document.getElementById('input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage()}});
+(async()=>{try{await ensureSession();await refreshAll();poll=setInterval(refreshAll,4000)}catch(e){showError(e)}})();
+</script>
+</body>
+</html>
