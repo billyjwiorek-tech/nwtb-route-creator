@@ -17,6 +17,8 @@ jobs:
         run: python scripts/upgrade_sales_delivery_routing.py
       - name: Require route review before Google Maps
         run: python scripts/require_sales_route_review.py
+      - name: Enable built-in Sales turn-by-turn
+        run: python scripts/enable_sales_builtin_navigation.py
       - name: Commit Sales routing updates
         shell: bash
         run: |
@@ -27,5 +29,5 @@ jobs:
             echo "No changes needed"
             exit 0
           fi
-          git commit -m "Require Sales route review before opening Google Maps"
+          git commit -m "Enable built-in turn-by-turn navigation in Sales"
           git push
