@@ -13,9 +13,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Apply routing upgrade
+      - name: Apply Delivery routing engine
         run: python scripts/upgrade_sales_delivery_routing.py
-      - name: Commit routing upgrade
+      - name: Require route review before Google Maps
+        run: python scripts/require_sales_route_review.py
+      - name: Commit Sales routing updates
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
@@ -25,5 +27,5 @@ jobs:
             echo "No changes needed"
             exit 0
           fi
-          git commit -m "Use Delivery road-matrix engine for Sales routing"
+          git commit -m "Require Sales route review before opening Google Maps"
           git push
