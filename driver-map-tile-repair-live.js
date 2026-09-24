@@ -21,6 +21,7 @@ function stabilize(){
  requestAnimationFrame(()=>requestAnimationFrame(run));
  setTimeout(run,120);setTimeout(run,350);
 }
+window.nwtbRepairDriverMap=stabilize;
 function installWatchers(){
  if(installed)return;installed=true;
  const el=document.getElementById('nwtbNavMap');
