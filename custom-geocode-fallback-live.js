@@ -2,24 +2,31 @@
 'use strict';
 const RESOLVER='/functions/v1/nwtb-location-resolver';
 const DELIVERY='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-delivery';
-function install(){
- if(typeof window.post!=='function'||window.__nwtbCustomGeocodeFallback)return false;
- window.__nwtbCustomGeocodeFallback=true;
- const original=window.post;
- window.post=async function(url,payload,need=true){
-  const isResolver=String(url||'').includes(RESOLVER);
-  if(!isResolver)return original(url,payload,need);
-  try{return await original(url,payload,need)}catch(primaryErr){
-   try{
-    const j=await original(DELIVERY,{action:'geocode',address:payload?.address||''},need);
-    if(!Number.isFinite(Number(j?.lat))||!Number.isFinite(Number(j?.lon)))throw primaryErr;
-    return {ok:true,lat:Number(j.lat),lon:Number(j.lon),address:payload?.address||'',matched_address:j.display_name||payload?.address||'',source:'DELIVERY_GEOCODE_FALLBACK'};
-   }catch(backupErr){
-    throw primaryErr?.message&&primaryErr.message!=='Failed to fetch'?primaryErr:backupErr;
-   }
+if(window.__nwtbCustomGeocodeFetchFallback)return;
+window.__nwtbCustomGeocodeFetchFallback=true;
+const originalFetch=window.fetch.bind(window);
+window.fetch=async function(input,init){
+ const url=typeof input==='string'?input:(input&&input.url)||'';
+ if(!String(url).includes(RESOLVER))return originalFetch(input,init);
+ try{
+  return await originalFetch(input,init);
+ }catch(primaryErr){
+  try{
+   let payload={};
+   try{payload=JSON.parse(init?.body||'{}')}catch{}
+   const address=String(payload?.address||'').trim();
+   if(!address)throw primaryErr;
+   const headers=new Headers(init?.headers||{});
+   headers.set('content-type','application/json');
+   const r=await originalFetch(DELIVERY,{method:'POST',headers,body:JSON.stringify({action:'geocode',address})});
+   const j=await r.json().catch(()=>({error:'Invalid geocoder response'}));
+   if(!r.ok)throw Error(j.error||'Address could not be located.');
+   if(!Number.isFinite(Number(j?.lat))||!Number.isFinite(Number(j?.lon)))throw Error('Address did not return usable coordinates.');
+   return new Response(JSON.stringify({ok:true,lat:Number(j.lat),lon:Number(j.lon),address,matched_address:j.display_name||address,source:'DELIVERY_GEOCODE_FALLBACK'}),{status:200,headers:{'content-type':'application/json'}});
+  }catch(backupErr){
+   if(backupErr?.message&&backupErr.message!=='Failed to fetch')throw backupErr;
+   throw primaryErr;
   }
- };
- return true;
-}
-let tries=0;const t=setInterval(()=>{if(install()||++tries>100)clearInterval(t)},50);
+ }
+};
 })();
