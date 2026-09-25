@@ -1,7 +1,7 @@
 (()=>{
 'use strict';
 if(window.__nwtbLiveMapActivation)return;window.__nwtbLiveMapActivation=true;
-const defs={tracker:{id:'fTracker',src:'tracker-live.html?v=20260925-0830'},driver:{id:'fDriver',src:'driver-supervisor-live.html?v=20260925-0905'}};
+const defs={tracker:{id:'fTracker',src:'tracker-live.html?v=20260925-1135'},driver:{id:'fDriver',src:'driver-supervisor-live.html?v=20260925-0905'}};
 function withBust(src){return src+(src.includes('?')?'&':'?')+'cb='+Date.now()}
 function wake(name){
  const d=defs[name];if(!d)return;const f=document.getElementById(d.id);if(!f)return;
