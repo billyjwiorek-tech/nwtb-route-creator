@@ -18,7 +18,7 @@
   html=html.replace('<title>NWTB Delivery Operations</title>','<title>NWTB Delivery Operations — Live Tracking</title>');
   html=html.replace('<div class="brand"><div class="mark">NWTB</div><div><b>Delivery Operations</b><span>Northwest Trucks</span></div></div>','<div class="brand"><div class="mark">NWTB</div><div><b>Delivery Operations</b><span>Live Tracking Edition</span></div></div>');
   html=html.replaceAll('src="dispatch.html','src="dispatch-live.html');
-  html=html.replaceAll('dispatch-live.html?v=20260923-0825','dispatch-live.html?v=20260925-0830');
+  html=html.replaceAll('dispatch-live.html?v=20260923-0825','dispatch-live.html?v=20260925-0915');
   html=html.replace(/<iframe id="fChat" src="[^"]+"/,'<iframe id="fChat" src="dispatch-chat-console-live.html?v=20260924-1115"');
   html=html.replace('<iframe id="fTracker" src="tracker.html"','<iframe id="fTracker" data-live-src="tracker-live.html?v=20260925-0830" src="about:blank"');
   html=html.replace('<iframe id="fDriver" src="driver.html"','<iframe id="fDriver" data-live-src="driver-supervisor-live.html?v=20260925-0905" src="about:blank"');
