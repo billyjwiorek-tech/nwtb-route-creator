@@ -6,11 +6,11 @@ const TRACK_URL='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-live
 const CHAT_URL='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-chat';
 const API_KEY='sb_publishable_EqF-iooqhmngSG5BbzOxfQ_Vnf9Altc';
 const QUEUE_KEY='nwtb_builtin_gps_queue_v2';
-const SEND_INTERVAL_MS=15000;
-const HEARTBEAT_MS=30000;
+const SEND_INTERVAL_MS=3000;
+const HEARTBEAT_MS=15000;
 const STALE_MS=45000;
 const HARD_STALE_MS=90000;
-const MIN_MOVE_M=10;
+const MIN_MOVE_M=3;
 const MAX_QUEUE=120;
 
 let running=false;
@@ -26,7 +26,7 @@ let wakeLock=null;
 let recoveries=0;
 
 const $=id=>document.getElementById(id);
-const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#039;'}[m]));
 const rad=x=>x*Math.PI/180;
 function meters(a,b){if(!a||!b)return Infinity;const R=6371008.8,dLat=rad(b.lat-a.lat),dLon=rad(b.lon-a.lon),x=Math.sin(dLat/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dLon/2)**2;return 2*R*Math.asin(Math.sqrt(x))}
 function bearing(a,b){if(!a||!b)return null;const y=Math.sin(rad(b.lon-a.lon))*Math.cos(rad(b.lat));const x=Math.cos(rad(a.lat))*Math.sin(rad(b.lat))-Math.sin(rad(a.lat))*Math.cos(rad(b.lat))*Math.cos(rad(b.lon-a.lon));const v=(Math.atan2(y,x)*180/Math.PI+360)%360;return Number.isFinite(v)?v:null}
@@ -77,7 +77,10 @@ async function flushQueue(){
 async function sendFix(fix,force=false){
  const ctx=context();if(!ctx.driver||!ctx.route){status('WAITING FOR ACTIVE ROUTE','warn');return}
  const age=Date.now()-lastSentAt,move=meters(lastSent,fix);
- if(!force&&age<SEND_INTERVAL_MS&&move<MIN_MOVE_M)return;
+ if(!force){
+  if(age<SEND_INTERVAL_MS)return;
+  if(move<MIN_MOVE_M&&age<HEARTBEAT_MS)return;
+ }
  const payload=makePayload(fix);lastSentAt=Date.now();lastSent={lat:fix.lat,lon:fix.lon};
  if(!navigator.onLine){enqueue(payload);status(`OFFLINE — SAVING GPS • ${queueRead().length} queued`,'warn');return}
  try{
