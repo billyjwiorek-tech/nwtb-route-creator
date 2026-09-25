@@ -17,11 +17,11 @@
   html=html.replace('<title>NWTB Delivery Operations</title>','<title>NWTB Delivery Operations — Live Tracking</title>');
   html=html.replace('<div class="brand"><div class="mark">NWTB</div><div><b>Delivery Operations</b><span>Northwest Trucks</span></div></div>','<div class="brand"><div class="mark">NWTB</div><div><b>Delivery Operations</b><span>Live Tracking Edition</span></div></div>');
   html=html.replaceAll('src="dispatch.html','src="dispatch-live.html');
-  html=html.replaceAll('dispatch-live.html?v=20260923-0825','dispatch-live.html?v=20260924-1115');
+  html=html.replaceAll('dispatch-live.html?v=20260923-0825','dispatch-live.html?v=20260925-0718');
   html=html.replace(/<iframe id="fChat" src="[^"]+"/,'<iframe id="fChat" src="dispatch-chat-console-live.html?v=20260924-1115"');
-  html=html.replace('<iframe id="fTracker" src="tracker.html"','<iframe id="fTracker" data-live-src="tracker-live.html?v=20260924-1155" src="about:blank"');
-  html=html.replace('<iframe id="fDriver" src="driver.html"','<iframe id="fDriver" data-live-src="driver-live.html?v=20260924-1200" src="about:blank"');
-  html=html.replace('</body>','<script src="delivery-chat-notify-live.js?v=20260924-1115"><\/script><script src="delivery-live-map-activation.js?v=20260924-1200"><\/script><div class="liveBadge">LIVE TRACKING EDITION</div></body>');
+  html=html.replace('<iframe id="fTracker" src="tracker.html"','<iframe id="fTracker" data-live-src="tracker-live.html?v=20260925-0718" src="about:blank"');
+  html=html.replace('<iframe id="fDriver" src="driver.html"','<iframe id="fDriver" data-live-src="driver-live.html?v=20260925-0718" src="about:blank"');
+  html=html.replace('</body>','<script src="delivery-chat-notify-live.js?v=20260924-1115"><\/script><script src="delivery-live-map-activation.js?v=20260925-0718"><\/script><div class="liveBadge">LIVE TRACKING EDITION</div></body>');
   html=html.replace('</style>','.liveBadge{position:fixed;right:26px;top:24px;z-index:9999;border:1px solid #86efac;background:#ecfdf3;color:#067647;border-radius:999px;padding:7px 11px;font-size:10px;font-weight:900;letter-spacing:.35px;box-shadow:0 3px 10px rgba(16,24,40,.08);pointer-events:none}@media(max-width:720px){.liveBadge{right:10px;top:13px;font-size:9px;padding:6px 8px}}</style>');
   document.open();document.write(html);document.close();
  }catch(e){document.getElementById('boot').innerHTML='<span class="err"><b>Live Tracking Edition failed to load.</b><br>'+String(e.message||e)+'</span>'}
