@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NWTB Live Driver Tracker — Live Edition</title></head><body><div style="font-family:Arial,sans-serif;padding:24px">Loading Live Driver Tracker…</div><script>
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0"><title>NWTB Live Driver Tracker — Live Edition</title></head><body><div style="font-family:Arial,sans-serif;padding:24px">Loading Live Driver Tracker…</div><script>
 (async()=>{
  const base='https://raw.githubusercontent.com/billyjwiorek-tech/nwtb-route-creator/52681eac6ded426c7e65ff9a37c42f7bae95010c/tracker.html';
  try{
@@ -6,7 +6,7 @@
   let html=await r.text();
   html=html.replaceAll('https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-delivery-tracking','https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-live-tracking-v2');
   html=html.replace("map=L.map('map'","map=window.__nwtbTrackerMap=L.map('map'");
-  html=html.replace('</body>','<script src="tracker-add-stop.js?v=20260923-2235"><\/script><script src="office-pause-alerts.js?v=20260923-2235"><\/script><script src="tracker-route-filter.js?v=20260923-2235"><\/script><script src="tracker-gps-status.js?v=20260924-0555"><\/script><script src="tracker-live-van.js?v=20260924-0725"><\/script><script src="tracker-route-pins-live.js?v=20260924-1305"><\/script><script src="tracker-realtime-refresh-live.js?v=20260925-0718"><\/script></body>');
+  html=html.replace('</body>','<script src="tracker-add-stop.js?v=20260923-2235"><\/script><script src="office-pause-alerts.js?v=20260923-2235"><\/script><script src="tracker-route-filter.js?v=20260925-0830"><\/script><script src="tracker-gps-status.js?v=20260924-0555"><\/script><script src="tracker-live-van.js?v=20260924-0725"><\/script><script src="tracker-route-pins-live.js?v=20260924-1305"><\/script><script src="tracker-realtime-refresh-live.js?v=20260925-0830"><\/script><script src="tracker-active-route-guard.js?v=20260925-0830"><\/script></body>');
   document.open();document.write(html);document.close();
  }catch(e){document.body.innerHTML='<div style="font-family:Arial,sans-serif;padding:24px;color:#b42318"><b>Live Driver Tracker failed to load.</b><br>'+String(e.message||e)+'</div>'}
 })();
