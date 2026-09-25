@@ -1,15 +1,41 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>NWTB Driver — Live Tracking + Navigation</title></head><body><div style="font-family:Arial,sans-serif;padding:24px">Loading NWTB Driver — Live Tracking + Navigation…</div><script>
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0"><meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0"><title>NWTB Driver — Live Tracking + Navigation</title></head><body><div style="font-family:Arial,sans-serif;padding:24px">Loading NWTB Driver — Live Tracking + Navigation…</div><script>
 (async()=>{
  const base='https://raw.githubusercontent.com/billyjwiorek-tech/nwtb-route-creator/58a2bfe685bb91bd5b957321b0a9f363b33b93ee/driver.html';
  try{
   const r=await fetch(base,{cache:'no-store'});if(!r.ok)throw Error('Could not load Driver Route.');
   let html=await r.text();
   const leafletCritical='<style id="leafletCritical">.leaflet-container{overflow:hidden;background:#ddd;outline-offset:1px;-webkit-tap-highlight-color:transparent}.leaflet-pane,.leaflet-tile,.leaflet-marker-icon,.leaflet-marker-shadow,.leaflet-tile-container,.leaflet-pane>svg,.leaflet-pane>canvas,.leaflet-zoom-box,.leaflet-image-layer,.leaflet-layer{position:absolute;left:0;top:0}.leaflet-container img.leaflet-tile{max-width:none!important;max-height:none!important}.leaflet-tile{filter:inherit}.leaflet-zoom-animated{transform-origin:0 0}.leaflet-map-pane canvas{z-index:100}.leaflet-map-pane svg{z-index:200}.leaflet-tile-pane{z-index:200}.leaflet-overlay-pane{z-index:400}.leaflet-shadow-pane{z-index:500}.leaflet-marker-pane{z-index:600}.leaflet-tooltip-pane{z-index:650}.leaflet-popup-pane{z-index:700}.leaflet-control{position:relative;z-index:800;pointer-events:auto}.leaflet-top,.leaflet-bottom{position:absolute;z-index:1000;pointer-events:none}.leaflet-top{top:0}.leaflet-right{right:0}.leaflet-bottom{bottom:0}.leaflet-left{left:0}.leaflet-control{float:left;clear:both}.leaflet-right .leaflet-control{float:right}.leaflet-top .leaflet-control{margin-top:10px}.leaflet-bottom .leaflet-control{margin-bottom:10px}.leaflet-left .leaflet-control{margin-left:10px}.leaflet-right .leaflet-control{margin-right:10px}</style>';
-  html=html.replace('</head>','<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css?v=20260925-0800">'+leafletCritical+'</head>');
+  html=html.replace('</head>','<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css?v=20260925-0815">'+leafletCritical+'</head>');
   html=html.replace('NWTB DRIVER ROUTE</h1>','NWTB DRIVER — LIVE GPS + NAVIGATION</h1>');
   html=html.replace('No PIN required • Live location while route page is open • Every route returns to NW Trucks Bolingbrook','No PIN required • NWTB built-in GPS engine • Built-in turn-by-turn navigation • Driver alerts automatic');
+
+  const newBoot=`async function boot(){
+   const bootEl=$('boot'),appEl=$('app');
+   const fail=(m)=>{bootEl.style.display='block';appEl.style.display='none';bootEl.innerHTML='<span class="warn">'+esc(m)+'</span><br><button class="btn" style="margin-top:10px" onclick="location.reload()">RETRY DRIVER CONNECTION</button>'};
+   try{
+    bootEl.innerHTML='Connecting to NWTB Driver…';
+    const c=new AbortController(),tm=setTimeout(()=>c.abort(),8000);
+    let br;
+    try{br=await fetch('https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-driver-bootstrap',{method:'POST',cache:'no-store',signal:c.signal,headers:{'content-type':'application/json','apikey':KEY},body:JSON.stringify({action:'bootstrap'})})}finally{clearTimeout(tm)}
+    const j=await br.json().catch(()=>({error:'Driver service returned an invalid response.'}));
+    if(!br.ok||!j.token)throw Error(j.error||'Could not open NWTB Driver.');
+    token=j.token;localStorage.setItem('nwtb_delivery_token',token);
+    drivers=(j.drivers||[]).filter(x=>x.employee_number!=='9998');
+    $('driver').innerHTML='<option value="">-- Select Driver --</option>'+drivers.map(x=>'<option value="'+esc(x.employee_number)+'">'+esc(x.display_name)+' ('+esc(x.employee_number)+')</option>').join('');
+    const saved=localStorage.getItem('nwtb_delivery_driver')||'';
+    if(saved&&drivers.some(x=>x.employee_number===saved)){$('driver').value=saved;driver=saved}
+    localStorage.setItem('nwtb_driver_alerts','1');alertsReady=true;
+    bootEl.style.display='none';appEl.style.display='block';updateAlertStatus();
+    if(driver)loadRoutes();
+   }catch(e){fail(e&&e.name==='AbortError'?'NWTB Driver connection timed out. Tap RETRY DRIVER CONNECTION.':(e?.message||'Could not open NWTB Driver.'))}
+  }`;
+  const bootPattern=/async function boot\(\)\{try\{.*?\}\}function driverChanged\(\)/;
+  if(!bootPattern.test(html))throw Error('Driver startup patch could not be applied.');
+  html=html.replace(bootPattern,newBoot+'function driverChanged()');
+  html=html.replace("$('alertStatus').innerHTML='Tap <b>ENABLE DRIVER ALERTS</b> once on this page to restore sound after reopening the browser.'","$('alertStatus').innerHTML='<span class=\"ok\">DRIVER ALERTS ON AUTOMATICALLY</span> • sound + vibration active after your first tap on this page'");
+
   const distanceFix='<script>window.haversine=window.haversine||function(a,b){const R=6371008.8,p=Math.PI/180,dLat=(b.lat-a.lat)*p,dLon=(b.lon-a.lon)*p,x=Math.sin(dLat/2)**2+Math.cos(a.lat*p)*Math.cos(b.lat*p)*Math.sin(dLon/2)**2;return 2*R*Math.asin(Math.sqrt(x))};<\/script>';
-  const extras='<script src="driver-custom-route.js?v=20260923-0835"><\/script><script src="driver-pause.js?v=20260923-0835"><\/script><script src="driver-custom-navigation-support.js?v=20260923-1518"><\/script><script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js?v=20260925-0800"><\/script>'+distanceFix+'<script src="driver-tracking-engine-v2.js?v=20260925-0718"><\/script><script src="driver-nav-van-overlay.js?v=20260924-0725"><\/script><script src="driver-mobile-nav-fix.js?v=20260924-1155"><\/script><script src="driver-chat-live.js?v=20260924-0900"><\/script><script src="driver-navigation.js?v=20260925-0718"><\/script><script src="driver-voice-live.js?v=20260925-0745"><\/script><script src="driver-alerts-auto-live.js?v=20260925-0800"><\/script><script src="driver-route-pins-live.js?v=20260924-1305"><\/script><script src="driver-ios-map-fallback.js?v=20260925-0745"><\/script>';
+  const extras='<script src="driver-custom-route.js?v=20260923-0835"><\/script><script src="driver-pause.js?v=20260923-0835"><\/script><script src="driver-custom-navigation-support.js?v=20260923-1518"><\/script><script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js?v=20260925-0815"><\/script>'+distanceFix+'<script src="driver-tracking-engine-v2.js?v=20260925-0718"><\/script><script src="driver-nav-van-overlay.js?v=20260924-0725"><\/script><script src="driver-mobile-nav-fix.js?v=20260924-1155"><\/script><script src="driver-chat-live.js?v=20260924-0900"><\/script><script src="driver-navigation.js?v=20260925-0718"><\/script><script src="driver-voice-live.js?v=20260925-0745"><\/script><script src="driver-alerts-auto-live.js?v=20260925-0800"><\/script><script src="driver-route-pins-live.js?v=20260924-1305"><\/script><script src="driver-ios-map-fallback.js?v=20260925-0745"><\/script>';
   html=html.replace('</body>',extras+'</body>');
   document.open();document.write(html);document.close();
  }catch(e){document.body.innerHTML='<div style="font-family:Arial,sans-serif;padding:24px;color:#b42318"><b>Driver Live Tracking + Navigation failed to load.</b><br>'+String(e.message||e)+'</div>'}
