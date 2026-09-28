@@ -15,7 +15,7 @@
  try{
   const r=await fetch(base,{cache:'no-store'});if(!r.ok)throw Error('Could not load the Universal Delivery workspace.');
   let html=await r.text();
-  html=html.replace('</body>','<script src="optimizer-v2.js?v=20260928-0825"><\/script></body>');
+  html=html.replace('</body>','<script src="optimizer-v2.js?v=20260928-0835"><\/script></body>');
   document.open();document.write(html);document.close();
  }catch(e){document.getElementById('boot').innerHTML='<span class="err"><b>Universal Delivery System failed to load.</b><br>'+String(e.message||e)+'</span>'}
 })();
