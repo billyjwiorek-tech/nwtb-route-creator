@@ -66,9 +66,9 @@
     '11935':{address:'850 Windham Pkwy, Bolingbrook, IL 60440',note:'ROADRUNNER current Chicago service center'},
     '22663':{address:'721 Parkwood Ave, Suite D, Romeoville, IL 60446',lat:41.656179,lon:-88.075574,note:'ROAD KING canonical route stop'},
     '11060':{address:'2605 W 22nd St, Suite 32, Oak Brook, IL 60523',lat:41.845455,lon:-87.980871,note:'IRON WAY final audited commercial office'},
-    '27727':{address:'10S530 Thames Dr, Downers Grove, IL 60516',note:'UZB current residential registration'},
+    '27727':{address:'15850 New Ave, Lemont, IL 60439',lat:41.6727040623,lon:-88.0066242944,note:'UZB TRANS verified commercial office — final audit 2026-09-28'},
     '11771':{address:'1024 Brentwood Cir, Buffalo Grove, IL 60089',note:'PJ TWINS current residential registration'},
-    '18153':{address:'2451 Sharon Ct, Naperville, IL 60565',note:'AFF TRANS current residential registration'},
+    '18153':{address:'1391 Roberts Rd Suite B, Morris, IL 60450',lat:41.385181,lon:-88.402842,note:'AFF TRANS verified commercial operating office — final audit 2026-09-28'},
     '11252':{address:'672 Banbury Way, Bolingbrook, IL 60440',note:'KZ EXPRESS current residential registration'},
     '16106':{address:'1226 N Webster St, Naperville, IL 60563',note:'US TRANS ONE current residential registration'},
     '12635':{address:'25015 Edison Ln, Plainfield, IL 60585',note:'GN EXPRESS current residential registration'},
@@ -80,10 +80,10 @@
   const COMMERCIAL_GO_FIRST_EXISTING_IDS=new Set([
     '21267','17772','11058','28276','28369','22663','20779','15491','20507','23325',
     '16350','27388','18091','20672','26334','19079','10366','11914','25846','26781',
-    '11179','11935','24881','15474','11395','15096','12389','26423','11218','21986','11060'
+    '11179','11935','24881','15474','11395','15096','12389','26423','11218','21986','11060','18153','27727'
   ]);
   const RESIDENTIAL_GO_FIRST_EXISTING_IDS=new Set([
-    '27727','11771','23016','18153','11252','26145','17219','16106','25606','12635','25909','25817','10803','28280'
+    '11771','23016','11252','26145','17219','16106','25606','12635','25909','25817','10803','28280'
   ]);
   const HOLD_GO_FIRST_EXISTING_IDS=new Set();
   const DUPLICATE_SUPPRESS_IDS=new Set(['25941','12038','12039','24956']);
@@ -141,6 +141,7 @@
   };
 
   function locationStatus(a){
+    if(a?.finalGoFirstMember===true&&a?.finalGoFirstRouteApproved===true)return 'COMMERCIAL_ROUTE_OK';
     if(a?.broadType==='PROSPECT'){
       const addr=auditNorm(a?.address);
       if(RESIDENTIAL_ADDRESS_PARTS.some(x=>addr.includes(auditNorm(x))))return 'RESIDENTIAL_DO_NOT_ROUTE';
@@ -196,7 +197,14 @@
   }
 
   function updateAuditNotice(){
-    try{const n=$('safetyNotice');if(n)n.innerHTML='<b>FINAL SALES DATABASE:</b> GO FIRST 66 • Verified Prospects 7 • Win-Back 232 • Active 135 • Total 440. <b>GO FIRST ROUTING:</b> 53 commercial stops approved • 13 valid GO FIRST accounts held until a commercial route stop is verified. Category membership and route-ready count are intentionally different.';}catch{}
+    try{
+      const n=$('safetyNotice');if(!n)return;
+      const finalAccounts=accounts.filter(a=>a.finalIncluded!==false);
+      const go=finalAccounts.filter(a=>a.layer==='GO FIRST');
+      const approved=go.filter(a=>a.finalGoFirstRouteApproved===true).length;
+      const hold=go.length-approved;
+      n.innerHTML=`<b>FINAL SALES DATABASE:</b> GO FIRST ${go.length} • Verified Prospects ${finalAccounts.filter(a=>a.layer==='VERIFIED PROSPECTS').length} • Win-Back ${finalAccounts.filter(a=>a.layer==='WIN-BACK CUSTOMERS').length} • Active ${finalAccounts.filter(a=>a.layer==='ACTIVE CUSTOMERS').length} • Total ${finalAccounts.length}. <b>GO FIRST ROUTING:</b> ${approved} commercial stops approved • ${hold} valid GO FIRST accounts held until a commercial route stop is verified. Category membership and route-ready count are intentionally different.`;
+    }catch{}
   }
 
   const css=`

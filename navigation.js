@@ -227,8 +227,12 @@
 
   function setFinalSafetyNotice(){
     try{
-      const n=$('safetyNotice');
-      if(n)n.innerHTML='<b>FINAL SALES DATABASE:</b> GO FIRST 66 • Verified Prospects 7 • Win-Back 232 • Active 135 • Total 440. <b>GO FIRST ROUTING:</b> 53 commercial stops approved • 13 valid GO FIRST accounts held until a commercial route stop is verified. Category membership and route-ready count are intentionally different.';
+      const n=$('safetyNotice');if(!n)return;
+      const finalAccounts=accounts.filter(a=>a.finalIncluded!==false);
+      const go=finalAccounts.filter(a=>a.layer==='GO FIRST');
+      const approved=go.filter(a=>a.finalGoFirstRouteApproved===true).length;
+      const hold=go.length-approved;
+      n.innerHTML=`<b>FINAL SALES DATABASE:</b> GO FIRST ${go.length} • Verified Prospects ${finalAccounts.filter(a=>a.layer==='VERIFIED PROSPECTS').length} • Win-Back ${finalAccounts.filter(a=>a.layer==='WIN-BACK CUSTOMERS').length} • Active ${finalAccounts.filter(a=>a.layer==='ACTIVE CUSTOMERS').length} • Total ${finalAccounts.length}. <b>GO FIRST ROUTING:</b> ${approved} commercial stops approved • ${hold} valid GO FIRST accounts held until a commercial route stop is verified. Category membership and route-ready count are intentionally different.`;
     }catch{}
   }
 
