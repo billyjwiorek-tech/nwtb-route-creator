@@ -1,0 +1,19 @@
+name: Audit Sales Cloud Dependencies
+
+on:
+  push:
+    paths:
+      - '.github/workflows/audit-sales-cloud-deps.yml'
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Find remaining dependencies
+        shell: bash
+        run: |
+          echo '=== accounts.json references ==='
+          git grep -n 'accounts\.json' -- ':!accounts.json' || true
+          echo '=== localhost/8765 references ==='
+          git grep -n -E '127\.0\.0\.1:8765|localhost:8765|:8765' || true
