@@ -1,30 +1,41 @@
-# NWTB Bolingbrook Daily Sales Route Creator — GitHub Pages Edition
+# NWTB Bolingbrook Daily Sales Route Creator — Cloud Production
 
-This package is prepared for free GitHub Pages static hosting.
+The production Sales Route Creator is a cloud-hosted web application. It does not require a local Windows server, Command Prompt window, localhost, `127.0.0.1`, or an office PC to remain powered on.
 
-## Current sales intelligence
-- GO FIRST: 79
-- VERIFIED PROSPECTS: 11
-- TRUE WIN-BACK: 269
-- ACTIVE CUSTOMERS: 154
-- TOTAL UNIQUE BUSINESSES: 513
+## Production architecture
 
-## Files to upload to the repository root
-- `index.html`
-- `accounts.json`
-- `.nojekyll`
+**Authorized browser / phone → GitHub Pages frontend → Supabase authentication + private Sales data + routing services**
 
-The app uses browser-side OpenStreetMap/OSRM routing and then creates Google Maps navigation links. No Google Maps Platform API key is required.
+Production URL:
 
-## Important privacy note
-On GitHub Free, GitHub Pages is published from a public repository. This means the website and the `accounts.json` file are publicly accessible to anyone who finds the URL. Do not publish this package if the customer/account list must remain private.
+`https://billyjwiorek-tech.github.io/nwtb-route-creator/`
 
-## GitHub Pages setup
-1. Create a new public repository, e.g. `nwtb-route-creator`.
-2. Upload the three site files to the repository root.
-3. Open **Settings → Pages**.
-4. Under **Build and deployment**, choose **Deploy from a branch**.
-5. Select branch **main** and folder **/(root)**, then **Save**.
-6. GitHub will provide a URL similar to `https://YOUR-USERNAME.github.io/nwtb-route-creator/`.
+## Sales data
 
-The `index.html` file uses a relative path for `accounts.json`, so it works correctly from a GitHub Pages project URL.
+The customer/prospect source is stored in the private Supabase `sales_accounts` table and is returned only through the authenticated `nwtb-sales-app` Edge Function.
+
+The public `accounts.json` runtime file has been removed from the current production branch.
+
+## Authentication
+
+The Sales frontend requires an active NWTB employee number before it loads the customer/prospect database. The Sales login reuses the existing NWTB employee/session system so Sales chat and route sharing can use the same browser session.
+
+## Routing
+
+- Sales selection, priority and territory rules remain Sales-specific.
+- Route ordering uses the NWTB Delivery road-matrix routing engine.
+- Built-in Sales turn-by-turn navigation uses the cloud-hosted NWTB navigation service plus browser GPS and OpenStreetMap/Leaflet.
+- Google Maps remains available as a backup launcher.
+- The final route returns to Northwest Trucks — Bolingbrook.
+
+## My Maps exporters
+
+The My Maps sync/export pages also load Sales data through the authenticated cloud source. They no longer require a public `accounts.json` file.
+
+## Local-server rule
+
+Do not reintroduce a dependency on port `8765`, `localhost`, or `127.0.0.1` for the Sales application. Production must remain usable when the office PC is shut down.
+
+## Data-history note
+
+The current branch no longer publishes the Sales account JSON file. Because this repository was historically public, older Git commit objects may still contain prior copies until repository history is separately purged or the repository is made private. Do not treat deletion from the current branch as a historical Git purge.
