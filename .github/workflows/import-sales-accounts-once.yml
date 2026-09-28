@@ -1,0 +1,17 @@
+name: Import Sales Accounts Once
+
+on:
+  push:
+    paths:
+      - '.github/workflows/import-sales-accounts-once.yml'
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Import current accounts.json into Supabase
+        run: |
+          set -euo pipefail
+          response=$(curl --fail --silent --show-error 'https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-sales-import-once')
+          echo "$response"
+          echo "$response" | grep '"ok":true'
