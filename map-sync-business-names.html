@@ -33,6 +33,7 @@ Visible labels = <b>MapLabel</b><br><br>
 GO FIRST: Group places by <code>GO_FIRST_TYPE</code>; EXISTING CUSTOMER = GREEN; NEW POTENTIAL CUSTOMER = RED.<br>
 VERIFIED PROSPECTS = PURPLE • WIN-BACK = ORANGE • ACTIVE = BLUE.</div>
 </div>
+<script src="./sales-cloud-auth.js?v=20260928CLOUD1"></script>
 <script>
 const $=id=>document.getElementById(id);
 const norm=s=>String(s||'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim().replace(/\s+/g,' ');
@@ -68,8 +69,7 @@ function csvEscape(v){const s=String(v??'');return /[",\n\r]/.test(s)?'"'+s.repl
 function toCsv(arr){return '\uFEFF'+[HEADERS,...arr.map(row)].map(r=>r.map(csvEscape).join(',')).join('\r\n');}
 function download(name,arr){const blob=new Blob([toCsv(arr)],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);}
 (async()=>{try{
- const r=await fetch('./accounts.json?v=20260923-business-name-fix',{cache:'no-store'});if(!r.ok)throw new Error('Could not load accounts.json');
- const raw=await r.json(),f=finalLayers(raw),total=f.go.length+f.verified.length+f.win.length+f.active.length;
+ const raw=await window.nwtbLoadSalesAccounts(),f=finalLayers(raw),total=f.go.length+f.verified.length+f.win.length+f.active.length;
  $('cGo').textContent=f.go.length;$('cGoSub').textContent=`${f.goExisting.length} existing • ${f.goPros.length} new potential`;$('cPros').textContent=f.verified.length;$('cWin').textContent=f.win.length;$('cActive').textContent=f.active.length;$('cTotal').textContent=total;
  const namesOk=[...f.go,...f.verified,...f.win,...f.active].every(x=>businessName(x));
  const exact=f.goExisting.length===29&&f.goPros.length===22&&f.verified.length===7&&f.win.length===232&&f.active.length===135&&total===425&&namesOk;
