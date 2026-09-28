@@ -1,0 +1,25 @@
+name: Secure Sales Exporters
+
+on:
+  push:
+    paths:
+      - '.github/workflows/secure-sales-exporters.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch exporters
+        run: python scripts/secure_sales_exporters.py
+      - name: Commit exporter migration
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add map-sync-final.html map-sync-business-names.html
+          git commit -m "Load My Maps exports from private Sales cloud data"
+          git push
