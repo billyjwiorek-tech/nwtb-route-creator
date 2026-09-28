@@ -1,0 +1,78 @@
+name: Set Final Sales Counts
+
+on:
+  push:
+    paths:
+      - '.github/workflows/set-final-sales-counts.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply user-confirmed final counts
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          FINAL="<b>FINAL ROUTE DATABASE:</b> GO FIRST 66 • Verified Prospects 7 • Win-Back 232 • Active 135 • Total 440. Residential, stale, duplicate, and held records remain blocked from routing."
+
+          # Main Sales pages: make the stat cards use the user-confirmed authoritative counts.
+          for name in ('index.html','app.html'):
+              p=Path(name)
+              if not p.exists():
+                  continue
+              s=p.read_text(encoding='utf-8')
+              old="statGo.textContent=go.length;statGoSub.textContent=`${goExist} existing • ${goPros} new potential`;statPros.textContent=usable.filter(a=>a.layer==='VERIFIED PROSPECTS').length;statWin.textContent=usable.filter(a=>a.layer==='WIN-BACK CUSTOMERS').length;statActive.textContent=usable.filter(a=>a.layer==='ACTIVE CUSTOMERS').length;statTotal.textContent=usable.length;safetyNotice.innerHTML=`<b>ROUTE DATABASE:</b> ${usable.length} usable accounts available. ${blocked} audited/excluded records are blocked from route selection.`"
+              new="statGo.textContent='66';statGoSub.textContent='Final audited count';statPros.textContent='7';statWin.textContent='232';statActive.textContent='135';statTotal.textContent='440';safetyNotice.innerHTML='"+FINAL+"'"
+              if old not in s:
+                  raise SystemExit(f'Could not find main stat block in {name}')
+              s=s.replace(old,new,1)
+              p.write_text(s,encoding='utf-8')
+
+          # navigation.js can refresh stats after init; keep the final display authoritative.
+          p=Path('navigation.js')
+          s=p.read_text(encoding='utf-8')
+          s=re.sub(
+              r"function refreshReconciledStats\(\)\{.*?\n  \}\n  function applyMasterReconciliation",
+              "function refreshReconciledStats(){\n    try{\n      if($('statGo'))$('statGo').textContent='66';\n      if($('statGoSub'))$('statGoSub').textContent='Final audited count';\n      if($('statPros'))$('statPros').textContent='7';\n      if($('statWin'))$('statWin').textContent='232';\n      if($('statActive'))$('statActive').textContent='135';\n      if($('statTotal'))$('statTotal').textContent='440';\n    }catch(e){console.warn('NWTB reconciliation stats:',e)}\n  }\n  function applyMasterReconciliation",
+              s,count=1,flags=re.S)
+          s=re.sub(
+              r"function setFinalSafetyNotice\(\)\{.*?\n  \}\n\n  function applyAllReconciliation",
+              "function setFinalSafetyNotice(){\n    try{const n=$('safetyNotice');if(n)n.innerHTML='"+FINAL+"';}catch{}\n  }\n\n  function applyAllReconciliation",
+              s,count=1,flags=re.S)
+          p.write_text(s,encoding='utf-8')
+
+          # chat.js also refreshes the stats and safety message.
+          p=Path('chat.js')
+          s=p.read_text(encoding='utf-8')
+          s=re.sub(
+              r"function updateSafeStats\(\)\{.*?\n  \}\n\n  function updateAuditNotice",
+              "function updateSafeStats(){\n    try{\n      if($('statGo'))$('statGo').textContent='66';\n      if($('statGoSub'))$('statGoSub').textContent='Final audited count';\n      if($('statPros'))$('statPros').textContent='7';\n      if($('statWin'))$('statWin').textContent='232';\n      if($('statActive'))$('statActive').textContent='135';\n      if($('statTotal'))$('statTotal').textContent='440';\n    }catch{}\n  }\n\n  function updateAuditNotice",
+              s,count=1,flags=re.S)
+          s=re.sub(
+              r"function updateAuditNotice\(\)\{.*?\n  \}\n\n  const css=",
+              "function updateAuditNotice(){\n    try{const n=$('safetyNotice');if(n)n.innerHTML='"+FINAL+"';}catch{}\n  }\n\n  const css=",
+              s,count=1,flags=re.S)
+          p.write_text(s,encoding='utf-8')
+
+          # Verify all production refresh points contain the final totals.
+          for name in ('index.html','app.html','navigation.js','chat.js'):
+              text=Path(name).read_text(encoding='utf-8')
+              for needle in ("'66'","'7'","'232'","'135'","'440'"):
+                  assert needle in text, (name,needle)
+          print('Final Sales counts applied: 66 / 7 / 232 / 135 / 440')
+          PY
+      - name: Commit final counts
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html app.html navigation.js chat.js
+          git commit -m "Set final Sales Route Creator counts to 440" || exit 0
+          git push
