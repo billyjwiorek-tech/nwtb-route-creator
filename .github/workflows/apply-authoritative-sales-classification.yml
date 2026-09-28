@@ -1,0 +1,29 @@
+name: Apply Authoritative Sales Classification
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-authoritative-sales-classification.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply authoritative Sales classification
+        run: python scripts/apply_authoritative_sales_classification.py
+      - name: Commit production Sales classification
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html app.html navigation.js chat.js sales-cloud-auth.js
+          if git diff --cached --quiet; then
+            echo "No changes needed"
+            exit 0
+          fi
+          git commit -m "Use authoritative final Sales classification"
+          git push
