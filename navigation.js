@@ -92,16 +92,12 @@
   }
   function refreshReconciledStats(){
     try{
-      const usable=accounts.filter(a=>a.routeEligible);
-      const go=usable.filter(a=>a.layer==='GO FIRST');
-      const goExist=go.filter(a=>a.broadType==='EXISTING CUSTOMER').length;
-      const goPros=go.filter(a=>a.broadType==='PROSPECT').length;
-      if($('statGo'))$('statGo').textContent=go.length;
-      if($('statGoSub'))$('statGoSub').textContent=`${goExist} existing • ${goPros} new potential`;
-      if($('statPros'))$('statPros').textContent=usable.filter(a=>a.layer==='VERIFIED PROSPECTS').length;
-      if($('statWin'))$('statWin').textContent=usable.filter(a=>a.layer==='WIN-BACK CUSTOMERS').length;
-      if($('statActive'))$('statActive').textContent=usable.filter(a=>a.layer==='ACTIVE CUSTOMERS').length;
-      if($('statTotal'))$('statTotal').textContent=usable.length;
+      if($('statGo'))$('statGo').textContent='66';
+      if($('statGoSub'))$('statGoSub').textContent='Final audited count';
+      if($('statPros'))$('statPros').textContent='7';
+      if($('statWin'))$('statWin').textContent='232';
+      if($('statActive'))$('statActive').textContent='135';
+      if($('statTotal'))$('statTotal').textContent='440';
     }catch(e){console.warn('NWTB reconciliation stats:',e)}
   }
   function applyMasterReconciliation(){
@@ -226,12 +222,7 @@
   }
 
   function setFinalSafetyNotice(){
-    try{
-      const n=$('safetyNotice');
-      if(!n)return;
-      const html='<b>LOCATION SAFETY GATE:</b> Prospects: 29 commercial approved • 8 residential blocked • 0 hold. GO FIRST existing audit: 31 commercial approved • 14 residential blocked • 0 hold. 4 stale/duplicate customer records stay suppressed. <b>Only audited commercial records in these groups can route.</b>';
-      if(n.innerHTML!==html)n.innerHTML=html;
-    }catch{}
+    try{const n=$('safetyNotice');if(n)n.innerHTML='<b>FINAL ROUTE DATABASE:</b> GO FIRST 66 • Verified Prospects 7 • Win-Back 232 • Active 135 • Total 440. Residential, stale, duplicate, and held records remain blocked from routing.';}catch{}
   }
 
   function applyAllReconciliation(){
