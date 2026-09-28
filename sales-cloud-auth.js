@@ -54,8 +54,27 @@
     try{
       const j=await api('accounts');
       if(!Array.isArray(j.accounts)||j.accounts.length<400)throw new Error('Private Sales database returned an unexpected account count.');
+      const asBool=v=>v===true||v==='true'||v===1||v==='1';
+      const normalized=j.accounts.map(src=>{
+        const a={...src};
+        const tagged=String(a.finalCategoryVersion||'')==='2026-09-28'||a.finalLayer!==undefined;
+        if(tagged){
+          a.finalIncluded=asBool(a.finalIncluded);
+          a.finalGoFirstMember=asBool(a.finalGoFirstMember);
+          a.finalGoFirstRouteApproved=asBool(a.finalGoFirstRouteApproved);
+          if(a.finalLayer)a.layer=a.finalLayer;
+          if(a.finalBroadType)a.broadType=a.finalBroadType;
+          if(a.finalCustomerNumber!==undefined)a.customerNumber=a.finalCustomerNumber;
+          if(a.finalBillCusId!==undefined)a.billCusId=a.finalBillCusId;
+          if(a.finalAccountType)a.accountType=a.finalAccountType;
+          if(a.finalBadge)a.badge=a.finalBadge;
+          if(a.finalPriority)a.priority=a.finalPriority;
+        }
+        return a;
+      });
       window.nwtbSalesCloudSource=j.source||'SUPABASE_PRIVATE';
-      return j.accounts;
+      window.nwtbSalesFinalCategoryVersion='2026-09-28';
+      return normalized;
     }catch(e){
       if(e.status===401){localStorage.removeItem(TOKEN_KEY);showGate('Your Sales session expired. Sign in again.');await ensureSession();return window.nwtbLoadSalesAccounts()}
       showGate('Could not load the private Sales database: '+(e.message||e));throw e

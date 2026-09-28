@@ -182,17 +182,21 @@
 
   function updateSafeStats(){
     try{
-      if($('statGo'))$('statGo').textContent='66';
-      if($('statGoSub'))$('statGoSub').textContent='Final audited count';
-      if($('statPros'))$('statPros').textContent='7';
-      if($('statWin'))$('statWin').textContent='232';
-      if($('statActive'))$('statActive').textContent='135';
-      if($('statTotal'))$('statTotal').textContent='440';
+      const finalAccounts=accounts.filter(a=>a.finalIncluded!==false);
+      const go=finalAccounts.filter(a=>a.layer==='GO FIRST');
+      const approved=go.filter(a=>a.finalGoFirstRouteApproved===true).length;
+      const hold=go.length-approved;
+      if($('statGo'))$('statGo').textContent=go.length;
+      if($('statGoSub'))$('statGoSub').textContent=`${approved} route-approved • ${hold} commercial-stop hold`;
+      if($('statPros'))$('statPros').textContent=finalAccounts.filter(a=>a.layer==='VERIFIED PROSPECTS').length;
+      if($('statWin'))$('statWin').textContent=finalAccounts.filter(a=>a.layer==='WIN-BACK CUSTOMERS').length;
+      if($('statActive'))$('statActive').textContent=finalAccounts.filter(a=>a.layer==='ACTIVE CUSTOMERS').length;
+      if($('statTotal'))$('statTotal').textContent=finalAccounts.length;
     }catch{}
   }
 
   function updateAuditNotice(){
-    try{const n=$('safetyNotice');if(n)n.innerHTML='<b>FINAL ROUTE DATABASE:</b> GO FIRST 66 • Verified Prospects 7 • Win-Back 232 • Active 135 • Total 440. Residential, stale, duplicate, and held records remain blocked from routing.';}catch{}
+    try{const n=$('safetyNotice');if(n)n.innerHTML='<b>FINAL SALES DATABASE:</b> GO FIRST 66 • Verified Prospects 7 • Win-Back 232 • Active 135 • Total 440. <b>GO FIRST ROUTING:</b> 53 commercial stops approved • 13 valid GO FIRST accounts held until a commercial route stop is verified. Category membership and route-ready count are intentionally different.';}catch{}
   }
 
   const css=`
