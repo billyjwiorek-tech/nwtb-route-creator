@@ -37,14 +37,13 @@ function enhanceDispatch(){
  const rc=document.getElementById('rc');if(rc&&!document.getElementById('udpRouteCreateNote')){const n=document.createElement('div');n.id='udpRouteCreateNote';n.className='udpOptNote';n.innerHTML='<b>AUTOMATIC ROUTE OPTIMIZATION:</b> Every route is optimized when it is created. Priority is optional. After reviewing the finished route, Dispatch can change a pending stop to PRIORITY / HOT SHOT / MUST FIRST from the Routes screen and re-optimize the remaining stops.';rc.insertAdjacentElement('afterend',n)}
 }
 
-let routesBusy=false,lastRoutesSignature='';
+let routesBusy=false;
 async function enhanceRoutes(){
  if(routesBusy)return;const h=[...document.querySelectorAll('#v h1')].find(x=>x.textContent.trim()==='Routes');if(!h||document.getElementById('udpEnhancedRoutes'))return;routesBusy=true;
  try{
   const j=await post(OLD,{action:'routes_list'}),routes=j.routes||[];
-  const sig=routes.map(r=>r.id+':'+r.updated_at).join('|');lastRoutesSignature=sig;
   const v=document.getElementById('v');if(!v||![...v.querySelectorAll('h1')].some(x=>x.textContent.trim()==='Routes'))return;
-  const rows=routes.map(r=>`<tr><td>${esc(r.route_date)}</td><td><b>${esc((r.app_users||{}).full_name||'')}</b></td><td>${esc(r.status)}</td><td>${esc(r.route_mode||'')}</td><td>${r.estimated_miles!=null?Number(r.estimated_miles).toFixed(1)+' mi':'—'}</td><td>${['PLANNED','ACTIVE','PAUSED'].includes(r.status)?`<button class="btn blue udpActionBtn" onclick="udpOpenRoute('${r.id}')">VIEW / PRIORITY</button>`:'<button class="btn ghost udpActionBtn" onclick="udpOpenRoute(\''+r.id+'\')">VIEW</button>'}</td></tr>`).join('');
+  const rows=routes.map(r=>{const action=['PLANNED','ACTIVE','PAUSED'].includes(r.status)?`<button class="btn blue udpActionBtn" onclick="udpOpenRoute('${r.id}')">VIEW / PRIORITY</button>`:`<button class="btn ghost udpActionBtn" onclick="udpOpenRoute('${r.id}')">VIEW</button>`;return `<tr><td>${esc(r.route_date)}</td><td><b>${esc((r.app_users||{}).full_name||'')}</b></td><td>${esc(r.status)}</td><td>${esc(r.route_mode||'')}</td><td>${r.estimated_miles!=null?Number(r.estimated_miles).toFixed(1)+' mi':'—'}</td><td>${action}</td></tr>`}).join('');
   v.innerHTML=`<h1>Routes</h1><div class="sub">Routes are optimized automatically when created. Priority changes are optional and are made after reviewing the route.</div><div id="udpEnhancedRoutes" class="panel"><div class="table"><table><tr><th>Date</th><th>Driver</th><th>Status</th><th>Mode</th><th>Miles</th><th>Actions</th></tr>${rows||'<tr><td colspan="6">No routes yet.</td></tr>'}</table></div></div>`;
  }catch(e){console.warn('Universal enhanced Routes view failed',e)}finally{routesBusy=false}
 }
