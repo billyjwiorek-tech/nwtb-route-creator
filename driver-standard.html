@@ -44,7 +44,7 @@ const KEY='sb_publishable_EqF-iooqhmngSG5BbzOxfQ_Vnf9Altc';
 const HOME={name:'Northwest Trucks - Bolingbrook',address:'201 S W Frontage Rd, Bolingbrook, IL 60440'};
 let token='',drivers=[],driver='',route='',changeTimer=null,audioCtx=null,alertsReady=false,currentPaused=false,currentRouteState=null;
 const $=x=>document.getElementById(x);
-const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#039;'}[m]));
 async function post(url,p,auth=true){const h={'content-type':'application/json','apikey':KEY};if(auth)h['x-nwtb-session']=token;const r=await fetch(url,{method:'POST',headers:h,body:JSON.stringify(p)}),j=await r.json().catch(()=>({error:'Bad response'}));if(!r.ok)throw Error(j.error||'Request failed');return j}
 const enc=x=>encodeURIComponent(`${x.name||'Location'}, ${x.address||''}`);
 function routeEndpoints(r,pts){
@@ -112,5 +112,6 @@ async function submitPause(){const reason=($('pauseReasonInput').value||'').trim
 async function resumePausedRoute(){if(!confirm('Resume this route now?'))return;try{await post(ROUTE_API,{action:'route_resume_driver',route_id:route,driver_employee_number:driver});await openRoute(route,true)}catch(e){alert(e.message)}}
 boot();
 </script>
+<script src="nwtb-system-lock-live.js?v=20260929-1200"></script>
 </body>
 </html>
