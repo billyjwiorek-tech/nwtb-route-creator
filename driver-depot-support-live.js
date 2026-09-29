@@ -1,0 +1,8 @@
+(()=>{
+'use strict';
+if(window.__nwtbDepotSupport)return;window.__nwtbDepotSupport=true;
+const DEPOTS={BOLINGBROOK:{name:'Northwest Trucks - Bolingbrook',address:'201 S W Frontage Rd, Bolingbrook, IL 60440'},PALATINE:{name:'Northwest Trucks - Palatine',address:'2120 N Rand Rd, Palatine, IL 60074'}};
+function install(){if(typeof window.routeEndpoints!=='function'){setTimeout(install,250);return}if(window.routeEndpoints.__nwtbSmartDepot)return;const fn=function(r,pts){const mode=String(r?.route_mode||'').toUpperCase();if(mode.startsWith('CUSTOM')){const start={name:r.start_name||'Custom Start',address:r.start_address||''},endMode=r.end_mode||'SAME_AS_START';if(endMode==='LAST_STOP')return{start,final:pts[pts.length-1]||start,label:'CUSTOM ROUTE',startText:start.name,endText:'Last Stop'};if(endMode==='SAME_AS_START')return{start,final:start,label:'CUSTOM ROUTE',startText:start.name,endText:'Same as Start'};const final={name:r.end_name||'Custom End',address:r.end_address||''};return{start,final,label:'CUSTOM ROUTE',startText:start.name,endText:final.name}}
+ const d=DEPOTS[String(r?.depot||'BOLINGBROOK').toUpperCase()]||DEPOTS.BOLINGBROOK,start={name:r?.start_name||d.name,address:r?.start_address||d.address},final={name:r?.end_name||d.name,address:r?.end_address||d.address};return{start,final,label:'START / RETURN',startText:start.name,endText:final.name}};fn.__nwtbSmartDepot=true;window.routeEndpoints=fn}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,600));else setTimeout(install,600);
+})();
