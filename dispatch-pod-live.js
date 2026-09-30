@@ -21,3 +21,4 @@ function loadExceptionModule(){if(document.querySelector('script[data-nwtb-dispa
 async function init(){const {b}=ensure();try{const j=await post(ROLES,{action:'my_role'});if(['ADMIN','DISPATCH','SUPERVISOR','VIEW_ONLY'].includes(j.role))b.style.display='block'}catch{}loadExceptionModule()}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(init,950));else setTimeout(init,950);
 })();
+(()=>{if(document.querySelector('script[data-nwtb-tools-hub]'))return;const s=document.createElement('script');s.src='dispatch-tools-hub-live.js?v=20260930-0825';s.dataset.nwtbToolsHub='1';document.head.appendChild(s)})();
