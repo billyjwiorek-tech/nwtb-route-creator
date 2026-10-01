@@ -91,6 +91,7 @@
   function applyAddressOverrides(){
     try{
       accounts.forEach(a=>{
+        if(a.finalLayer!==undefined)return;
         const id=String(a?.customerNumber||'').trim();
         const o=ADDRESS_OVERRIDES.get(id);
         if(!o)return;
@@ -141,6 +142,7 @@
   };
 
   function locationStatus(a){
+    if(a?.finalLayer!==undefined)return window.NwtbSalesPolicy.reason(a)?'UNCERTAIN_HOLD':'COMMERCIAL_ROUTE_OK';
     if(a?.finalGoFirstMember===true&&a?.finalGoFirstRouteApproved===true)return 'COMMERCIAL_ROUTE_OK';
     if(a?.broadType==='PROSPECT'){
       const addr=auditNorm(a?.address);
@@ -165,12 +167,13 @@
       s==='UNCERTAIN_HOLD'?'UNCERTAIN — HOLD':'NOT YET AUDITED';
   }
   function locationClass(s){return s==='COMMERCIAL_ROUTE_OK'?'loc-ok':s==='RESIDENTIAL_DO_NOT_ROUTE'||s==='DUPLICATE_SUPPRESSED'?'loc-stop':'loc-hold'}
-  function isLocationAuditedGroup(a){return a?.broadType==='PROSPECT'||(a?.layer==='GO FIRST'&&a?.broadType==='EXISTING CUSTOMER')}
+  function isLocationAuditedGroup(a){return a?.finalLayer!==undefined||a?.broadType==='PROSPECT'||(a?.layer==='GO FIRST'&&a?.broadType==='EXISTING CUSTOMER')}
 
   function enforceLocationVerification(){
     try{
       applyAddressOverrides();
       accounts.forEach(a=>{
+        if(a.finalLayer!==undefined){a.routeEligible=!window.NwtbSalesPolicy.reason(a);return;}
         if(!isLocationAuditedGroup(a))return;
         const s=locationStatus(a);
         a.locationVerification=locationLabel(s);
@@ -240,12 +243,12 @@
     try{
       const j=await call('list'),box=$('nwtbMessages');
       box.innerHTML=(j.messages||[]).map(m=>m.message_type==='route'?`<div class="nwtb-msg route"><div class="meta"><b>${h(m.display_name)}</b> - ${h(when(m.created_at))}</div><b>${h(m.route_payload?.title||'NWTB Sales Route')}</b><div>${(m.route_payload?.stops||[]).length} stops</div><button class="nwtb-load-route" data-id="${m.id}">LOAD ROUTE</button></div>`:`<div class="nwtb-msg"><div class="meta"><b>${h(m.display_name)}</b> - ${h(when(m.created_at))}</div>${h(m.body||'')}</div>`).join('');
-      (j.messages||[]).filter(m=>m.message_type==='route').forEach(m=>{const b=box.querySelector(`[data-id="${m.id}"]`);if(b)b.onclick=()=>{currentRoute=(m.route_payload?.stops||[]).map(s=>({...s}));renderRoute(currentRoute,{shared:true});panel.classList.remove('open')}});
+      (j.messages||[]).filter(m=>m.message_type==='route').forEach(m=>{const b=box.querySelector(`[data-id="${m.id}"]`);if(b)b.onclick=async()=>{await renderRoute(m.route_payload?.stops||[],{shared:true});panel.classList.remove('open')}});
       if(!quiet)box.scrollTop=box.scrollHeight;
     }catch(e){if(!quiet)$('nwtbChatError').textContent=e.message}
   }
   async function sendText(){const body=$('nwtbMessageText').value.trim();if(!body)return;try{await call('send_text',{body});$('nwtbMessageText').value='';loadMessages()}catch(e){$('nwtbChatError').textContent=e.message}}
-  async function sendRoute(){if(!currentRoute?.length){$('nwtbChatError').textContent='Create a route first.';return}try{await call('send_route',{route_payload:{title:'NWTB Sales Route - '+currentRoute.length+' Stops',stops:currentRoute,route_type:$('routeType')?.value||null,route_subtype:$('routeSubFilter')?.value||null,radius:$('radius')?.value||null}});loadMessages();alert('Route sent to NWTB Chat.')}catch(e){$('nwtbChatError').textContent=e.message}}
+  async function sendRoute(){if(!currentRoute?.length){$('nwtbChatError').textContent='Create a route first.';return}try{currentRoute=await window.nwtbRequireSalesRoute(currentRoute);await call('send_route',{route_payload:{title:'NWTB Sales Route - '+currentRoute.length+' Stops',stops:currentRoute,route_type:$('routeType')?.value||null,route_subtype:$('routeSubFilter')?.value||null,radius:$('radius')?.value||null}});loadMessages();alert('Route sent to NWTB Chat.')}catch(e){$('nwtbChatError').textContent=e.message}}
 
   chatBtn.onclick=()=>{panel.classList.toggle('open');if(panel.classList.contains('open'))restore()};
   $('nwtbChatClose').onclick=()=>panel.classList.remove('open');
@@ -384,7 +387,7 @@
     enforceLocationVerification();
     const out=$('output'),t=$('routeType').value,r=+$('radius').value,includeFollow=$('includeFollowUps')?.checked;
     let n=Math.max(1,Math.min(25,+$('stopCount').value||10));
-    let cand=accounts.filter(a=>a.routeEligible)
+    let cand=accounts.filter(a=>window.nwtbSalesRouteAllowed(a))
       .filter(a=>!isLocationAuditedGroup(a)||locationStatus(a)==='COMMERCIAL_ROUTE_OK')
       .filter(filterFn(t))
       .filter(a=>r>=999||miles(depot,a)<=r);
@@ -405,7 +408,7 @@
       else if(t==='mixed')sel=selectMixed(cand,n);
       else sel=selectCluster(cand,n,t);
       const j=await optimize(sel);
-      renderRoute(j.order.map(i=>sel[i]),{miles:j.miles,minutes:j.minutes,efficiencyFirst:t==='new_business'});
+      await renderRoute(j.order.map(i=>sel[i]),{miles:j.miles,minutes:j.minutes,efficiencyFirst:t==='new_business'});
     }catch(e){out.innerHTML=`<div class="notice"><b>ROUTE NOT CREATED:</b> ${esc(e.message||e)}</div>`}
   };
 
@@ -421,8 +424,8 @@
     if(isLocationAuditedGroup(a)){
       const loc=locationStatus(a),lbox=document.createElement('div');
       lbox.className='locationbox';
-      const correction=a.auditAddressCorrected&&a.originalAddress&&a.originalAddress!==a.address?`<div class="visit-note"><b>Address corrected:</b> ${h(a.originalAddress)} → ${h(a.address)}</div>`:'';
-      const note=a.auditLocationNote?`<div class="visit-note">${h(a.auditLocationNote)}</div>`:'';
+      const correction=a.originalAddress&&a.originalAddress!==a.address?`<div class="visit-note"><b>Address corrected:</b> ${h(a.originalAddress)} → ${h(a.address)}</div>`:'';
+      const note=`<div class="visit-note">${h(a.finalLocationAuditReason||a.auditLocationNote||'')}</div>`;
       lbox.innerHTML=`<h3>LOCATION VERIFICATION</h3><span class="locationstatus ${locationClass(loc)}">${h(locationLabel(loc))}</span>${correction}${note}<div class="visit-note">Routing is fail-closed for this account group: only audited commercial locations can be selected.</div>`;
       body.insertBefore(lbox,body.children[1]||null);
     }
@@ -448,11 +451,4 @@
       }catch(e){alert(e.message)}
     });
   };
-})();
-
-(()=>{
-  const s=document.createElement('script');
-  s.src='./navigation.js?v=20260921A';
-  s.defer=true;
-  document.body.appendChild(s);
 })();

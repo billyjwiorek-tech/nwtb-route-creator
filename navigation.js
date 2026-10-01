@@ -60,6 +60,7 @@
   }
 
   async function deliveryOptimizeSales(selected){
+    selected=await window.nwtbRequireSalesRoute(selected);
     const pts=[depot,...selected];
     const matrix=await deliveryRoadMatrix(pts);
     const order=deliveryTwoOpt(deliveryNearest(matrix.durations,selected.length),matrix.durations);
@@ -107,6 +108,7 @@
   function applyMasterReconciliation(){
     try{
       if(!Array.isArray(accounts)||!accounts.length)return false;
+      if(accounts.every(a=>a.finalLayer!==undefined))return true;
 
       const bsl=accounts.find(a=>a.broadType==='PROSPECT'&&masterNorm(a.name)==='BSL EXPRESS TRUCKING INC');
       if(bsl){
@@ -178,6 +180,7 @@
   function applyHoldAudit(){
     try{
       if(!Array.isArray(accounts)||!accounts.length)return false;
+      if(accounts.every(a=>a.finalLayer!==undefined))return true;
 
       const iron=accounts.find(a=>String(a.customerNumber||'')==='11060');
       if(iron){
@@ -232,7 +235,8 @@
       const go=finalAccounts.filter(a=>a.layer==='GO FIRST');
       const approved=go.filter(a=>a.finalGoFirstRouteApproved===true).length;
       const hold=go.length-approved;
-      n.innerHTML=`<b>FINAL SALES DATABASE:</b> GO FIRST ${go.length} • Verified Prospects ${finalAccounts.filter(a=>a.layer==='VERIFIED PROSPECTS').length} • Win-Back ${finalAccounts.filter(a=>a.layer==='WIN-BACK CUSTOMERS').length} • Active ${finalAccounts.filter(a=>a.layer==='ACTIVE CUSTOMERS').length} • Total ${finalAccounts.length}. <b>GO FIRST ROUTING:</b> ${approved} commercial stops approved • ${hold} valid GO FIRST accounts held until a commercial route stop is verified. Category membership and route-ready count are intentionally different.`;
+      const routeApproved=finalAccounts.filter(a=>!window.NwtbSalesPolicy.reason(a)).length;
+      n.innerHTML=`<b>FINAL SALES DATABASE:</b> GO FIRST ${go.length} • Verified Prospects ${finalAccounts.filter(a=>a.layer==='VERIFIED PROSPECTS').length} • Win-Back ${finalAccounts.filter(a=>a.layer==='WIN-BACK CUSTOMERS').length} • Active ${finalAccounts.filter(a=>a.layer==='ACTIVE CUSTOMERS').length} • Total ${finalAccounts.length}. <b>ALL SALES ROUTING:</b> ${routeApproved} eligible • ${finalAccounts.length-routeApproved} held from routes. <b>GO FIRST:</b> ${approved} location-approved • ${hold} HOLD. Categories are preserved. Residential, uncertain, excluded, and DO NOT ROUTE / NOT A FIT stops cannot be routed.`;
     }catch{}
   }
 
@@ -249,21 +253,6 @@
     if(tries<80)setTimeout(()=>waitForReconciliation(tries+1),100);
   }
   waitForReconciliation();
-
-  // If the older safety gate refreshes itself later (for example after visit-status loading),
-  // immediately re-apply the completed 09-22 hold decisions and the final counts.
-  setTimeout(()=>{
-    const n=$('safetyNotice');
-    if(n){
-      const obs=new MutationObserver(()=>{
-        applyMasterReconciliation();
-        applyHoldAudit();
-        refreshReconciledStats();
-        setFinalSafetyNotice();
-      });
-      obs.observe(n,{childList:true,subtree:true,characterData:true});
-    }
-  },800);
 
   const encPlace=x=>{
     const name=String(x?.name||'').trim(),address=String(x?.address||'').trim();
@@ -288,8 +277,10 @@
     if(!currentRoute?.length)return alert('Create a route first.');
     const btn=$('nwtbStartNavBtn');
     if(btn){btn.disabled=true;btn.textContent='GETTING YOUR GPS LOCATION...'}
-    const launch=origin=>{
-      const url=firstPhoneUrl(origin);
+    const launch=async origin=>{
+      let url;
+      try { currentRoute=await window.nwtbRequireSalesRoute(currentRoute); url=firstPhoneUrl(origin); }
+      catch(e){if(btn){btn.disabled=false;btn.textContent='START NAVIGATION — PART 1'}window.nwtbSalesSafetyWarning(e);return;}
       if(btn){btn.disabled=false;btn.textContent='START NAVIGATION — PART 1'}
       if(!url)return alert('Could not create the Google Maps route.');
       window.location.href=url;
@@ -380,7 +371,7 @@
     const out=$('output'),t=$('routeType').value,r=+$('radius').value,includeFollow=$('includeFollowUps')?.checked;
     let n=Math.max(1,Math.min(25,+$('stopCount').value||10));
     let cand=accounts.filter(a=>a.finalIncluded!==false)
-      .filter(a=>a.routeEligible)
+      .filter(a=>window.nwtbSalesRouteAllowed(a))
       .filter(filterFn(t))
       .filter(a=>r>=999||miles(depot,a)<=r);
     cand=applySubFilterFinal(cand,t);
@@ -400,7 +391,7 @@
       else if(t==='mixed')sel=selectMixed(cand,n);
       else sel=selectCluster(cand,n,t);
       const j=await deliveryOptimizeSales(sel);
-      renderRoute(j.order.map(i=>sel[i]),{miles:j.miles,minutes:j.minutes,efficiencyFirst:t==='new_business'});
+      await renderRoute(j.order.map(i=>sel[i]),{miles:j.miles,minutes:j.minutes,efficiencyFirst:t==='new_business'});
       annotateDeliveryEngine(j);
     }catch(e){out.innerHTML=`<div class="notice"><b>ROUTE NOT CREATED:</b> ${esc(e.message||e)}</div>`}
   }
@@ -417,7 +408,7 @@
       const r=await baseShow(i);
       try{
         const a=currentRoute?.[i];
-        if(String(a?.customerNumber||'')==='11060'){
+        if(String(a?.customerNumber||'')==='11060' && !window.nwtbSalesRouteReason(a)){
           const box=document.querySelector('#modal .locationbox');
           if(box)box.innerHTML='<h3>LOCATION VERIFICATION</h3><span class="locationstatus loc-ok">COMMERCIAL — ROUTE OK</span><div class="visit-note"><b>Address corrected:</b> 1821 S Washington Street, Apt #3, Naperville → 2605 W 22nd St, Suite 32, Oak Brook, IL 60523</div><div class="visit-note">FINAL HOLD AUDIT 09-22-2026: verified current commercial office.</div>';
         }

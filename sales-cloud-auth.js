@@ -15,6 +15,8 @@
     return j;
   }
 
+  window.nwtbSalesApi=api;
+
   function ensureUI(){
     if(!document.getElementById('nwtbSalesCloudStyle')){
       const s=document.createElement('style');s.id='nwtbSalesCloudStyle';s.textContent=`
@@ -55,7 +57,7 @@
       const j=await api('accounts');
       if(!Array.isArray(j.accounts)||j.accounts.length<400)throw new Error('Private Sales database returned an unexpected account count.');
       const asBool=v=>v===true||v==='true'||v===1||v==='1';
-      const normalized=j.accounts.map(src=>{
+      window.nwtbNormalizeSalesAccount=src=>{
         const a={...src};
         const tagged=String(a.finalCategoryVersion||'')==='2026-09-28'||a.finalLayer!==undefined;
         if(tagged){
@@ -70,8 +72,10 @@
           if(a.finalBadge)a.badge=a.finalBadge;
           if(a.finalPriority)a.priority=a.finalPriority;
         }
+        a.routeEligible=!window.NwtbSalesPolicy.reason(a);
         return a;
-      });
+      };
+      const normalized=j.accounts.map(window.nwtbNormalizeSalesAccount);
       window.nwtbSalesCloudSource=j.source||'SUPABASE_PRIVATE';
       window.nwtbSalesFinalCategoryVersion='2026-09-28';
       return normalized;
