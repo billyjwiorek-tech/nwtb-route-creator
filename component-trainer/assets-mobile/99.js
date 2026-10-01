@@ -1,0 +1,1 @@
+window.NWTB_ASSETS=window.NWTB_ASSETS||{};for(const [k,v] of Object.entries(window.NWTB_MOBILE_CHUNKS||{})){window.NWTB_ASSETS[k]='data:image/webp;base64,'+v.join('');}
