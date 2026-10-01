@@ -31,7 +31,7 @@ jobs:
         run: |
           set -euo pipefail
           cat .trainer-assets/bundle.part* | base64 -d > /tmp/trainer-hq-assets.zip
-          echo '7ba73f9e71f1c06a1148c987807e6f2fc637f6e1a4ea503af6c1b71544b90e8d  /tmp/trainer-hq-assets.zip' | sha256sum -c -
+          echo 'ba876ac9fbb50f534ee5fc7ce28a5bd1c1dd8ebbe292fa1037181d7f5db39f79  /tmp/trainer-hq-assets.zip' | sha256sum -c -
           mkdir -p component-trainer/assets
           unzip -o /tmp/trainer-hq-assets.zip -d component-trainer
           git show d6984a17a9b4c916514c85ba43a987b1074445a5:component-trainer/index.html > component-trainer/index.html
