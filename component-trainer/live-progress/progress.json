@@ -1,0 +1,9 @@
+{
+  "task": "NWTB Component Trainer PRO — Public Phone/Cloud Repair",
+  "subtitle": "High-quality image replacement, trainer QA, and public GitHub Pages verification",
+  "percent": 70,
+  "stage": "Replacing the old Base64/mobile image system with clean direct assets",
+  "status": "Active",
+  "next": "Wire all 5 clean views, then run desktop/phone QA",
+  "updated": "2026-10-01T11:18:00-05:00"
+}
