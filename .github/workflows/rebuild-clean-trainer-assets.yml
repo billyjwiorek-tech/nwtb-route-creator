@@ -1,0 +1,42 @@
+name: Rebuild clean trainer assets
+
+on:
+  push:
+    branches: [trainer-clean-rebuild]
+    paths:
+      - '.hq-assets/READY'
+
+permissions:
+  contents: write
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Decode direct HQ trainer images
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p component-trainer/assets
+          for n in cascadia-front cascadia-side cascadia-rear dd13-left dd13-right; do
+            cat .hq-assets/${n}.part* | base64 -d > component-trainer/assets/${n}.avif
+            test -s component-trainer/assets/${n}.avif
+          done
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('component-trainer/app-1.js')
+          s=p.read_text()
+          start=s.index("const A=window.NWTB_ASSETS||{}; const CLEAN_IMAGES=")
+          end=s.index(";\nconst PART_RENDERS", start)
+          repl="const A=window.NWTB_ASSETS||{}; const CLEAN_IMAGES={'cascadia-front':'assets/cascadia-front.avif','cascadia-side':'assets/cascadia-side.avif','cascadia-rear':'assets/cascadia-rear.avif','dd13-left':'assets/dd13-left.avif','dd13-right':'assets/dd13-right.avif'}"
+          p.write_text(s[:start]+repl+s[end:])
+          PY
+          rm -rf .hq-assets .engine-assets
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Install direct HQ images in clean Component Trainer rebuild'
+          git push
