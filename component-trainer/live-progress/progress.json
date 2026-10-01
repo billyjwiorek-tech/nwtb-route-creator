@@ -4,6 +4,50 @@
   "percent": 70,
   "stage": "Replacing the old Base64/mobile image system with clean direct assets",
   "status": "Active",
-  "next": "Wire all 5 clean views, then run desktop/phone QA",
-  "updated": "2026-10-01T11:18:00-05:00"
+  "currentAction": "Preparing the five clean source images to become real files under component-trainer/assets/, then switching the trainer away from assets-mobile/01.js–11.js and 99.js.",
+  "next": "Commit all 5 clean image assets, wire them into app-1.js/index.html, then run desktop + phone QA",
+  "updated": "2026-10-01T11:16:00-05:00",
+  "log": [
+    {
+      "state": "done",
+      "action": "Inspected the live Component Trainer build",
+      "result": "Confirmed index.html still loads assets-mobile/01.js through 11.js plus 99.js before the app scripts."
+    },
+    {
+      "state": "done",
+      "action": "Verified the image-quality failure",
+      "result": "The tiny embedded WebP payloads are the source of the blocky/pixelated rendering on both PC and phone."
+    },
+    {
+      "state": "done",
+      "action": "Recovered clean source artwork from your original PDFs",
+      "result": "Prepared clean Cascadia Front, Side, Rear, DD13 Left, and DD13 Right images from the original training material."
+    },
+    {
+      "state": "done",
+      "action": "Protected the existing system",
+      "result": "Created an isolated trainer-hq-fix branch so trainer repair work can be separated from the NWTB Delivery System."
+    },
+    {
+      "state": "working",
+      "action": "Move the five clean images into normal GitHub-hosted assets",
+      "result": "Using GitHub blob/tree support instead of JavaScript/Base64 image chunks."
+    },
+    {
+      "state": "next",
+      "action": "Switch the trainer to direct assets and visually QA all five views",
+      "result": "Then verify Study, Quiz, Exam, desktop layout, phone layout, and the public GitHub Pages URL."
+    }
+  ],
+  "files": [
+    "component-trainer/index.html",
+    "component-trainer/app-1.js",
+    "component-trainer/assets/cascadia-front.webp",
+    "component-trainer/assets/cascadia-side.webp",
+    "component-trainer/assets/cascadia-rear.webp",
+    "component-trainer/assets/dd13-left.webp",
+    "component-trainer/assets/dd13-right.webp",
+    "component-trainer/live-progress/index.html",
+    "component-trainer/live-progress/progress.json"
+  ]
 }
