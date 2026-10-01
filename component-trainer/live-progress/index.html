@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#0b0f14" />
+  <title>NWTB Live Task Progress</title>
+  <style>
+    :root{color-scheme:dark;--bg:#0b0f14;--panel:#121821;--text:#f5f7fb;--muted:#9aa7b6;--accent:#ef4d3c;--border:#263142;}
+    *{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#0b0f14,#101722);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--text);min-height:100vh;display:grid;place-items:center;padding:22px}
+    .card{width:min(760px,100%);background:rgba(18,24,33,.97);border:1px solid var(--border);border-radius:20px;padding:24px;box-shadow:0 18px 60px rgba(0,0,0,.35)}
+    .brand{font-size:13px;font-weight:900;letter-spacing:.12em;color:var(--accent)}
+    h1{margin:8px 0 4px;font-size:clamp(24px,4vw,38px)}
+    .muted{color:var(--muted)}
+    .percent{font-size:clamp(52px,12vw,96px);font-weight:950;line-height:1;margin:24px 0 12px}
+    .barShell{height:28px;border:1px solid #344257;background:#070b10;border-radius:999px;overflow:hidden;position:relative}
+    .bar{height:100%;width:0;background:linear-gradient(90deg,#ef4d3c,#ff8b5c);transition:width .7s ease}
+    .barText{position:absolute;inset:0;display:grid;place-items:center;font-weight:900;text-shadow:0 1px 2px #000}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:22px}.box{border:1px solid var(--border);background:#0d131b;border-radius:14px;padding:14px}.label{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:5px}.value{font-weight:800}
+    .statusDot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#38d39f;margin-right:7px;box-shadow:0 0 12px rgba(56,211,159,.7)}
+    .foot{margin-top:18px;font-size:12px;color:var(--muted)}
+    @media(max-width:620px){.card{padding:18px}.grid{grid-template-columns:1fr}.barShell{height:32px}}
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="brand">NWTB LIVE COMPLETION MONITOR</div>
+    <h1 id="task">Loading task…</h1>
+    <div class="muted" id="subtitle">This page refreshes automatically.</div>
+    <div class="percent" id="percent">--%</div>
+    <div class="barShell" aria-label="Task completion"><div class="bar" id="bar"></div><div class="barText" id="barText">Loading…</div></div>
+    <div class="grid">
+      <div class="box"><div class="label">Current stage</div><div class="value" id="stage">Loading…</div></div>
+      <div class="box"><div class="label">Status</div><div class="value"><span class="statusDot"></span><span id="status">Active</span></div></div>
+      <div class="box"><div class="label">Last updated</div><div class="value" id="updated">—</div></div>
+      <div class="box"><div class="label">Next milestone</div><div class="value" id="next">—</div></div>
+    </div>
+    <div class="foot">Auto-checks for updates every 2 seconds. Leave this page open while the task is in progress.</div>
+  </main>
+<script>
+const els={task:document.getElementById('task'),subtitle:document.getElementById('subtitle'),percent:document.getElementById('percent'),bar:document.getElementById('bar'),barText:document.getElementById('barText'),stage:document.getElementById('stage'),status:document.getElementById('status'),updated:document.getElementById('updated'),next:document.getElementById('next')};
+let last='';
+async function refresh(){
+  try{
+    const r=await fetch('progress.json?t='+Date.now(),{cache:'no-store'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    const p=Math.max(0,Math.min(100,Number(d.percent)||0));
+    const sig=JSON.stringify(d);
+    if(sig!==last){last=sig;els.task.textContent=d.task||'Task Progress';els.subtitle.textContent=d.subtitle||'Live task completion';els.percent.textContent=p+'%';els.bar.style.width=p+'%';els.barText.textContent=p+'% complete';els.stage.textContent=d.stage||'Working';els.status.textContent=d.status||'Active';els.next.textContent=d.next||'—';const dt=d.updated?new Date(d.updated):new Date();els.updated.textContent=isNaN(dt)?String(d.updated||'—'):dt.toLocaleString();document.title=p+'% — '+(d.task||'Task Progress');}
+  }catch(e){els.status.textContent='Waiting for update';}
+}
+refresh();setInterval(refresh,2000);
+</script>
+</body>
+</html>
