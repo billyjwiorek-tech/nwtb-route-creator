@@ -1,6 +1,6 @@
 const D=window.NWTB_DATA; const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const storeKey='nwtbTrainerProgressV2';
-const A=window.NWTB_ASSETS||{}; const CLEAN_IMAGES={'cascadia-front':A['cascadia-front']||'assets/cascadia-front.webp','cascadia-side':A['cascadia-side']||'assets/cascadia-side.webp','cascadia-rear':A['cascadia-rear']||'assets/cascadia-rear.webp','dd13-left':A['dd13-left']||'assets/dd13-left.webp','dd13-right':A['dd13-right']||'assets/dd13-right.webp'};
+const A=window.NWTB_ASSETS||{}; const CLEAN_IMAGES={'cascadia-front':'assets/cascadia-front.webp','cascadia-side':'assets/cascadia-side.webp','cascadia-rear':'assets/cascadia-rear.webp','dd13-left':'assets/dd13-left.avif','dd13-right':'assets/dd13-right.avif'};
 const PART_RENDERS={'dd13-left:10':A['dd13-left-10']||'assets/dd13-left-10.webp','dd13-right:7':A['dd13-right-7']||'assets/dd13-right-7.webp'};
 function displayImage(m){return CLEAN_IMAGES[m.id]||('assets/'+m.image)}
 function partRender(m,c){return PART_RENDERS[`${m.id}:${c.number}`]||''}
