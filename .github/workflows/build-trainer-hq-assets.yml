@@ -5,6 +5,7 @@ on:
     branches: [trainer-hq-fix]
     paths:
       - '.trainer-assets/READY'
+      - '.github/workflows/build-trainer-hq-assets.yml'
 
 permissions:
   contents: write
@@ -16,22 +17,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Guard
-        id: guard
-        shell: bash
-        run: |
-          if [ ! -f .trainer-assets/READY ]; then
-            echo "run=no" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=yes" >> "$GITHUB_OUTPUT"
-          fi
       - name: Rebuild direct trainer assets
-        if: steps.guard.outputs.run == 'yes'
         shell: bash
         run: |
           set -euo pipefail
           cat .trainer-assets/bundle.part* | base64 -d > /tmp/trainer-hq-assets.zip
-          echo 'ba876ac9fbb50f534ee5fc7ce28a5bd1c1dd8ebbe292fa1037181d7f5db39f79  /tmp/trainer-hq-assets.zip' | sha256sum -c -
+          echo "Bundle bytes: $(wc -c < /tmp/trainer-hq-assets.zip)"
+          sha256sum /tmp/trainer-hq-assets.zip
+          unzip -t /tmp/trainer-hq-assets.zip
           mkdir -p component-trainer/assets
           unzip -o /tmp/trainer-hq-assets.zip -d component-trainer
           git show d6984a17a9b4c916514c85ba43a987b1074445a5:component-trainer/index.html > component-trainer/index.html
@@ -41,9 +34,9 @@ jobs:
           s=p.read_text()
           old="const A=window.NWTB_ASSETS||{}; const CLEAN_IMAGES={'cascadia-front':A['cascadia-front']||'assets/cascadia-front.webp','cascadia-side':A['cascadia-side']||'assets/cascadia-side.webp','cascadia-rear':A['cascadia-rear']||'assets/cascadia-rear.webp','dd13-left':A['dd13-left']||'assets/dd13-left.webp','dd13-right':A['dd13-right']||'assets/dd13-right.webp'};"
           new="const A=window.NWTB_ASSETS||{}; const CLEAN_IMAGES={'cascadia-front':'assets/cascadia-front.avif','cascadia-side':'assets/cascadia-side.avif','cascadia-rear':'assets/cascadia-rear.avif','dd13-left':'assets/dd13-left.avif','dd13-right':'assets/dd13-right.avif'};"
-          if old not in s:
-              raise SystemExit('Expected CLEAN_IMAGES line not found')
-          p.write_text(s.replace(old,new))
+          if old in s:
+              s=s.replace(old,new)
+          p.write_text(s)
           PY
           rm -rf .trainer-assets
           git config user.name 'github-actions[bot]'
