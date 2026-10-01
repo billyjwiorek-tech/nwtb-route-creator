@@ -1,0 +1,53 @@
+name: Build trainer HQ assets
+
+on:
+  push:
+    branches: [trainer-hq-fix]
+    paths:
+      - '.trainer-assets/READY'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Guard
+        id: guard
+        shell: bash
+        run: |
+          if [ ! -f .trainer-assets/READY ]; then
+            echo "run=no" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=yes" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Rebuild direct trainer assets
+        if: steps.guard.outputs.run == 'yes'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .trainer-assets/bundle.part* | base64 -d > /tmp/trainer-hq-assets.zip
+          echo '7ba73f9e71f1c06a1148c987807e6f2fc637f6e1a4ea503af6c1b71544b90e8d  /tmp/trainer-hq-assets.zip' | sha256sum -c -
+          mkdir -p component-trainer/assets
+          unzip -o /tmp/trainer-hq-assets.zip -d component-trainer
+          git show d6984a17a9b4c916514c85ba43a987b1074445a5:component-trainer/index.html > component-trainer/index.html
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('component-trainer/app-1.js')
+          s=p.read_text()
+          old="const A=window.NWTB_ASSETS||{}; const CLEAN_IMAGES={'cascadia-front':A['cascadia-front']||'assets/cascadia-front.webp','cascadia-side':A['cascadia-side']||'assets/cascadia-side.webp','cascadia-rear':A['cascadia-rear']||'assets/cascadia-rear.webp','dd13-left':A['dd13-left']||'assets/dd13-left.webp','dd13-right':A['dd13-right']||'assets/dd13-right.webp'};"
+          new="const A=window.NWTB_ASSETS||{}; const CLEAN_IMAGES={'cascadia-front':'assets/cascadia-front.avif','cascadia-side':'assets/cascadia-side.avif','cascadia-rear':'assets/cascadia-rear.avif','dd13-left':'assets/dd13-left.avif','dd13-right':'assets/dd13-right.avif'};"
+          if old not in s:
+              raise SystemExit('Expected CLEAN_IMAGES line not found')
+          p.write_text(s.replace(old,new))
+          PY
+          rm -rf .trainer-assets
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Replace embedded trainer images with direct HQ assets'
+          git push
