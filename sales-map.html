@@ -24,7 +24,7 @@ header{height:58px;background:#fff;border-bottom:1px solid var(--bd);display:fle
 .layerRow{display:grid;grid-template-columns:26px 28px 1fr auto;align-items:center;gap:8px;padding:9px 14px;border-top:1px solid #f1f2f3;cursor:pointer}.layerRow:hover{background:#f8f9fa}.layerRow input{width:17px;height:17px;cursor:pointer}.layerName{font-size:13px;font-weight:700}.layerSub{font-size:10px;color:#6b7280;margin-top:2px}.countBubble{font-size:11px;color:#5f6368}
 .pinSample{width:18px;height:18px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 1px 2px #0004;border:1px solid #fff}.pinSample i{display:block;width:6px;height:6px;background:#fff;border-radius:50%;margin:5px}
 .pin-green{background:var(--green)}.pin-red{background:var(--red)}.pin-purple{background:var(--purple)}.pin-orange{background:var(--orange)}.pin-blue{background:var(--blue)}.pin-gray{background:var(--gray);border-color:#d93025}
-.businessBox{margin:8px 12px 14px;border:1px solid #e3e6ea;border-radius:8px;overflow:hidden;background:#fff}.businessHeader{padding:9px 10px;background:#f8f9fa;font-size:12px;font-weight:800;border-bottom:1px solid #e3e6ea;display:flex;justify-content:space-between;gap:8px}.businessList{max-height:330px;overflow:auto}.businessItem{display:grid;grid-template-columns:14px 1fr;gap:8px;align-items:start;padding:8px 10px;border-bottom:1px solid #f0f1f2;font-size:11px;cursor:pointer}.businessItem:last-child{border-bottom:0}.businessItem:hover{background:#f8f9fa}.businessDot{width:10px;height:10px;border-radius:50%;margin-top:2px}.businessName{font-weight:800;color:#17202a}.businessAddr{font-size:10px;color:#6b7280;margin-top:2px;line-height:1.25}.businessEmpty{padding:10px;color:#6b7280;font-size:11px}
+.businessBox{margin:8px 12px 14px;border:1px solid #e3e6ea;border-radius:8px;overflow:hidden;background:#fff}.businessHeader{padding:9px 10px;background:#f8f9fa;font-size:12px;font-weight:800;border-bottom:1px solid #e3e6ea;display:flex;justify-content:space-between;gap:8px}.businessList{max-height:330px;overflow:auto}.businessItem{display:grid;grid-template-columns:18px 14px 1fr;gap:8px;align-items:start;padding:8px 10px;border-bottom:1px solid #f0f1f2;font-size:11px;cursor:pointer}.businessCheck{width:15px;height:15px;margin:0;cursor:pointer}.businessCheck:disabled{cursor:not-allowed;opacity:.45}.businessItem:last-child{border-bottom:0}.businessItem:hover{background:#f8f9fa}.businessDot{width:10px;height:10px;border-radius:50%;margin-top:2px}.businessName{font-weight:800;color:#17202a}.businessAddr{font-size:10px;color:#6b7280;margin-top:2px;line-height:1.25}.businessEmpty{padding:10px;color:#6b7280;font-size:11px}
 .popupTitle{font-weight:800;font-size:15px;margin-bottom:4px}.small{font-size:12px;color:#5e6872;line-height:1.5}.pill{display:inline-block;border-radius:999px;padding:3px 7px;color:#fff;font-size:10px;font-weight:800;margin:3px 3px 5px 0}.warn{color:#a11212;font-weight:800}.holdReason{background:#fff4f4;border-left:4px solid #d93025;padding:8px;margin-top:8px;font-size:12px;line-height:1.4}
 .pinIcon{width:24px;height:24px;position:relative}.pinShape{position:absolute;width:22px;height:22px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);left:1px;top:0;box-shadow:0 1px 3px #0005;border:1.5px solid #fff}.pinDot{position:absolute;width:7px;height:7px;background:#fff;border-radius:50%;left:8px;top:7px}
 @media(max-width:820px){body{overflow:auto}.layout{grid-template-columns:1fr;height:auto}.sidebar{max-height:47vh;border-right:0;border-bottom:1px solid var(--bd)}.mapWrap{height:53vh}.topActions .btn:not(.blue){display:none}}
@@ -74,7 +74,7 @@ const DEPOT={name:'Northwest Trucks – Bolingbrook',address:'201 S W Frontage R
 const map=L.map('map',{zoomControl:true}).setView([41.69,-88.08],10);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
 const accountGroup=L.layerGroup().addTo(map),referenceGroup=L.layerGroup().addTo(map);
-let accounts=[],markerByKey=new Map();
+let accounts=[],markerByKey=new Map(),excludedRouteAccounts=new Set();
 const $=id=>document.getElementById(id),asBool=v=>v===true||v==='true'||v===1||v==='1';
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 function approved(a){return asBool(a.finalRouteApproved)}
@@ -144,18 +144,23 @@ function popup(a){
 }
 function checkedBuckets(){return new Set([...document.querySelectorAll('.layerToggle:checked')].map(x=>x.dataset.layer))}
 function updateRouteCreatorLink(){
- const selected=[...checkedBuckets()].filter(x=>['go_existing','go_new','verified','winback','active','hold'].includes(x));
- const link=$('routeCreatorLink');if(link)link.href='./?layers='+encodeURIComponent(selected.join(','));
+ const selectedLayers=[...checkedBuckets()].filter(x=>['go_existing','go_new','verified','winback','active','hold'].includes(x));
+ const selectedIds=accounts.filter(a=>a.finalIncluded!==false&&approved(a)&&selectedLayers.includes(bucket(a))&&!excludedRouteAccounts.has(accountKey(a))).map(a=>String(a.salesAccountId||'')).filter(Boolean);
+ const p=new URLSearchParams();p.set('layers',selectedLayers.join(','));if(selectedIds.length)p.set('accounts',selectedIds.join(','));
+ const link=$('routeCreatorLink');if(link)link.href='./?'+p.toString();
 }
 function accountKey(a){return String(a.salesAccountId??a.customerNumber??(a.name+'|'+a.address))}
 function renderBusinessList(items){
  const list=$('businessList'),count=$('businessListCount');count.textContent=items.length;
- if(!items.length){list.innerHTML='<div class="businessEmpty">No businesses match the selected layers.</div>';return}
+ if(!items.length){list.innerHTML='<div class="businessEmpty">No businesses match the selected layers.</div>';updateRouteCreatorLink();return}
  const sorted=items.slice().sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
- list.innerHTML=sorted.map(a=>'<div class="businessItem" data-key="'+esc(accountKey(a))+'"><span class="businessDot" style="background:'+colorFor(a)+'"></span><span><div class="businessName">'+esc(a.name||'Unnamed business')+'</div><div class="businessAddr">'+esc(a.address||'')+'</div></span></div>').join('');
- list.querySelectorAll('.businessItem').forEach(row=>row.onclick=()=>{
-   const marker=markerByKey.get(row.dataset.key);if(marker){map.setView(marker.getLatLng(),15);marker.openPopup()}
+ list.innerHTML=sorted.map(a=>{const key=accountKey(a),canRoute=approved(a),checked=canRoute&&!excludedRouteAccounts.has(key);return '<div class="businessItem" data-key="'+esc(key)+'"><input class="businessCheck" type="checkbox" '+(checked?'checked ':'')+(canRoute?'':'disabled ')+'title="'+(canRoute?'Include in Route Creator':'HOLD — not route approved')+'"><span class="businessDot" style="background:'+colorFor(a)+'"></span><span><div class="businessName">'+esc(a.name||'Unnamed business')+'</div><div class="businessAddr">'+esc(a.address||'')+'</div></span></div>'}).join('');
+ list.querySelectorAll('.businessItem').forEach(row=>{
+   const cb=row.querySelector('.businessCheck');
+   cb.addEventListener('click',e=>{e.stopPropagation();const key=row.dataset.key;if(cb.checked)excludedRouteAccounts.delete(key);else excludedRouteAccounts.add(key);updateRouteCreatorLink()});
+   row.onclick=e=>{if(e.target===cb)return;const marker=markerByKey.get(row.dataset.key);if(marker){map.setView(marker.getLatLng(),15);marker.openPopup()}};
  });
+ updateRouteCreatorLink();
 }
 function matchesSearch(a,q){if(!q)return true;const hay=[a.name,a.address,a.customerNumber,a.layer,a.finalLocationAuditStatus,a.finalLocationAuditReason,a.finalRouteSafetyReason].join(' ').toLowerCase();return hay.includes(q.toLowerCase())}
 function render(){
