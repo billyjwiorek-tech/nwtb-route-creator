@@ -17,14 +17,14 @@ header{height:58px;background:#fff;border-bottom:1px solid var(--bd);display:fle
 .sidebar{background:#fff;border-right:1px solid var(--bd);overflow:auto;z-index:900}
 .mapWrap{position:relative;min-width:0}.mapToolbar{position:absolute;top:10px;left:10px;right:10px;z-index:800;display:flex;gap:8px;pointer-events:none}.searchBox{pointer-events:auto;flex:1;max-width:520px;background:#fff;border-radius:8px;box-shadow:0 2px 8px #0003;padding:0 12px;display:flex;align-items:center}.searchBox input{width:100%;border:0;outline:0;padding:12px 4px;font-size:14px;background:transparent}.mapToolBtn{pointer-events:auto;background:#fff;border:0;border-radius:8px;box-shadow:0 2px 8px #0003;padding:10px 12px;font-weight:800;cursor:pointer}
 #map{height:100%;width:100%}
-.sideTitle{padding:16px 16px 10px;border-bottom:1px solid #eee}.sideTitle h2{font-size:16px;margin:0 0 5px}.sideTitle p{margin:0;color:#5f6368;font-size:12px;line-height:1.4}
+.sideTitle{padding:16px 16px 10px;border-bottom:1px solid #eee}.sideTitle h2{font-size:16px;margin:0 0 5px}.sideTitle p{margin:0;color:#5f6368;font-size:12px;line-height:1.4}.sidebarToggle{width:100%;margin-top:10px;border:1px solid #202124;background:#202124;color:#fff;border-radius:7px;padding:9px 10px;font-size:11px;font-weight:900;cursor:pointer}.sidebarToggle:hover{background:#343a40}
 .summary{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;padding:10px 12px;border-bottom:1px solid #eee}.sum{background:#f5f7f8;border:1px solid #e2e5e8;border-radius:8px;padding:7px;text-align:center;font-size:10px}.sum b{display:block;font-size:16px}
 .quick{display:flex;gap:6px;padding:10px 12px;border-bottom:1px solid #eee}.quick button{flex:1;border:1px solid #d4d8dd;background:#fff;border-radius:6px;padding:7px;font-size:11px;font-weight:800;cursor:pointer}
 .layerSection{padding:8px 0}.sectionLabel{padding:7px 16px;font-size:11px;color:#6b7280;font-weight:800;text-transform:uppercase;letter-spacing:.5px}
 .layerRow{display:grid;grid-template-columns:26px 28px 1fr auto;align-items:center;gap:8px;padding:9px 14px;border-top:1px solid #f1f2f3;cursor:pointer}.layerRow:hover{background:#f8f9fa}.layerRow input{width:17px;height:17px;cursor:pointer}.layerName{font-size:13px;font-weight:700}.layerSub{font-size:10px;color:#6b7280;margin-top:2px}.countBubble{font-size:11px;color:#5f6368}
 .pinSample{width:18px;height:18px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 1px 2px #0004;border:1px solid #fff}.pinSample i{display:block;width:6px;height:6px;background:#fff;border-radius:50%;margin:5px}
 .pin-green{background:var(--green)}.pin-red{background:var(--red)}.pin-purple{background:var(--purple)}.pin-orange{background:var(--orange)}.pin-blue{background:var(--blue)}.pin-gray{background:var(--gray);border-color:#d93025}
-.businessBox{margin:8px 12px 14px;border:1px solid #e3e6ea;border-radius:8px;overflow:hidden;background:#fff}.businessHeader{padding:9px 10px;background:#f8f9fa;font-size:12px;font-weight:800;border-bottom:1px solid #e3e6ea;display:flex;justify-content:space-between;gap:8px}.businessList{max-height:330px;overflow:auto}.businessItem{display:grid;grid-template-columns:18px 14px 1fr;gap:8px;align-items:start;padding:8px 10px;border-bottom:1px solid #f0f1f2;font-size:11px;cursor:pointer}.businessCheck{width:15px;height:15px;margin:0;cursor:pointer}.businessCheck:disabled{cursor:not-allowed;opacity:.45}.businessItem:last-child{border-bottom:0}.businessItem:hover{background:#f8f9fa}.businessDot{width:10px;height:10px;border-radius:50%;margin-top:2px}.businessName{font-weight:800;color:#17202a}.businessAddr{font-size:10px;color:#6b7280;margin-top:2px;line-height:1.25}.businessEmpty{padding:10px;color:#6b7280;font-size:11px}
+.businessBox{margin:8px 12px 14px;border:1px solid #e3e6ea;border-radius:8px;overflow:hidden;background:#fff}.businessHeader{padding:9px 10px;background:#f8f9fa;font-size:12px;font-weight:800;border-bottom:1px solid #e3e6ea;display:flex;justify-content:space-between;gap:8px}.businessList{max-height:330px;overflow:auto}.sidebar.listFocus{overflow:hidden;display:flex;flex-direction:column}.sidebar.listFocus #sidebarControls{display:none}.sidebar.listFocus .businessBox{flex:1;min-height:0;display:flex;flex-direction:column;margin-top:10px}.sidebar.listFocus .businessList{flex:1;min-height:0;max-height:none;overflow:auto}.sidebar.listFocus .sideTitle p{display:none}.businessItem{display:grid;grid-template-columns:18px 14px 1fr;gap:8px;align-items:start;padding:8px 10px;border-bottom:1px solid #f0f1f2;font-size:11px;cursor:pointer}.businessCheck{width:15px;height:15px;margin:0;cursor:pointer}.businessCheck:disabled{cursor:not-allowed;opacity:.45}.businessItem:last-child{border-bottom:0}.businessItem:hover{background:#f8f9fa}.businessDot{width:10px;height:10px;border-radius:50%;margin-top:2px}.businessName{font-weight:800;color:#17202a}.businessAddr{font-size:10px;color:#6b7280;margin-top:2px;line-height:1.25}.businessEmpty{padding:10px;color:#6b7280;font-size:11px}
 .popupTitle{font-weight:800;font-size:15px;margin-bottom:4px}.small{font-size:12px;color:#5e6872;line-height:1.5}.pill{display:inline-block;border-radius:999px;padding:3px 7px;color:#fff;font-size:10px;font-weight:800;margin:3px 3px 5px 0}.warn{color:#a11212;font-weight:800}.holdReason{background:#fff4f4;border-left:4px solid #d93025;padding:8px;margin-top:8px;font-size:12px;line-height:1.4}
 .pinIcon{width:24px;height:24px;position:relative}.pinShape{position:absolute;width:22px;height:22px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);left:1px;top:0;box-shadow:0 1px 3px #0005;border:1.5px solid #fff}.pinDot{position:absolute;width:7px;height:7px;background:#fff;border-radius:50%;left:8px;top:7px}
 @media(max-width:820px){body{overflow:auto}.layout{grid-template-columns:1fr;height:auto}.sidebar{max-height:47vh;border-right:0;border-bottom:1px solid var(--bd)}.mapWrap{height:53vh}.topActions .btn:not(.blue){display:none}}
@@ -37,7 +37,8 @@ header{height:58px;background:#fff;border-bottom:1px solid var(--bd);display:fle
 </header>
 <div class="layout">
  <aside class="sidebar">
-  <div class="sideTitle"><h2>Map layers</h2><p>Turn layers on or off just like Google My Maps. HOLD is hidden by default.</p></div>
+  <div class="sideTitle"><h2>Map layers</h2><p>Turn layers on or off just like Google My Maps. HOLD is hidden by default.</p><button class="sidebarToggle" id="sidebarToggle" type="button">SHOW BUSINESS LIST</button></div>
+  <div id="sidebarControls">
   <div class="summary"><div class="sum"><b id="approvedCount">—</b>APPROVED</div><div class="sum"><b id="holdCount">—</b>HOLD</div><div class="sum"><b id="visibleCount">—</b>VISIBLE</div></div>
   <div class="quick"><button id="allOn">ALL ON</button><button id="allOff">ALL OFF</button><button id="prosOnly">PROSPECTS ONLY</button></div>
 
@@ -56,6 +57,7 @@ header{height:58px;background:#fff;border-bottom:1px solid var(--bd);display:fle
    <label class="layerRow"><input id="depotToggle" type="checkbox" checked><span class="pinSample pin-green"><i></i></span><span><div class="layerName">NWTB Bolingbrook Home Base</div></span><span></span></label>
    <label class="layerRow"><input id="ring5Toggle" type="checkbox" checked><span style="width:20px;height:20px;border:2px solid #d93025;border-radius:50%"></span><span><div class="layerName">5-Mile Ring</div></span><span></span></label>
    <label class="layerRow"><input id="ring10Toggle" type="checkbox" checked><span style="width:20px;height:20px;border:2px solid #7b2cbf;border-radius:50%"></span><span><div class="layerName">10-Mile Ring</div></span><span></span></label>
+  </div>
   </div>
 
   <div class="businessBox"><div class="businessHeader"><span>BUSINESSES IN SELECTED LAYERS</span><span id="businessListCount">—</span></div><div id="businessList" class="businessList"><div class="businessEmpty">Loading…</div></div></div>
@@ -76,6 +78,14 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,att
 const accountGroup=L.layerGroup().addTo(map),referenceGroup=L.layerGroup().addTo(map);
 let accounts=[],markerByKey=new Map(),excludedRouteAccounts=new Set();
 const $=id=>document.getElementById(id),asBool=v=>v===true||v==='true'||v===1||v==='1';
+const sidebarToggle=$('sidebarToggle');
+if(sidebarToggle){
+ sidebarToggle.addEventListener('click',()=>{
+  const sidebar=document.querySelector('.sidebar');
+  const focused=sidebar.classList.toggle('listFocus');
+  sidebarToggle.textContent=focused?'SHOW MAP CONTROLS':'SHOW BUSINESS LIST';
+ });
+}
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 function approved(a){return asBool(a.finalRouteApproved)}
 function bucket(a){
