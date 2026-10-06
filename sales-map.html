@@ -33,7 +33,7 @@ header{height:58px;background:#fff;border-bottom:1px solid var(--bd);display:fle
 <body>
 <header>
  <div class="brand"><div class="brandMark">NWTB</div><div class="brandText"><h1>NWTB BOLINGBROOK SALES INTELLIGENCE SYSTEM</h1><div>Live Sales Map • Supabase synchronized • audited route safety</div></div></div>
- <div class="topActions"><a class="btn dark" href="./">ROUTE CREATOR</a><a class="btn blue" target="_blank" rel="noopener" href="https://www.google.com/maps/@41.8851984,-88.4726658,10z/data=!3m1!4b1!4m2!6m1!1s1Iwg8AUCkXqJCqGKKuij5PygqYuf7-Qg?authuser=0&entry=ttu&g_ep=EgoyMDI2MDkzMC4wIKXMDSoASAFQAw%3D%3D">ORIGINAL GOOGLE SALES MAP</a></div>
+ <div class="topActions"><a class="btn dark" id="routeCreatorLink" href="./">ROUTE CREATOR</a><a class="btn blue" target="_blank" rel="noopener" href="https://www.google.com/maps/@41.8851984,-88.4726658,10z/data=!3m1!4b1!4m2!6m1!1s1Iwg8AUCkXqJCqGKKuij5PygqYuf7-Qg?authuser=0&entry=ttu&g_ep=EgoyMDI2MDkzMC4wIKXMDSoASAFQAw%3D%3D">ORIGINAL GOOGLE SALES MAP</a></div>
 </header>
 <div class="layout">
  <aside class="sidebar">
@@ -143,6 +143,10 @@ function popup(a){
   '<div style="margin-top:9px"><a class="btn blue" style="padding:7px 9px" target="_blank" rel="noopener" href="'+googleMaps(a)+'">OPEN IN GOOGLE MAPS</a></div>';
 }
 function checkedBuckets(){return new Set([...document.querySelectorAll('.layerToggle:checked')].map(x=>x.dataset.layer))}
+function updateRouteCreatorLink(){
+ const selected=[...checkedBuckets()].filter(x=>['go_existing','go_new','verified','winback','active','hold'].includes(x));
+ const link=$('routeCreatorLink');if(link)link.href='./?layers='+encodeURIComponent(selected.join(','));
+}
 function accountKey(a){return String(a.salesAccountId??a.customerNumber??(a.name+'|'+a.address))}
 function renderBusinessList(items){
  const list=$('businessList'),count=$('businessListCount');count.textContent=items.length;
@@ -186,12 +190,12 @@ function updateCounts(){
  $('countWinback').textContent=ap.filter(a=>bucket(a)==='winback').length;
  $('countActive').textContent=ap.filter(a=>bucket(a)==='active').length;
 }
-document.querySelectorAll('.layerToggle').forEach(x=>x.addEventListener('change',render));
+document.querySelectorAll('.layerToggle').forEach(x=>x.addEventListener('change',()=>{updateRouteCreatorLink();render()}));
 ['depotToggle','ring5Toggle','ring10Toggle'].forEach(id=>$(id).addEventListener('change',renderReference));
 $('search').addEventListener('input',render);$('fitBtn').onclick=fitPins;
-$('allOn').onclick=()=>{document.querySelectorAll('.layerToggle').forEach(x=>x.checked=true);render()};
-$('allOff').onclick=()=>{document.querySelectorAll('.layerToggle').forEach(x=>x.checked=false);render()};
-$('prosOnly').onclick=()=>{document.querySelectorAll('.layerToggle').forEach(x=>x.checked=(x.dataset.layer==='go_new'||x.dataset.layer==='verified'));render()};
-(async()=>{accounts=await window.nwtbLoadSalesAccounts();updateCounts();renderReference();render()})();
+$('allOn').onclick=()=>{document.querySelectorAll('.layerToggle').forEach(x=>x.checked=true);updateRouteCreatorLink();render()};
+$('allOff').onclick=()=>{document.querySelectorAll('.layerToggle').forEach(x=>x.checked=false);updateRouteCreatorLink();render()};
+$('prosOnly').onclick=()=>{document.querySelectorAll('.layerToggle').forEach(x=>x.checked=(x.dataset.layer==='go_new'||x.dataset.layer==='verified'));updateRouteCreatorLink();render()};
+(async()=>{accounts=await window.nwtbLoadSalesAccounts();updateCounts();renderReference();updateRouteCreatorLink();render()})();
 </script>
 </body></html>
