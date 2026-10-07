@@ -1,5 +1,5 @@
 {
-  "version": "20261007NOLOGIN2",
+  "version": "20261007QA1",
   "updated": "2026-10-07",
-  "purpose": "NWTB no-login + cache-busting build marker"
+  "purpose": "NWTB no-login full QA build"
 }
