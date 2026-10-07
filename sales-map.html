@@ -3,8 +3,25 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<title>NWTB Live Sales Map</title>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">\n<meta http-equiv="Pragma" content="no-cache">\n<meta http-equiv="Expires" content="0">
+<title>NWTB Live Sales Map</title><script>
+(function(){
+  const key='nwtb_build_seen:'+location.pathname;
+  fetch('./build-version.json?t='+Date.now(),{cache:'no-store'})
+    .then(r=>r.ok?r.json():null)
+    .then(data=>{
+      if(!data||!data.version)return;
+      const seen=localStorage.getItem(key);
+      if(seen!==data.version){
+        localStorage.setItem(key,data.version);
+        const u=new URL(location.href);
+        u.searchParams.set('v',data.version);
+        location.replace(u.toString());
+      }
+    })
+    .catch(()=>{});
+})();
+</script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
 :root{--green:#18864b;--red:#d93025;--purple:#7b2cbf;--orange:#f08b18;--blue:#2764c7;--gray:#6b7280;--ink:#202124;--bd:#dadce0}
@@ -69,8 +86,8 @@ header{height:58px;background:#fff;border-bottom:1px solid var(--bd);display:fle
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="./sales-route-policy.js?v=20261006MAP2"></script>
-<script src="./sales-cloud-auth.js?v=20261006MAP2"></script>
+<script src="./sales-route-policy.js?v=20261007CACHE1"></script>
+<script src="./sales-cloud-auth.js?v=20261007CACHE1"></script>
 <script>
 const DEPOT={name:'Northwest Trucks – Bolingbrook',address:'201 S W Frontage Rd, Bolingbrook, IL 60440',lat:41.682487,lon:-88.072262};
 const map=L.map('map',{zoomControl:true}).setView([41.69,-88.08],10);
