@@ -223,7 +223,7 @@
   panel.id='nwtbChatPanel';
   panel.innerHTML=`<div class="nwtb-chat-head"><b>NWTB CHAT + ROUTES</b><button id="nwtbChatClose">X</button></div><div id="nwtbChatLogin" class="nwtb-chat-login"><b>Enter your 4-digit employee number</b><input id="nwtbEmpNo" inputmode="numeric" maxlength="4" placeholder="0000"><button id="nwtbLoginBtn">ENTER CHAT</button><div id="nwtbLoginError" class="nwtb-chat-error"></div></div><div id="nwtbChatBody" class="nwtb-chat-body"><div class="nwtb-chat-who"><span id="nwtbWho"></span><button id="nwtbLogoutBtn" style="float:right;padding:3px 7px">LOG OUT</button></div><div id="nwtbMessages" class="nwtb-chat-messages"></div><div class="nwtb-chat-send"><textarea id="nwtbMessageText" placeholder="Type a message..."></textarea><div class="nwtb-chat-actions"><button class="nwtb-send-msg" id="nwtbSendMsg">SEND MESSAGE</button><button class="nwtb-send-route" id="nwtbSendRoute">SEND CURRENT ROUTE</button></div><div id="nwtbChatError" class="nwtb-chat-error"></div></div></div>`;
   document.body.appendChild(panel);
-  const chatBtn=document.createElement('button');chatBtn.id='nwtbChatBtn';chatBtn.textContent='CHAT';document.body.appendChild(chatBtn);
+  const chatBtn=document.createElement('button');chatBtn.id='nwtbChatBtn';chatBtn.textContent='CHAT';chatBtn.style.display='none';document.body.appendChild(chatBtn);
 
   async function call(action,data={}){
     const headers={'Content-Type':'application/json','apikey':APIKEY};
