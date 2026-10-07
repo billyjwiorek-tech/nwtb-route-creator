@@ -56,7 +56,7 @@ header{height:58px;background:#fff;border-bottom:1px solid var(--bd);display:fle
  <aside class="sidebar">
   <div class="sideTitle"><h2>Map layers</h2><p>Turn layers on or off just like Google My Maps. HOLD is hidden by default.</p><button class="sidebarToggle" id="sidebarToggle" type="button">SHOW BUSINESS LIST</button></div>
   <div id="sidebarControls">
-  <div class="summary"><div class="sum"><b id="approvedCount">—</b>APPROVED</div><div class="sum"><b id="holdCount">—</b>HOLD</div><div class="sum"><b id="visibleCount">—</b>VISIBLE</div></div>
+  <div class="summary"><div class="sum"><b id="approvedCount">—</b>ROUTE READY</div><div class="sum"><b id="holdCount">—</b>TOTAL</div><div class="sum"><b id="visibleCount">—</b>VISIBLE</div></div>
   <div class="quick"><button id="allOn">ALL ON</button><button id="allOff">ALL OFF</button><button id="prosOnly">PROSPECTS ONLY</button></div>
 
   <div class="layerSection">
@@ -66,8 +66,7 @@ header{height:58px;background:#fff;border-bottom:1px solid var(--bd);display:fle
    <label class="layerRow"><input class="layerToggle" type="checkbox" data-layer="verified" checked><span class="pinSample pin-purple"><i></i></span><span><div class="layerName">Verified Prospects</div><div class="layerSub">Verified non-customers</div></span><span class="countBubble" id="countVerified">—</span></label>
    <label class="layerRow"><input class="layerToggle" type="checkbox" data-layer="winback" checked><span class="pinSample pin-orange"><i></i></span><span><div class="layerName">Win-Back Customers</div><div class="layerSub">Former / lapsed parts customers</div></span><span class="countBubble" id="countWinback">—</span></label>
    <label class="layerRow"><input class="layerToggle" type="checkbox" data-layer="active" checked><span class="pinSample pin-blue"><i></i></span><span><div class="layerName">Active Customers</div><div class="layerSub">Current customers</div></span><span class="countBubble" id="countActive">—</span></label>
-   <label class="layerRow"><input class="layerToggle" type="checkbox" data-layer="hold"><span class="pinSample pin-gray"><i></i></span><span><div class="layerName">HOLD Review</div><div class="layerSub">Not route-safe yet — click pin for reason</div></span><span class="countBubble" id="countHold">—</span></label>
-  </div>
+     </div>
 
   <div class="layerSection">
    <div class="sectionLabel">Reference layers</div>
@@ -86,8 +85,8 @@ header{height:58px;background:#fff;border-bottom:1px solid var(--bd);display:fle
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="./sales-route-policy.js?v=20261007NOLOGIN2"></script>
-<script src="./sales-cloud-auth.js?v=20261007NOLOGIN2"></script>
+<script src="./sales-route-policy.js?v=20261007QA1"></script>
+<script src="./sales-cloud-auth.js?v=20261007QA1"></script>
 <script>
 const DEPOT={name:'Northwest Trucks – Bolingbrook',address:'201 S W Frontage Rd, Bolingbrook, IL 60440',lat:41.682487,lon:-88.072262};
 const map=L.map('map',{zoomControl:true}).setView([41.69,-88.08],10);
@@ -171,7 +170,7 @@ function popup(a){
 }
 function checkedBuckets(){return new Set([...document.querySelectorAll('.layerToggle:checked')].map(x=>x.dataset.layer))}
 function updateRouteCreatorLink(){
- const selectedLayers=[...checkedBuckets()].filter(x=>['go_existing','go_new','verified','winback','active','hold'].includes(x));
+ const selectedLayers=[...checkedBuckets()].filter(x=>['go_existing','go_new','verified','winback','active'].includes(x));
  const selectedIds=accounts.filter(a=>a.finalIncluded!==false&&approved(a)&&selectedLayers.includes(bucket(a))&&!excludedRouteAccounts.has(accountKey(a))).map(a=>String(a.salesAccountId||'')).filter(Boolean);
  const p=new URLSearchParams();p.set('layers',selectedLayers.join(','));if(selectedIds.length)p.set('accounts',selectedIds.join(','));
  const link=$('routeCreatorLink');if(link)link.href='./?'+p.toString();
@@ -215,7 +214,7 @@ function renderReference(){
 function fitPins(){const b=[];accountGroup.eachLayer(x=>{if(x.getLatLng){const p=x.getLatLng();b.push([p.lat,p.lng])}});if(b.length)map.fitBounds(b,{padding:[25,25],maxZoom:13})}
 function updateCounts(){
  const inc=accounts.filter(a=>a.finalIncluded!==false),ap=inc.filter(approved),hold=inc.filter(a=>!approved(a));
- $('approvedCount').textContent=ap.length;$('holdCount').textContent=hold.length;$('countHold').textContent=hold.length;
+ $('approvedCount').textContent=ap.length;$('holdCount').textContent=inc.length;
  $('countGoExisting').textContent=ap.filter(a=>bucket(a)==='go_existing').length;
  $('countGoNew').textContent=ap.filter(a=>bucket(a)==='go_new').length;
  $('countVerified').textContent=ap.filter(a=>bucket(a)==='verified').length;
