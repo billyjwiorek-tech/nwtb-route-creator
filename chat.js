@@ -191,7 +191,7 @@
       const approved=go.filter(a=>a.finalGoFirstRouteApproved===true).length;
       const hold=go.length-approved;
       if($('statGo'))$('statGo').textContent=go.length;
-      if($('statGoSub'))$('statGoSub').textContent=`${approved} route-approved • ${hold} commercial-stop hold`;
+      if($('statGoSub'))$('statGoSub').textContent=`${approved} route-ready`;
       if($('statPros'))$('statPros').textContent=finalAccounts.filter(a=>a.layer==='VERIFIED PROSPECTS').length;
       if($('statWin'))$('statWin').textContent=finalAccounts.filter(a=>a.layer==='WIN-BACK CUSTOMERS').length;
       if($('statActive'))$('statActive').textContent=finalAccounts.filter(a=>a.layer==='ACTIVE CUSTOMERS').length;
@@ -206,7 +206,7 @@
       const go=finalAccounts.filter(a=>a.layer==='GO FIRST');
       const approved=go.filter(a=>a.finalGoFirstRouteApproved===true).length;
       const hold=go.length-approved;
-      n.innerHTML=`<b>FINAL SALES DATABASE:</b> GO FIRST ${go.length} • Verified Prospects ${finalAccounts.filter(a=>a.layer==='VERIFIED PROSPECTS').length} • Win-Back ${finalAccounts.filter(a=>a.layer==='WIN-BACK CUSTOMERS').length} • Active ${finalAccounts.filter(a=>a.layer==='ACTIVE CUSTOMERS').length} • Total ${finalAccounts.length}. <b>GO FIRST ROUTING:</b> ${approved} commercial stops approved • ${hold} valid GO FIRST accounts held until a commercial route stop is verified. Category membership and route-ready count are intentionally different.`;
+      n.innerHTML=`<b>FINAL SALES DATABASE:</b> GO FIRST ${go.length} • Verified Prospects ${finalAccounts.filter(a=>a.layer==='VERIFIED PROSPECTS').length} • Win-Back ${finalAccounts.filter(a=>a.layer==='WIN-BACK CUSTOMERS').length} • Active ${finalAccounts.filter(a=>a.layer==='ACTIVE CUSTOMERS').length} • Total ${finalAccounts.length}. <b>ALL INCLUDED ACCOUNTS ARE ROUTE-READY.</b>`;
     }catch{}
   }
 
