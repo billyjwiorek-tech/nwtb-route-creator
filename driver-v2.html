@@ -32,7 +32,7 @@ button,input{font:inherit}.wrap{max-width:760px;margin:auto;padding:18px}.top{ba
  </section>
 
  <section id="app" class="hidden">
-   <div class="notice">V2 BETA ROUTE — this page reads the isolated V2 route plan. It does not change your current production route.</div>
+   <div class="notice">V2 ROUTED ASSIGNMENT — this page shows the route released to your employee number. It does not change your current production route.</div>
    <div class="card identity">
      <div><h2 id="driverName">Driver</h2><span id="driverNo"></span></div>
      <div><button id="refresh" class="btn ghost">REFRESH ROUTE</button> <button id="logout" class="btn ghost">LOG OUT</button></div>
@@ -63,7 +63,7 @@ function render(j){
   '<div class="kpi"><span>Stops</span><b>'+esc(r.stop_count||0)+'</b></div>'+
   '<div class="kpi"><span>Est. Miles</span><b>'+Number(r.estimated_miles||0).toFixed(1)+'</b></div>'+
   '<div class="kpi"><span>Est. Minutes</span><b>'+esc(r.estimated_minutes||0)+'</b></div>';
- msg('routeMsg','Route '+esc(r.route_index)+' • '+esc(p.depot)+' • V2 draft plan '+esc(p.id),'good');
+ msg('routeMsg','ROUTED • Route '+esc(r.route_index)+' • '+esc(p.depot)+' • V2 plan '+esc(p.id),'good');
  $('stops').innerHTML=ss.map(s=>'<div class="stop"><div class="stopTop"><span class="seq">'+esc(s.stop_sequence)+'</span><div><h3>'+esc(s.customer_name)+'</h3><p>'+esc(s.address)+'</p><p>'+esc((s.stop_type||'STOP').replaceAll('_',' '))+' • '+Number(s.leg_miles||0).toFixed(1)+' mi from previous • '+esc(s.leg_minutes||0)+' min drive • '+esc(s.service_minutes||0)+' min service</p></div><span class="tag '+esc(s.priority||'NORMAL')+'">'+esc((s.priority||'NORMAL').replace('_',' '))+'</span></div><div class="actions"><a href="'+mapsUrl(s)+'" target="_blank" rel="noopener">NAVIGATE TO STOP</a></div></div>').join('')||'<div class="card empty">This V2 route has no stops.</div>';
 }
 async function loadRoute(){try{msg('routeMsg','Loading your V2 route…');const j=await post(API,{action:'driver_route'});render(j)}catch(e){if(/expired|sign in/i.test(e.message)){localStorage.removeItem('nwtb_v2_driver_token');token='';showLogin(e.message)}else msg('routeMsg',e.message,'bad')}}
