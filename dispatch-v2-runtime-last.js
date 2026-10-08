@@ -55,7 +55,16 @@ function decorateUseButtons(){
  });
 }
 
+function sendDispatchSelection(){
+ try{
+  const order_ids=qsa('.pick:checked').map(x=>x.value).filter(Boolean);
+  window.parent.postMessage({type:'nwtb-v2-selection-changed',order_ids},location.origin);
+ }catch{}
+}
 function installButtonCapture(){
+ document.addEventListener('change',e=>{
+  if(e.target?.classList?.contains('pick'))setTimeout(sendDispatchSelection,0);
+ },true);
  document.addEventListener('pointerdown',e=>{
   const b=e.target.closest?.('button');
   if(!b)return;
@@ -174,6 +183,7 @@ window.useResult=async function(i,saved){
   if(document.getElementById('searchResults'))document.getElementById('searchResults').innerHTML='';
 
   if(typeof refreshAll==='function')await refreshAll();
+  try{window.parent.postMessage({type:'nwtb-v2-queue-changed',order_id:created?.order?.id||null},location.origin)}catch{}
   if(typeof setQueue==='function'){
    const available=qsa('.filter').find(x=>x.dataset.q==='AVAILABLE');
    if(available)setQueue('AVAILABLE',available);
