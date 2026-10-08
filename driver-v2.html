@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-store,no-cache,must-revalidate,max-age=0">
+<title>NWTB Driver V2</title>
+<style>
+:root{--nav:#101828;--ink:#182230;--muted:#667085;--line:#e4e7ec;--page:#f4f6f8;--green:#067647;--blue:#175cd3;--red:#b42318;--amber:#b54708}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--page);color:var(--ink)}
+button,input{font:inherit}.wrap{max-width:760px;margin:auto;padding:18px}.top{background:linear-gradient(135deg,#101828,#1d2939);color:white;border-radius:18px;padding:20px;margin-bottom:14px}.top h1{margin:0;font-size:24px}.top p{margin:6px 0 0;color:#cbd5e1;font-size:11px}
+.card{background:white;border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 6px 20px rgba(16,24,40,.06);margin-bottom:12px}.login{max-width:440px;margin:70px auto}.login h2{margin:0 0 5px}.login p{font-size:11px;color:var(--muted);margin:0 0 14px}
+.row{display:flex;gap:8px}.row input{flex:1;min-width:0;border:1px solid #cfd4dc;border-radius:10px;padding:13px;font-size:18px;font-weight:900;letter-spacing:3px;text-align:center}.btn{border:0;border-radius:10px;background:var(--nav);color:white;padding:12px 14px;font-weight:900;cursor:pointer}.btn.blue{background:var(--blue)}.btn.green{background:var(--green)}.btn.ghost{background:#f2f4f7;color:#344054;border:1px solid var(--line)}.btn:disabled{opacity:.45}
+.msg{margin-top:10px;border-radius:10px;padding:10px 12px;font-size:11px;background:#f8fafc;color:#475467}.msg.bad{background:#fef3f2;color:var(--red)}.msg.good{background:#ecfdf3;color:var(--green)}
+.hidden{display:none!important}.identity{display:flex;justify-content:space-between;align-items:center;gap:10px}.identity h2{margin:0;font-size:18px}.identity span{font-size:10px;color:var(--muted)}
+.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.kpi{background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:11px}.kpi span{display:block;font-size:9px;color:var(--muted);text-transform:uppercase;font-weight:900}.kpi b{display:block;font-size:20px;margin-top:4px}
+.stop{background:#fff;border:1px solid var(--line);border-radius:14px;padding:13px;margin-bottom:9px}.stopTop{display:grid;grid-template-columns:34px 1fr auto;gap:10px;align-items:start}.seq{width:30px;height:30px;border-radius:50%;background:#eef4ff;color:var(--blue);display:grid;place-items:center;font-weight:950}.stop h3{margin:0;font-size:14px}.stop p{margin:4px 0 0;color:var(--muted);font-size:10px;line-height:1.4}.tag{font-size:8px;font-weight:950;padding:5px 7px;border-radius:999px;background:#f2f4f7;color:#475467}.tag.HOT_SHOT{background:#fef3f2;color:var(--red)}.tag.PRIORITY{background:#fff8e8;color:var(--amber)}.actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}.actions a{display:inline-block;text-decoration:none;border-radius:9px;padding:9px 11px;font-size:10px;font-weight:900;background:var(--blue);color:#fff}.actions a.secondary{background:#f2f4f7;color:#344054;border:1px solid var(--line)}
+.notice{font-size:10px;color:#7a2e0e;background:#fffaeb;border:1px solid #fdb022;border-radius:12px;padding:10px 12px;margin-bottom:12px;font-weight:800}
+.empty{text-align:center;padding:30px 12px;color:var(--muted)}.footer{text-align:center;font-size:9px;color:#98a2b3;padding:12px}
+@media(max-width:520px){.wrap{padding:10px}.login{margin:35px auto}.row{display:grid}.summary{grid-template-columns:1fr 1fr}.stopTop{grid-template-columns:34px 1fr}.tag{grid-column:2;justify-self:start}}
+</style>
+</head>
+<body>
+<div class="wrap">
+ <div class="top"><h1>NWTB DRIVER V2</h1><p>Multi-Driver Optimizer Route • Enter your 4-digit employee number to see your assigned route.</p></div>
+
+ <section id="login" class="card login">
+   <h2>Driver Sign In</h2>
+   <p>Enter your NWTB 4-digit employee number. V2 will show only the route assigned to that employee number.</p>
+   <div class="row"><input id="emp" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" placeholder="0000" autocomplete="off"><button id="signIn" class="btn blue">OPEN MY ROUTE</button></div>
+   <div id="loginMsg" class="msg">Waiting for employee number.</div>
+ </section>
+
+ <section id="app" class="hidden">
+   <div class="notice">V2 BETA ROUTE — this page reads the isolated V2 route plan. It does not change your current production route.</div>
+   <div class="card identity">
+     <div><h2 id="driverName">Driver</h2><span id="driverNo"></span></div>
+     <div><button id="refresh" class="btn ghost">REFRESH ROUTE</button> <button id="logout" class="btn ghost">LOG OUT</button></div>
+   </div>
+   <div id="summary" class="summary"></div>
+   <div id="routeMsg" class="msg"></div>
+   <div id="stops"></div>
+   <div class="footer">NWTB Delivery System V2 • Driver route is matched to your employee number.</div>
+ </section>
+</div>
+<script>
+(()=>{
+'use strict';
+const SUP='https://ufnjyidhxuytrmbjzgtu.supabase.co';
+const KEY='sb_publishable_EqF-iooqhmngSG5BbzOxfQ_Vnf9Altc';
+const CHAT=SUP+'/functions/v1/nwtb-chat', API=SUP+'/functions/v1/nwtb-v2-multi-route';
+const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+let token=localStorage.getItem('nwtb_v2_driver_token')||'';
+async function post(url,body,auth=true){const h={'content-type':'application/json','apikey':KEY};if(auth&&token)h['x-nwtb-session']=token;const r=await fetch(url,{method:'POST',cache:'no-store',headers:h,body:JSON.stringify(body)}),j=await r.json().catch(()=>({error:'Invalid server response.'}));if(!r.ok)throw new Error(j.error||'Request failed.');return j}
+function msg(id,t,cls=''){const e=$(id);e.textContent=t;e.className='msg'+(cls?' '+cls:'')}
+function mapsUrl(stop){return 'https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(stop.address)}
+function render(j){
+ $('login').classList.add('hidden');$('app').classList.remove('hidden');
+ $('driverName').textContent=j.display_name||'Driver';$('driverNo').textContent='EMPLOYEE '+(j.employee_number||'');
+ const r=j.route,p=j.plan,ss=j.stops||[];
+ if(!r){$('summary').innerHTML='';$('stops').innerHTML='<div class="card empty">No V2 route is currently assigned to your employee number.</div>';msg('routeMsg',j.message||'No V2 route assigned.');return}
+ $('summary').innerHTML=
+  '<div class="kpi"><span>Stops</span><b>'+esc(r.stop_count||0)+'</b></div>'+
+  '<div class="kpi"><span>Est. Miles</span><b>'+Number(r.estimated_miles||0).toFixed(1)+'</b></div>'+
+  '<div class="kpi"><span>Est. Minutes</span><b>'+esc(r.estimated_minutes||0)+'</b></div>';
+ msg('routeMsg','Route '+esc(r.route_index)+' • '+esc(p.depot)+' • V2 draft plan '+esc(p.id),'good');
+ $('stops').innerHTML=ss.map(s=>'<div class="stop"><div class="stopTop"><span class="seq">'+esc(s.stop_sequence)+'</span><div><h3>'+esc(s.customer_name)+'</h3><p>'+esc(s.address)+'</p><p>'+esc((s.stop_type||'STOP').replaceAll('_',' '))+' • '+Number(s.leg_miles||0).toFixed(1)+' mi from previous • '+esc(s.leg_minutes||0)+' min drive • '+esc(s.service_minutes||0)+' min service</p></div><span class="tag '+esc(s.priority||'NORMAL')+'">'+esc((s.priority||'NORMAL').replace('_',' '))+'</span></div><div class="actions"><a href="'+mapsUrl(s)+'" target="_blank" rel="noopener">NAVIGATE TO STOP</a></div></div>').join('')||'<div class="card empty">This V2 route has no stops.</div>';
+}
+async function loadRoute(){try{msg('routeMsg','Loading your V2 route…');const j=await post(API,{action:'driver_route'});render(j)}catch(e){if(/expired|sign in/i.test(e.message)){localStorage.removeItem('nwtb_v2_driver_token');token='';showLogin(e.message)}else msg('routeMsg',e.message,'bad')}}
+function showLogin(t='Enter your 4-digit employee number.'){$('app').classList.add('hidden');$('login').classList.remove('hidden');msg('loginMsg',t)}
+async function signIn(){const emp=$('emp').value.trim();if(!/^\d{4}$/.test(emp)){msg('loginMsg','Enter a 4-digit employee number.','bad');return}const b=$('signIn');b.disabled=true;msg('loginMsg','Signing in…');try{const j=await post(CHAT,{action:'login',employee_number:emp},false);token=j.token;localStorage.setItem('nwtb_v2_driver_token',token);await loadRoute()}catch(e){msg('loginMsg',e.message,'bad')}finally{b.disabled=false}}
+$('signIn').onclick=signIn;$('emp').addEventListener('keydown',e=>{if(e.key==='Enter')signIn()});$('refresh').onclick=loadRoute;$('logout').onclick=async()=>{try{if(token)await post(CHAT,{action:'logout'})}catch{}token='';localStorage.removeItem('nwtb_v2_driver_token');$('emp').value='';showLogin('Signed out. Enter your employee number.')};
+if(token)loadRoute();else showLogin();
+})();
+</script>
+<script src="nwtb-system-lock-live.js?v=20260929-1200"></script>
+</body>
+</html>
