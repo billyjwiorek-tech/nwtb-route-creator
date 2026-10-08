@@ -165,6 +165,15 @@ window.addEventListener('message',async e=>{
   renderStops();counts();
   setStatus('Dispatch stop selections copied into the V2 Route Builder.','good');
  }
+ if(e.data.type==='nwtb-v2-view-plan'&&e.data.plan_id){
+  try{
+   openView('planner');
+   setStatus('Loading routed V2 plan…');
+   const j=await post(API,{action:'plan_get',plan_id:e.data.plan_id});
+   renderResults(j);
+   setStatus('Showing ROUTED V2 plan.','good');
+  }catch(err){setStatus(err.message||'Could not load the V2 route.','bad')}
+ }
 });
 setInterval(()=>{if(document.getElementById('planner')?.classList.contains('active'))syncAvailableStops({silent:true})},5000);
 document.querySelectorAll('.nav').forEach(b=>b.onclick=()=>openView(b.dataset.v));
