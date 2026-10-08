@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+<title>NWTB Delivery System V2 — Multi-Driver Optimizer</title>
+<style>
+:root{--nav:#0f172a;--ink:#182230;--muted:#667085;--line:#e4e7ec;--page:#f4f6f8;--card:#fff;--blue:#175cd3;--green:#067647;--amber:#b54708;--red:#b42318;--purple:#6941c6}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--page);color:var(--ink)}button,input,select{font:inherit}
+.app{min-height:100vh;display:grid;grid-template-columns:230px minmax(0,1fr)}.side{background:linear-gradient(180deg,#101828,#0b1220);color:#fff;padding:18px 13px;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}.brand{padding:5px 8px 18px;border-bottom:1px solid rgba(255,255,255,.09)}.brand b{display:block;font-size:16px}.brand span{display:block;color:#98a2b3;font-size:10px;margin-top:4px}.navlabel{font-size:9px;color:#66758a;letter-spacing:1.1px;font-weight:900;margin:17px 10px 5px}.nav{width:100%;border:0;background:transparent;color:#cdd6e1;border-radius:10px;padding:11px 12px;text-align:left;font-weight:800;cursor:pointer;margin:2px 0}.nav:hover{background:rgba(255,255,255,.07)}.nav.active{background:#fff;color:#101828}.beta{margin-top:auto;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:11px;font-size:10px;color:#cbd5e1}.beta b{color:#fff;display:block;margin-bottom:4px}
+.main{min-width:0}.top{height:72px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:5}.top h1{font-size:20px;margin:0}.top p{font-size:10px;color:var(--muted);margin:4px 0 0}.pill{border-radius:999px;padding:7px 10px;font-size:10px;font-weight:900;border:1px solid #86efac;background:#ecfdf3;color:#067647}.content{padding:20px;max-width:1700px;margin:auto}.view{display:none}.view.active{display:block}
+.safety{border:1px solid #fdb022;background:#fffaeb;color:#7a2e0e;border-radius:14px;padding:12px 14px;font-size:11px;font-weight:800;margin-bottom:14px}.safety b{display:block;color:#b54708;font-size:12px;margin-bottom:3px}
+.hero{background:linear-gradient(135deg,#101828,#1d2939);color:#fff;border-radius:18px;padding:22px 24px;margin-bottom:14px}.hero h2{margin:0;font-size:23px}.hero p{margin:6px 0 0;color:#cbd5e1;font-size:11px;max-width:900px}
+.workflow{display:grid;grid-template-columns:1fr 1fr;gap:14px}.card{background:#fff;border:1px solid var(--line);border-radius:15px;padding:16px;box-shadow:0 5px 18px rgba(16,24,40,.05)}.card h3{margin:0;font-size:14px}.sub{font-size:10px;color:var(--muted);margin-top:4px}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.btn{border:0;border-radius:9px;padding:10px 12px;font-weight:900;font-size:11px;cursor:pointer;background:#17202a;color:#fff}.btn.blue{background:var(--blue)}.btn.green{background:var(--green)}.btn.purple{background:var(--purple)}.btn.ghost{background:#f2f4f7;color:#344054;border:1px solid var(--line)}.btn:disabled{opacity:.45;cursor:not-allowed}
+.driverGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;max-height:330px;overflow:auto}.driver{border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px;text-align:left;cursor:pointer}.driver.sel{border-color:#175cd3;background:#eff8ff}.driver b{display:block;font-size:11px}.driver span{display:block;font-size:9px;color:var(--muted);margin-top:3px}
+.queue{min-height:52px;padding:9px;border:1px dashed #98a2b3;border-radius:10px;background:#f8fafc;display:flex;gap:7px;flex-wrap:wrap}.chip{border-radius:999px;background:#175cd3;color:#fff;padding:7px 9px;font-size:10px;font-weight:900}
+.stopTools{display:grid;grid-template-columns:1fr auto auto;gap:8px;margin:12px 0}.stopTools input{min-width:0;border:1px solid #cfd4dc;border-radius:9px;padding:10px}.stopList{max-height:430px;overflow:auto;border:1px solid var(--line);border-radius:10px}.stop{display:grid;grid-template-columns:32px minmax(0,1fr) auto;gap:9px;align-items:center;padding:9px 10px;border-bottom:1px solid #f0f2f5}.stop:last-child{border-bottom:0}.stop b{display:block;font-size:11px}.stop small{display:block;color:var(--muted);margin-top:2px;font-size:9px}.tag{font-size:8px;font-weight:900;border-radius:999px;padding:4px 6px;background:#f2f4f7;color:#475467}.tag.HOT_SHOT{background:#fef3f2;color:#b42318}.tag.PRIORITY{background:#fff8e8;color:#b54708}.invalid{color:#b42318;font-weight:900}
+.runbar{margin-top:14px;background:#fff;border:1px solid var(--line);border-radius:15px;padding:14px;display:grid;grid-template-columns:180px 1fr auto;gap:10px;align-items:center}.runbar select{padding:10px;border:1px solid #cfd4dc;border-radius:9px}.counts{font-size:11px;color:#475467;font-weight:800}.status{margin-top:10px;border-radius:10px;padding:10px 12px;font-size:10px;background:#f8fafc;color:#475467}.status.good{background:#ecfdf3;color:#067647}.status.bad{background:#fef3f2;color:#b42318}
+.results{margin-top:14px}.resultsHead{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;margin-bottom:10px}.resultsHead h3{margin:0}.routeGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.route{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden}.routeHead{padding:13px 14px;background:#101828;color:#fff;display:flex;justify-content:space-between;gap:10px}.routeHead b{font-size:13px}.routeHead span{font-size:9px;color:#cbd5e1}.metrics{padding:9px 12px;background:#f8fafc;border-bottom:1px solid var(--line);display:flex;gap:15px;flex-wrap:wrap;font-size:10px;font-weight:900}.routeStops{max-height:430px;overflow:auto}.rstop{display:grid;grid-template-columns:30px 1fr auto;gap:8px;padding:9px 11px;border-bottom:1px solid #f0f2f5}.rstop:last-child{border:0}.seq{width:25px;height:25px;border-radius:999px;background:#eef4ff;color:#175cd3;display:grid;place-items:center;font-weight:950;font-size:10px}.rstop b{font-size:10px;display:block}.rstop small{font-size:9px;color:var(--muted);display:block;margin-top:2px}.leg{font-size:9px;color:#475467;font-weight:800;white-space:nowrap}
+.frame{height:calc(100vh - 125px);border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#fff}.frame iframe{width:100%;height:100%;border:0}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}.kpi{background:#fff;border:1px solid var(--line);border-radius:13px;padding:14px}.kpi span{display:block;font-size:9px;text-transform:uppercase;color:var(--muted);font-weight:900}.kpi b{display:block;font-size:24px;margin-top:5px}
+@media(max-width:950px){.app{grid-template-columns:190px 1fr}.workflow,.routeGrid{grid-template-columns:1fr}.driverGrid{grid-template-columns:1fr}.runbar{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:720px){.app{display:block}.side{height:auto;position:sticky;top:0;z-index:20;flex-direction:row;overflow:auto;padding:7px}.brand,.navlabel,.beta{display:none}.nav{width:auto;white-space:nowrap;padding:9px 10px}.top{height:62px;padding:0 12px}.top h1{font-size:16px}.pill{display:none}.content{padding:10px}.workflow{grid-template-columns:1fr}.stopTools{grid-template-columns:1fr 1fr}.stopTools input{grid-column:1/-1}.routeGrid{grid-template-columns:1fr}.frame{height:calc(100vh - 92px)}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="side">
+ <div class="brand"><b>NWTB DELIVERY SYSTEM V2</b><span>Multi-Driver Optimizer Beta</span></div>
+ <div class="navlabel">V2</div>
+ <button class="nav active" data-v="planner">⚡ Auto Route Builder</button>
+ <button class="nav" data-v="dashboard">▦ V2 Dashboard</button>
+ <div class="navlabel">CURRENT NWTB TOOLS</div>
+ <button class="nav" data-v="dispatch">↗ Dispatch</button>
+ <button class="nav" data-v="drivers">◎ Live Drivers</button>
+ <button class="nav" data-v="driver">▰ Driver View</button>
+ <button class="nav" data-v="chat">◌ Chat</button>
+ <button class="nav" data-v="admin">⚙ Admin</button>
+ <div class="beta"><b>SAFE BETA</b>Auto Route Builder saves only isolated V2 drafts. It cannot release or change production routes.</div>
+</aside>
+<main class="main">
+ <header class="top"><div><h1 id="title">Auto Route Builder</h1><p id="subtitle">Driver Queue → All Stops → Optimize & Assign</p></div><span class="pill">PRODUCTION ROUTES PROTECTED</span></header>
+ <div class="content">
+  <section id="planner" class="view active">
+   <div class="safety"><b>V2 ISOLATED ROUTE PLANNER</b>This screen reads the current AVAILABLE delivery queue, but optimization writes only to V2 draft tables. Your current live routes and delivery statuses are not changed.</div>
+   <div class="hero"><h2>Automatic Multi-Driver Route Assignment</h2><p>Select who is driving today, put those names into the Driver Queue, add all available stops, and V2 will divide and sequence the work across the selected drivers for the most efficient balanced route plan.</p></div>
+   <div class="workflow">
+    <div class="card">
+     <h3>1. WHO IS DRIVING TODAY?</h3><div class="sub">Click each driver. Their name is added to the Driver Queue.</div>
+     <div class="toolbar"><button class="btn ghost" id="clearDrivers">CLEAR DRIVER QUEUE</button><button class="btn ghost" id="refresh">REFRESH LIVE DATA</button></div>
+     <div id="driverGrid" class="driverGrid"><div class="sub">Loading drivers…</div></div>
+     <h3 style="margin-top:14px">DRIVER QUEUE</h3><div id="driverQueue" class="queue"><span class="sub">No drivers selected.</span></div>
+    </div>
+    <div class="card">
+     <h3>2. ADD DELIVERIES</h3><div class="sub">Use ADD ALL AVAILABLE STOPS for the normal workflow, or choose individual stops.</div>
+     <div class="stopTools"><input id="stopSearch" placeholder="Search customer, address, order # or customer #"><button class="btn blue" id="allStops">ADD ALL AVAILABLE STOPS</button><button class="btn ghost" id="clearStops">CLEAR STOPS</button></div>
+     <div id="stopList" class="stopList"><div class="sub" style="padding:14px">Loading available stops…</div></div>
+    </div>
+   </div>
+   <div class="runbar">
+    <select id="depot"><option value="BOLINGBROOK">BOLINGBROOK DEPOT</option><option value="PALATINE">PALATINE DEPOT</option></select>
+    <div class="counts" id="counts">0 drivers • 0 stops selected</div>
+    <button class="btn green" id="optimize">OPTIMIZE & ASSIGN</button>
+   </div>
+   <div id="status" class="status">Connecting to V2 planner…</div>
+   <div id="results" class="results"></div>
+  </section>
+  <section id="dashboard" class="view">
+   <div class="hero"><h2>NWTB Delivery System V2</h2><p>This separate app is the test bed for the new multi-driver optimizer. Existing NWTB operational screens are available below without modifying the current production app files.</p></div>
+   <div class="kpis"><div class="kpi"><span>Selected Drivers</span><b id="kDrivers">0</b></div><div class="kpi"><span>Selected Stops</span><b id="kStops">0</b></div><div class="kpi"><span>Available Stops</span><b id="kAvailable">0</b></div><div class="kpi"><span>V2 Draft Plans</span><b id="kPlans">—</b></div></div>
+  </section>
+  <section id="dispatch" class="view"><div class="safety"><b>SHARED CURRENT DISPATCH</b>This tab displays the existing NWTB Dispatch tool. Use Auto Route Builder for isolated V2 planning.</div><div class="frame"><iframe src="dispatch-live.html?v=20260930-0842" title="Dispatch"></iframe></div></section>
+  <section id="drivers" class="view"><div class="frame"><iframe src="tracker-live.html?v=20260925-1135" title="Live Drivers"></iframe></div></section>
+  <section id="driver" class="view"><div class="frame"><iframe src="driver-supervisor-live.html?v=20260925-0905" title="Driver View"></iframe></div></section>
+  <section id="chat" class="view"><div class="frame"><iframe src="dispatch-chat-console-live.html?v=20260924-1115" title="Chat"></iframe></div></section>
+  <section id="admin" class="view"><div class="safety"><b>SHARED CURRENT ADMIN</b>This tab displays the existing current Admin tool. V2 Auto Route Builder remains isolated.</div><div class="frame"><iframe src="dispatch-live.html?v=20260930-0842#data" title="Admin"></iframe></div></section>
+ </div>
+</main>
+</div>
+<script>
+(()=>{
+'use strict';
+const SUP='https://ufnjyidhxuytrmbjzgtu.supabase.co', KEY='sb_publishable_EqF-iooqhmngSG5BbzOxfQ_Vnf9Altc';
+const BOOT=SUP+'/functions/v1/nwtb-driver-bootstrap', API=SUP+'/functions/v1/nwtb-v2-multi-route';
+let token='',drivers=[],orders=[],selectedDrivers=new Set(),selectedStops=new Set(),recentPlans=0;
+const $=id=>document.getElementById(id), esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+async function post(url,body,auth=true){const h={'content-type':'application/json','apikey':KEY};if(auth&&token)h['x-nwtb-session']=token;const r=await fetch(url,{method:'POST',cache:'no-store',headers:h,body:JSON.stringify(body)}),j=await r.json().catch(()=>({error:'Invalid server response.'}));if(!r.ok)throw Object.assign(new Error(j.error||'Request failed.'),{data:j,status:r.status});return j}
+async function connect(){setStatus('Connecting to isolated V2 planner…');try{const b=await post(BOOT,{action:'bootstrap'},false);token=b.token;const j=await post(API,{action:'bootstrap'});drivers=j.drivers||[];orders=j.orders||[];renderAll();await loadPlanCount();setStatus('V2 planner ready. Production routes are untouched.','good')}catch(e){setStatus(e.message||'Could not connect to V2 planner.','bad')}}
+function setStatus(t,cls=''){const x=$('status');x.textContent=t;x.className='status'+(cls?' '+cls:'')}
+function renderAll(){renderDrivers();renderStops();renderQueue();counts()}
+function renderDrivers(){const g=$('driverGrid');g.innerHTML=drivers.map(d=>'<button class="driver '+(selectedDrivers.has(d.employee_number)?'sel':'')+'" data-id="'+esc(d.employee_number)+'"><b>'+esc(d.display_name)+'</b><span>EMPLOYEE '+esc(d.employee_number)+'</span></button>').join('')||'<div class="sub">No active DRIVER-role employees were found.</div>';g.querySelectorAll('.driver').forEach(b=>b.onclick=()=>{const id=b.dataset.id;selectedDrivers.has(id)?selectedDrivers.delete(id):selectedDrivers.add(id);renderDrivers();renderQueue();counts()})}
+function renderQueue(){const q=$('driverQueue'),sel=drivers.filter(d=>selectedDrivers.has(d.employee_number));q.innerHTML=sel.map(d=>'<span class="chip">'+esc(d.display_name)+'</span>').join('')||'<span class="sub">No drivers selected.</span>'}
+function visibleOrders(){const s=$('stopSearch').value.trim().toLowerCase();return orders.filter(o=>!s||[o.customer_name,o.address,o.sales_order_no,o.customer_number,o.reference_no].some(v=>String(v||'').toLowerCase().includes(s)))}
+function renderStops(){const list=$('stopList'),vis=visibleOrders();list.innerHTML=vis.map(o=>{const valid=Number.isFinite(Number(o.lat))&&Number.isFinite(Number(o.lon));return '<label class="stop"><input type="checkbox" data-id="'+esc(o.id)+'" '+(selectedStops.has(o.id)?'checked':'')+'><span><b>'+esc(o.customer_name)+'</b><small>'+esc(o.address)+(o.sales_order_no?' • SO '+esc(o.sales_order_no):'')+'</small>'+(valid?'':'<small class="invalid">LOCATION NEEDS COORDINATES</small>')+'</span><span class="tag '+esc(o.priority)+'">'+esc(o.priority||'NORMAL').replace('_',' ')+'</span></label>'}).join('')||'<div class="sub" style="padding:16px">No AVAILABLE / UNASSIGNED stops are currently in the live queue.</div>';list.querySelectorAll('input[type=checkbox]').forEach(c=>c.onchange=()=>{c.checked?selectedStops.add(c.dataset.id):selectedStops.delete(c.dataset.id);counts()})}
+function counts(){$('counts').textContent=selectedDrivers.size+' driver'+(selectedDrivers.size===1?'':'s')+' • '+selectedStops.size+' stop'+(selectedStops.size===1?'':'s')+' selected';$('kDrivers').textContent=selectedDrivers.size;$('kStops').textContent=selectedStops.size;$('kAvailable').textContent=orders.length}
+async function refresh(){selectedStops.clear();try{const j=await post(API,{action:'bootstrap'});drivers=j.drivers||[];orders=j.orders||[];for(const id of [...selectedDrivers])if(!drivers.some(d=>d.employee_number===id))selectedDrivers.delete(id);renderAll();setStatus('Live drivers and AVAILABLE stops refreshed.','good')}catch(e){setStatus(e.message,'bad')}}
+async function loadPlanCount(){try{const j=await post(API,{action:'plans_recent'});recentPlans=(j.plans||[]).length;$('kPlans').textContent=recentPlans}catch{$('kPlans').textContent='—'}}
+function groupStops(stops,emp){return (stops||[]).filter(s=>s.driver_employee_number===emp).sort((a,b)=>a.stop_sequence-b.stop_sequence)}
+function renderResults(j){const box=$('results'),p=j.plan||{},ds=(j.drivers||[]).slice().sort((a,b)=>a.route_index-b.route_index);box.innerHTML='<div class="resultsHead"><div><h3>V2 DRAFT PLAN</h3><div class="sub">Plan '+esc(p.id||'')+' • '+esc(p.stop_count||0)+' stops • '+esc(p.driver_count||0)+' drivers • production routes untouched</div></div><div class="sub"><b>'+Number(p.estimated_total_miles||0).toFixed(1)+' total mi</b> • '+esc(p.estimated_total_minutes||0)+' total route min • longest '+esc(p.max_route_minutes||0)+' min</div></div><div class="routeGrid">'+ds.map(d=>{const ss=groupStops(j.stops,d.driver_employee_number);return '<div class="route"><div class="routeHead"><div><b>'+esc(d.driver_display_name)+'</b><span>EMPLOYEE '+esc(d.driver_employee_number)+' • ROUTE '+esc(d.route_index)+'</span></div><b>'+esc(d.stop_count)+' STOPS</b></div><div class="metrics"><span>'+Number(d.estimated_miles||0).toFixed(1)+' MI</span><span>'+esc(d.estimated_minutes||0)+' MIN</span></div><div class="routeStops">'+ss.map(s=>'<div class="rstop"><span class="seq">'+esc(s.stop_sequence)+'</span><span><b>'+esc(s.customer_name)+'</b><small>'+esc(s.address)+'</small><small>'+esc((s.priority||'NORMAL').replace('_',' '))+' • service '+esc(s.service_minutes)+' min</small></span><span class="leg">'+Number(s.leg_miles||0).toFixed(1)+' mi<br>'+esc(s.leg_minutes)+' min</span></div>').join('')+'</div></div>'}).join('')+'</div>';box.scrollIntoView({behavior:'smooth',block:'start'})}
+async function optimize(){if(!selectedDrivers.size){setStatus('Choose the drivers who are driving today.','bad');return}if(!selectedStops.size){setStatus('Add the deliveries before optimizing.','bad');return}const btn=$('optimize');btn.disabled=true;setStatus('Optimizing all selected stops across the Driver Queue… This can take several seconds.');try{const j=await post(API,{action:'optimize',depot:$('depot').value,drivers:[...selectedDrivers],order_ids:[...selectedStops]});renderResults(j);await loadPlanCount();setStatus('V2 route plan created. No production routes or delivery statuses were changed.','good')}catch(e){const extra=e.data?.invalid_orders?.length?' '+e.data.invalid_orders.map(x=>x.name).join(', '):'';setStatus((e.message||'Optimization failed.')+extra,'bad')}finally{btn.disabled=false}}
+const titles={planner:['Auto Route Builder','Driver Queue → All Stops → Optimize & Assign'],dashboard:['V2 Dashboard','Separate optimizer test application'],dispatch:['Dispatch','Current NWTB Dispatch screen'],drivers:['Live Drivers','Current live GPS screen'],driver:['Driver View','Current supervisor driver view'],chat:['Delivery / Pickup Chat','Current operations chat'],admin:['Administration','Current master-data screen']};
+function openView(v){document.querySelectorAll('.view').forEach(x=>x.classList.toggle('active',x.id===v));document.querySelectorAll('.nav').forEach(x=>x.classList.toggle('active',x.dataset.v===v));$('title').textContent=titles[v]?.[0]||'NWTB V2';$('subtitle').textContent=titles[v]?.[1]||'';history.replaceState(null,'','#'+v)}
+document.querySelectorAll('.nav').forEach(b=>b.onclick=()=>openView(b.dataset.v));
+$('clearDrivers').onclick=()=>{selectedDrivers.clear();renderDrivers();renderQueue();counts()};$('refresh').onclick=refresh;$('allStops').onclick=()=>{orders.forEach(o=>selectedStops.add(o.id));renderStops();counts()};$('clearStops').onclick=()=>{selectedStops.clear();renderStops();counts()};$('stopSearch').oninput=renderStops;$('optimize').onclick=optimize;
+const start=(location.hash||'#planner').slice(1);if(titles[start])openView(start);connect();
+})();
+</script>
+<script src="nwtb-system-lock-live.js?v=20260929-1200"></script>
+</body></html>
