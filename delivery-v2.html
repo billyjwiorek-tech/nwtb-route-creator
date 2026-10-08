@@ -72,7 +72,7 @@
   </section>
   <section id="dispatch" class="view"><div class="safety"><b>V2 DISPATCH WORKSPACE</b>USE LOCATION adds a stop directly to the AVAILABLE queue. Driver assignment is handled by Auto Route Builder, not manually here.</div><div class="frame"><iframe src="dispatch-v2.html?v=20261008-1304" title="Dispatch"></iframe></div></section>
   <section id="drivers" class="view"><div class="frame"><iframe src="tracker-live.html?v=20260925-1135" title="Live Drivers"></iframe></div></section>
-  <section id="driver" class="view"><div class="frame"><iframe src="driver-v2.html?v=20261008-1200" title="V2 Driver App"></iframe></div></section>
+  <section id="driver" class="view"><div class="frame"><iframe src="driver-v2.html?v=20261008-1318" title="V2 Driver App"></iframe></div></section>
   <section id="chat" class="view"><div class="frame"><iframe src="dispatch-chat-console-live.html?v=20260924-1115" title="Chat"></iframe></div></section>
   <section id="admin" class="view"><div class="safety"><b>SHARED CURRENT ADMIN</b>This tab displays the existing current Admin tool. V2 Auto Route Builder remains isolated.</div><div class="frame"><iframe src="dispatch-live.html?v=20260930-0842#data" title="Admin"></iframe></div></section>
  </div>
@@ -122,7 +122,33 @@ async function syncAvailableStops(opts={}){
 async function refresh(){await syncAvailableStops({silent:false})}
 async function loadPlanCount(){try{const j=await post(API,{action:'plans_recent'});recentPlans=(j.plans||[]).length;$('kPlans').textContent=recentPlans}catch{$('kPlans').textContent='—'}}
 function groupStops(stops,emp){return (stops||[]).filter(s=>s.driver_employee_number===emp).sort((a,b)=>a.stop_sequence-b.stop_sequence)}
-function renderResults(j){const box=$('results'),p=j.plan||{},ds=(j.drivers||[]).slice().sort((a,b)=>a.route_index-b.route_index);box.innerHTML='<div class="resultsHead"><div><h3>V2 DRAFT PLAN</h3><div class="sub">Plan '+esc(p.id||'')+' • '+esc(p.stop_count||0)+' stops • '+esc(p.driver_count||0)+' drivers • production routes untouched</div></div><div class="sub"><b>'+Number(p.estimated_total_miles||0).toFixed(1)+' total mi</b> • '+esc(p.estimated_total_minutes||0)+' total route min • longest '+esc(p.max_route_minutes||0)+' min</div></div><div class="routeGrid">'+ds.map(d=>{const ss=groupStops(j.stops,d.driver_employee_number);return '<div class="route"><div class="routeHead"><div><b>'+esc(d.driver_display_name)+'</b><span>EMPLOYEE '+esc(d.driver_employee_number)+' • ROUTE '+esc(d.route_index)+'</span></div><b>'+esc(d.stop_count)+' STOPS</b></div><div class="metrics"><span>'+Number(d.estimated_miles||0).toFixed(1)+' MI</span><span>'+esc(d.estimated_minutes||0)+' MIN</span></div><div class="routeStops">'+ss.map(s=>'<div class="rstop"><span class="seq">'+esc(s.stop_sequence)+'</span><span><b>'+esc(s.customer_name)+'</b><small>'+esc(s.address)+'</small><small>'+esc((s.priority||'NORMAL').replace('_',' '))+' • service '+esc(s.service_minutes)+' min</small></span><span class="leg">'+Number(s.leg_miles||0).toFixed(1)+' mi<br>'+esc(s.leg_minutes)+' min</span></div>').join('')+'</div></div>'}).join('')+'</div>';box.scrollIntoView({behavior:'smooth',block:'start'})}
+function renderResults(j){
+ const box=$('results'),p=j.plan||{},ds=(j.drivers||[]).slice().sort((a,b)=>a.route_index-b.route_index),isRouted=p.status==='ROUTED';
+ const actions='<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">'+
+  (isRouted
+   ?'<span class="btn green" style="cursor:default">ROUTED ✓</span><button class="btn ghost" onclick="window.open(\'driver-v2.html\',\'_blank\')">OPEN DRIVER APP</button>'
+   :'<button class="btn green" id="releasePlanBtn" onclick="releasePlan(\''+esc(p.id||'')+'\')">ROUTE / RELEASE TO DRIVERS</button>')+
+  '</div>';
+ box.innerHTML='<div class="resultsHead"><div><h3>V2 '+esc(p.status||'DRAFT')+' PLAN</h3><div class="sub">Plan '+esc(p.id||'')+' • '+esc(p.stop_count||0)+' stops • '+esc(p.driver_count||0)+' drivers • production routes untouched</div></div><div><div class="sub" style="text-align:right;margin-bottom:8px"><b>'+Number(p.estimated_total_miles||0).toFixed(1)+' total mi</b> • '+esc(p.estimated_total_minutes||0)+' total route min • longest '+esc(p.max_route_minutes||0)+' min</div>'+actions+'</div></div><div class="routeGrid">'+ds.map(d=>{const ss=groupStops(j.stops,d.driver_employee_number);return '<div class="route"><div class="routeHead"><div><b>'+esc(d.driver_display_name)+'</b><span>EMPLOYEE '+esc(d.driver_employee_number)+' • ROUTE '+esc(d.route_index)+' • '+esc(d.status||p.status||'DRAFT')+'</span></div><b>'+esc(d.stop_count)+' STOPS</b></div><div class="metrics"><span>'+Number(d.estimated_miles||0).toFixed(1)+' MI</span><span>'+esc(d.estimated_minutes||0)+' MIN</span>'+(isRouted?'<span>DRIVER VISIBLE</span>':'<span>NOT RELEASED YET</span>')+'</div><div class="routeStops">'+ss.map(s=>'<div class="rstop"><span class="seq">'+esc(s.stop_sequence)+'</span><span><b>'+esc(s.customer_name)+'</b><small>'+esc(s.address)+'</small><small>'+esc((s.priority||'NORMAL').replace('_',' '))+' • service '+esc(s.service_minutes)+' min</small></span><span class="leg">'+Number(s.leg_miles||0).toFixed(1)+' mi<br>'+esc(s.leg_minutes)+' min</span></div>').join('')+'</div></div>'}).join('')+'</div>';
+ box.scrollIntoView({behavior:'smooth',block:'start'})
+}
+async function releasePlan(planId){
+ const btn=$('releasePlanBtn');if(btn){btn.disabled=true;btn.textContent='ROUTING…'}
+ setStatus('Releasing this V2 plan to the assigned drivers…');
+ try{
+  const j=await post(API,{action:'release_plan',plan_id:planId});
+  renderResults(j);
+  await syncAvailableStops({silent:true});
+  setStatus('V2 routes are ROUTED and released to the assigned drivers. Each driver can now sign in with their 4-digit employee number.','good');
+  try{
+   const frame=document.querySelector('#dispatch iframe');
+   frame?.contentWindow?.postMessage({type:'nwtb-v2-routes-released'},location.origin);
+  }catch{}
+ }catch(e){
+  setStatus(e.message||'Could not release the V2 routes.','bad');
+  if(btn){btn.disabled=false;btn.textContent='ROUTE / RELEASE TO DRIVERS'}
+ }
+}
 async function optimize(){if(!selectedDrivers.size){setStatus('Choose the drivers who are driving today.','bad');return}if(!selectedStops.size){setStatus('Add the deliveries before optimizing.','bad');return}const btn=$('optimize');btn.disabled=true;setStatus('Optimizing all selected stops across the Driver Queue… This can take several seconds.');try{const j=await post(API,{action:'optimize',depot:$('depot').value,drivers:[...selectedDrivers],order_ids:[...selectedStops]});renderResults(j);await loadPlanCount();setStatus('V2 route plan created. No production routes or delivery statuses were changed.','good')}catch(e){const extra=e.data?.invalid_orders?.length?' '+e.data.invalid_orders.map(x=>x.name).join(', '):'';setStatus((e.message||'Optimization failed.')+extra,'bad')}finally{btn.disabled=false}}
 const titles={planner:['Auto Route Builder','Driver Queue → All Stops → Optimize & Assign'],dashboard:['V2 Dashboard','Separate optimizer test application'],dispatch:['Dispatch','Current NWTB Dispatch screen'],drivers:['Live Drivers','Current live GPS screen'],driver:['V2 Driver App','Exactly what a V2 driver sees after 4-digit employee sign-in'],chat:['Delivery / Pickup Chat','Current operations chat'],admin:['Administration','Current master-data screen']};
 function openView(v){document.querySelectorAll('.view').forEach(x=>x.classList.toggle('active',x.id===v));document.querySelectorAll('.nav').forEach(x=>x.classList.toggle('active',x.dataset.v===v));$('title').textContent=titles[v]?.[0]||'NWTB V2';$('subtitle').textContent=titles[v]?.[1]||'';history.replaceState(null,'','#'+v);if(v==='planner')syncAvailableStops({silent:true})}
