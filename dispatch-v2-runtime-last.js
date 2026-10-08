@@ -1,6 +1,7 @@
 (()=>{
 'use strict';
 
+const V2_ROUTE_API='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-v2-multi-route';
 const V2_ID='nwtbV2FinalRuntime';
 if(window[V2_ID])return;
 window[V2_ID]=true;
@@ -215,9 +216,41 @@ window.useResult=async function(i,saved){
  }
 };
 
+
+async function decorateV2RoutedRows(){
+ try{
+  const j=await post(V2_ROUTE_API,{action:'routed_status'});
+  const map=j?.order_map||{};
+  qsa('#ordersBody .pick').forEach(cb=>{
+   const info=map[String(cb.value)];
+   if(!info)return;
+   cb.checked=false;cb.disabled=true;
+   const tr=cb.closest('tr');if(!tr)return;
+   tr.dataset.v2Routed='1';
+   tr.style.background='#f5f8ff';
+   const cells=tr.querySelectorAll('td');
+   if(cells[7])cells[7].innerHTML='<span class="pill" style="background:#eef4ff;color:#175cd3">V2 ROUTED</span>';
+   if(cells[9])cells[9].innerHTML='<div style="font-size:9px;font-weight:900;color:#175cd3;margin-bottom:5px">'+
+     String(info.driver_display_name||info.driver_employee_number||'DRIVER')+' • STOP '+String(info.stop_sequence||'')+
+     '</div><button class="btn blue mini nwtbV2ViewRoute" type="button">VIEW V2 ROUTE</button>';
+   const btn=cells[9]?.querySelector('.nwtbV2ViewRoute');
+   if(btn)btn.onclick=()=>{try{window.parent.postMessage({type:'nwtb-v2-view-plan',plan_id:info.plan_id},location.origin)}catch{}};
+  });
+ }catch{}
+}
+
+function startV2RoutedOverlay(){
+ decorateV2RoutedRows();
+ setInterval(decorateV2RoutedRows,4000);
+ window.addEventListener('message',e=>{
+  if(e.origin!==location.origin||!e.data)return;
+  if(e.data.type==='nwtb-v2-routes-released')setTimeout(decorateV2RoutedRows,250);
+ });
+}
 function boot(){
  installStyles();
  installButtonCapture();
+ startV2RoutedOverlay();
  if(!installAutoAssignmentPanel()){
   let n=0;const t=setInterval(()=>{n++;if(installAutoAssignmentPanel()||n>40)clearInterval(t)},150);
  }
