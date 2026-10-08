@@ -13,7 +13,7 @@ button,input{font:inherit}.wrap{max-width:760px;margin:auto;padding:18px}.top{ba
 .row{display:flex;gap:8px}.row input{flex:1;min-width:0;border:1px solid #cfd4dc;border-radius:10px;padding:13px;font-size:18px;font-weight:900;letter-spacing:3px;text-align:center}.btn{border:0;border-radius:10px;background:var(--nav);color:white;padding:12px 14px;font-weight:900;cursor:pointer}.btn.blue{background:var(--blue)}.btn.green{background:var(--green)}.btn.ghost{background:#f2f4f7;color:#344054;border:1px solid var(--line)}.btn:disabled{opacity:.45}
 .msg{margin-top:10px;border-radius:10px;padding:10px 12px;font-size:11px;background:#f8fafc;color:#475467}.msg.bad{background:#fef3f2;color:var(--red)}.msg.good{background:#ecfdf3;color:var(--green)}
 .hidden{display:none!important}.identity{display:flex;justify-content:space-between;align-items:center;gap:10px}.identity h2{margin:0;font-size:18px}.identity span{font-size:10px;color:var(--muted)}
-.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.kpi{background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:11px}.kpi span{display:block;font-size:9px;color:var(--muted);text-transform:uppercase;font-weight:900}.kpi b{display:block;font-size:20px;margin-top:4px}
+.summary{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}.kpi{background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:11px}.kpi span{display:block;font-size:9px;color:var(--muted);text-transform:uppercase;font-weight:900}.kpi b{display:block;font-size:20px;margin-top:4px}
 .stop{background:#fff;border:1px solid var(--line);border-radius:14px;padding:13px;margin-bottom:9px}.stopTop{display:grid;grid-template-columns:34px 1fr auto;gap:10px;align-items:start}.seq{width:30px;height:30px;border-radius:50%;background:#eef4ff;color:var(--blue);display:grid;place-items:center;font-weight:950}.stop h3{margin:0;font-size:14px}.stop p{margin:4px 0 0;color:var(--muted);font-size:10px;line-height:1.4}.tag{font-size:8px;font-weight:950;padding:5px 7px;border-radius:999px;background:#f2f4f7;color:#475467}.tag.HOT_SHOT{background:#fef3f2;color:var(--red)}.tag.PRIORITY{background:#fff8e8;color:var(--amber)}.actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}.actions a{display:inline-block;text-decoration:none;border-radius:9px;padding:9px 11px;font-size:10px;font-weight:900;background:var(--blue);color:#fff}.actions a.secondary{background:#f2f4f7;color:#344054;border:1px solid var(--line)}
 .notice{font-size:10px;color:#7a2e0e;background:#fffaeb;border:1px solid #fdb022;border-radius:12px;padding:10px 12px;margin-bottom:12px;font-weight:800}
 .empty{text-align:center;padding:30px 12px;color:var(--muted)}.footer{text-align:center;font-size:9px;color:#98a2b3;padding:12px}
@@ -54,17 +54,25 @@ let token=localStorage.getItem('nwtb_v2_driver_token')||'';
 async function post(url,body,auth=true){const h={'content-type':'application/json','apikey':KEY};if(auth&&token)h['x-nwtb-session']=token;const r=await fetch(url,{method:'POST',cache:'no-store',headers:h,body:JSON.stringify(body)}),j=await r.json().catch(()=>({error:'Invalid server response.'}));if(!r.ok)throw new Error(j.error||'Request failed.');return j}
 function msg(id,t,cls=''){const e=$(id);e.textContent=t;e.className='msg'+(cls?' '+cls:'')}
 function mapsUrl(stop){return 'https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(stop.address)}
+function fmtMin(v){const n=Math.max(0,Math.round(Number(v)||0)),h=Math.floor(n/60),m=n%60;return h?h+'h '+m+'m':m+'m'}
 function render(j){
  $('login').classList.add('hidden');$('app').classList.remove('hidden');
  $('driverName').textContent=j.display_name||'Driver';$('driverNo').textContent='EMPLOYEE '+(j.employee_number||'');
  const r=j.route,p=j.plan,ss=j.stops||[];
  if(!r){$('summary').innerHTML='';$('stops').innerHTML='<div class="card empty">No V2 route is currently assigned to your employee number.</div>';msg('routeMsg',j.message||'No V2 route assigned.');return}
+ const svc=Number(r.service_minutes)||ss.reduce((a,s)=>a+(Number(s.service_minutes)||0),0);
+ const drive=Number(r.drive_minutes)||Math.max(0,(Number(r.estimated_minutes)||0)-svc);
+ const retMi=Number(r.return_miles)||Math.max(0,(Number(r.estimated_miles)||0)-ss.reduce((a,s)=>a+(Number(s.leg_miles)||0),0));
+ const retMin=Number(r.return_minutes)||Math.max(0,drive-ss.reduce((a,s)=>a+(Number(s.leg_minutes)||0),0));
  $('summary').innerHTML=
   '<div class="kpi"><span>Stops</span><b>'+esc(r.stop_count||0)+'</b></div>'+
-  '<div class="kpi"><span>Est. Miles</span><b>'+Number(r.estimated_miles||0).toFixed(1)+'</b></div>'+
-  '<div class="kpi"><span>Est. Minutes</span><b>'+esc(r.estimated_minutes||0)+'</b></div>';
- msg('routeMsg','ROUTED • Route '+esc(r.route_index)+' • '+esc(p.depot)+' • V2 plan '+esc(p.id),'good');
- $('stops').innerHTML=ss.map(s=>'<div class="stop"><div class="stopTop"><span class="seq">'+esc(s.stop_sequence)+'</span><div><h3>'+esc(s.customer_name)+'</h3><p>'+esc(s.address)+'</p><p>'+esc((s.stop_type||'STOP').replaceAll('_',' '))+' • '+Number(s.leg_miles||0).toFixed(1)+' mi from previous • '+esc(s.leg_minutes||0)+' min drive • '+esc(s.service_minutes||0)+' min service</p></div><span class="tag '+esc(s.priority||'NORMAL')+'">'+esc((s.priority||'NORMAL').replace('_',' '))+'</span></div><div class="actions"><a href="'+mapsUrl(s)+'" target="_blank" rel="noopener">NAVIGATE TO STOP</a></div></div>').join('')||'<div class="card empty">This V2 route has no stops.</div>';
+  '<div class="kpi"><span>Total Miles</span><b>'+Number(r.estimated_miles||0).toFixed(1)+'</b></div>'+
+  '<div class="kpi"><span>Drive Time</span><b>'+fmtMin(drive)+'</b></div>'+
+  '<div class="kpi"><span>Service Time</span><b>'+fmtMin(svc)+'</b></div>'+
+  '<div class="kpi"><span>Total Route Time</span><b>'+fmtMin(r.estimated_minutes||0)+'</b></div>';
+ msg('routeMsg','ROUTED • Route '+esc(r.route_index)+' • '+esc(p.depot)+' • return to Bolingbrook '+retMi.toFixed(1)+' mi / '+fmtMin(retMin)+' • '+(p.traffic_aware?'traffic adjusted':'static road times'),'good');
+ $('stops').innerHTML=(ss.map(s=>'<div class="stop"><div class="stopTop"><span class="seq">'+esc(s.stop_sequence)+'</span><div><h3>'+esc(s.customer_name)+'</h3><p>'+esc(s.address)+'</p><p>'+esc((s.stop_type||'STOP').replaceAll('_',' '))+' • '+Number(s.leg_miles||0).toFixed(1)+' mi from previous • '+esc(s.leg_minutes||0)+' min drive • '+esc(s.service_minutes||0)+' min service</p></div><span class="tag '+esc(s.priority||'NORMAL')+'">'+esc((s.priority||'NORMAL').replace('_',' '))+'</span></div><div class="actions"><a href="'+mapsUrl(s)+'" target="_blank" rel="noopener">NAVIGATE TO STOP</a></div></div>').join('')+
+  '<div class="stop"><div class="stopTop"><span class="seq">↩</span><div><h3>RETURN TO NWTB BOLINGBROOK</h3><p>Final depot return leg • '+retMi.toFixed(1)+' mi • '+fmtMin(retMin)+' drive</p></div><span class="tag">RETURN</span></div></div>')||'<div class="card empty">This V2 route has no stops.</div>';
 }
 async function loadRoute(){try{msg('routeMsg','Loading your V2 route…');const j=await post(API,{action:'driver_route'});render(j)}catch(e){if(/expired|sign in/i.test(e.message)){localStorage.removeItem('nwtb_v2_driver_token');token='';showLogin(e.message)}else msg('routeMsg',e.message,'bad')}}
 function showLogin(t='Enter your 4-digit employee number.'){$('app').classList.add('hidden');$('login').classList.remove('hidden');msg('loginMsg',t)}
