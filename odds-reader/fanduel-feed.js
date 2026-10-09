@@ -191,4 +191,5 @@ $$('fdGenerate').onclick=function(){
  }).join('')||'<p>None available.</p>';
 };
 $$('fdCandidates').addEventListener('click',function(e){var b=e.target.closest('[data-fd-candidate]');if(!b)return;var c=generated[Number(b.dataset.fdCandidate)];if(c)installLegs(c.legs,'FanDuel feed candidate • '+c.legs.length+' legs')});
+window.OddsReaderFanDuel={getSelections:function(){return list.map(function(l){return Object.assign({},l)})},getLastRefresh:function(){return lastFetched}};
 })();
