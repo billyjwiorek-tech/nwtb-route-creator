@@ -192,8 +192,7 @@ function scan(){
   if(search&&!normalized(player+' '+latest.team).includes(search))return;
   var g=gameForTeam(latest.team),opp=opponent(latest.team,g);
   var matches=src==='fanduel'?offers.filter(function(o){
-   return normalized(o.player)===normalized(player)&&o.original.eventId&&
-    normalized(o.original.home+' '+o.original.away).includes(normalized(latest.team))===false?false:true
+   return normalized(o.player)===normalized(player)&&!!o.original&&!!o.original.eventId
   }):[{player,side,line,odds:null,original:null}];
   if(src==='fanduel'){
     matches=matches.filter(function(o){
