@@ -93,15 +93,21 @@ function valid(n){return Number.isFinite(n)&&n>0&&n<100}
 function pnorm(g){return String(g||'').toUpperCase().replace(/[^A-Z0-9]/g,'')}
 function cleanLeg(){return {game:'',market:'',pick:'',prob:'',price:''}}
 function clearVerified(){D.verified=false;$('verified').checked=false}
+function migrateHistoricalDraft(){
+ if(!D||!/^Historical trend research/.test(D.name||'')||D.provenanceMigrated)return;
+ D.legs.forEach(function(l){if(l.prob!==''&&l.prob!=null){l.research=l.research||{hits:'prior import',played:'?',rating:String(l.prob)};l.prob=''}});
+ D.prob='';D.provenanceMigrated=true;
+}
 function renderLegs(){
  var html='';
- D.legs.forEach(function(l,i){html+='<div class="leg"><div class="flex"><h4>LEG '+(i+1)+'</h4><button class="del" data-del="'+i+'">Remove ×</button></div>'+
+ D.legs.forEach(function(l,i){html+='<div class="leg"><div class="flex"><h4>LEG '+(i+1)+'</h4><button class="del" data-del="'+i+'">Remove ×</button></div>'+ (l.research?'<div class="research-note" style="padding:9px;border-radius:8px;background:#322a19;border:1px solid #8e7441;color:#ffdda6;font-size:12px;line-height:1.5;margin-top:9px"><b>HISTORICAL TREND:</b> '+enc(l.research.hits)+'/'+enc(l.research.played)+' hits • Experimental rating '+enc(l.research.rating)+'% — NOT a predicted win probability or validated FanDuel line.</div>':'')+
  '<div class="cols2"><label>GAME<input data-i="'+i+'" data-field="game" value="'+enc(l.game)+'" placeholder="PHI @ JAX"></label><label>MARKET<input data-i="'+i+'" data-field="market" value="'+enc(l.market)+'" placeholder="Spread / Player prop"></label></div>'+
  '<label>EXACT SELECTION AND LINE<input data-i="'+i+'" data-field="pick" value="'+enc(l.pick)+'" placeholder="Player over 50.5 yards"></label>'+
  '<div class="cols2"><label>Modeled hit %<input type="number" min=".001" max="99.999" step="any" data-i="'+i+'" data-field="prob" value="'+enc(l.prob)+'" placeholder="Optional"></label><label>Individual odds<input data-i="'+i+'" data-field="price" value="'+enc(l.price)+'" placeholder="+125 (optional)"></label></div></div>'});
  $('legs').innerHTML=html;
 }
 function fill(){
+ migrateHistoricalDraft();
  $('name').value=D.name||'';
  ['prob','buffer','quote','stake','fee','cost'].forEach(function(k){$(k).value=D[k]==null?'':D[k]});
  $('verified').checked=!!D.verified;renderLegs();recalc();
@@ -171,7 +177,7 @@ document.querySelectorAll('[data-tab]').forEach(function(b){b.addEventListener('
 $('example').onclick=function(){if(!confirm('Replace current draft with the Eagles/Jaguars example?'))return;D=example();persist();fill();go('builder')};
 $('new').onclick=function(){if(!confirm('Clear the current parlay draft? Saved history is preserved.'))return;D=blank();persist();fill()};
 $('addLeg').onclick=function(){if(D.legs.length>=15){show('15-leg limit');return}D.legs.push(cleanLeg());clearVerified();persist();renderLegs();recalc()};
-$('legs').addEventListener('input',function(e){var el=e.target;if(el.dataset.i===undefined)return;var i=Number(el.dataset.i),f=el.dataset.field;if(!D.legs[i]||!f)return;D.legs[i][f]=el.value;clearVerified();persist();recalc()});
+$('legs').addEventListener('input',function(e){var el=e.target;if(el.dataset.i===undefined)return;var i=Number(el.dataset.i),f=el.dataset.field;if(!D.legs[i]||!f)return;D.legs[i][f]=el.value;if(D.legs[i].research&&['game','market','pick'].indexOf(f)>=0){delete D.legs[i].research;var note=el.closest('.leg')?.querySelector('.research-note');if(note)note.remove()}clearVerified();persist();recalc()});
 $('legs').addEventListener('click',function(e){var el=e.target.closest('[data-del]');if(!el)return;D.legs.splice(Number(el.dataset.del),1);clearVerified();persist();renderLegs();recalc()});
 ['name','prob','buffer','quote','stake','fee','cost'].forEach(function(id){$(id).addEventListener('input',function(){if(id==='quote'){clearVerified()}collect()})});
 $('verified').onchange=collect;
@@ -202,6 +208,7 @@ $('records').addEventListener('click',function(e){var load=e.target.closest('[da
 $('export').onclick=function(){var a=document.createElement('a'),blob=new Blob([JSON.stringify({app:'Odds Reader Lab',saved:new Date().toISOString(),history:H},null,2)],{type:'application/json'});a.href=URL.createObjectURL(blob);a.download='odds-reader-history.json';a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},1500)};
 $('importBtn').onclick=function(){$('import').click()};
 $('import').onchange=async function(){try{var o=JSON.parse(await this.files[0].text());if(!o||!Array.isArray(o.history))throw Error('Invalid history file');if(!confirm('Import '+o.history.length+' records?'))return;var ids=new Set(H.map(function(h){return h.id}));o.history.forEach(function(h){if(h&&h.id&&h.draft&&Array.isArray(h.legs)&&!ids.has(h.id)){H.push(h);ids.add(h.id)}});persist();renderHistory();show('History imported')}catch(e){show('Import failed')}};
+window.OddsReaderDraft={setResearch:function(index,data){if(!D.legs[index])return;D.legs[index].research={hits:data.hits,played:data.played,rating:data.rating};D.provenanceMigrated=true;persist();renderLegs();recalc()}};
 fill();persist();
 })();
 </script>
