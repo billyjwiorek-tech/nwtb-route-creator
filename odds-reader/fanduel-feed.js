@@ -6,6 +6,10 @@
 'use strict';
 var api='https://api.the-odds-api.com/v4/sports/americanfootball_nfl';
 var key='',events=[],marketsByEvent={},list=[],generated=[],lastFetched=null,model={};
+var FEATURED_CACHE_KEY='oddsreader_fanduel_featured_snapshot_1',CACHE_AGE_MS=10*60*1000;
+function cachedFeatured(){try{var x=JSON.parse(sessionStorage.getItem(FEATURED_CACHE_KEY)||'null');return x&&Array.isArray(x.data)&&Number.isFinite(x.at)?x:null}catch(e){return null}}
+function storeFeatured(data){try{sessionStorage.setItem(FEATURED_CACHE_KEY,JSON.stringify({data:data,at:Date.now(),credits:$('fdQuota')?$('fdQuota').textContent:''}))}catch(e){}}
+function useFeatured(data,savedAt,cached){list=[];events=data.filter(function(g){return(g.bookmakers||[]).some(function(b){return b.key==='fanduel'})});events.forEach(function(g){addOffers(g,(g.bookmakers||[]).find(function(b){return b.key==='fanduel'}))});lastFetched=new Date(savedAt).toISOString();showGames();renderOffers();stat('FanDuel odds feed '+(cached?'loaded from browser cache (0 credits charged).':'connected.')+' '+events.length+' games • '+list.length+' individual selections • price snapshot '+new Date(savedAt).toLocaleString()+(cached?' (refresh for latest odds).':''));marketStat('Choose a game and market. Featured moneyline, spreads, totals are loaded.');}
 var $$=function(id){return document.getElementById(id)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
 var percent=function(o){var n=Number(o);return n>0?100/(n+100):n<-99?100*-n/(-n+100):null};
@@ -25,7 +29,9 @@ panel.innerHTML=
 '<div class="notice"><b>Coverage limits:</b> This shows FanDuel prices available to the connected data provider, which may omit some alternate lines or player props. The API does not provide the exact combined FanDuel same-game-parlay quote. Confirm that price from FanDuel’s public bet slip (screenshot or shared link) before comparing EV.</div>'+
 '<div class="fdcols"><div class="card"><h2>1. Connect FanDuel market data</h2>'+
 '<p class="hint">This optional external service requires its own API key. You can <a target="_blank" rel="noopener noreferrer" href="https://the-odds-api.com/">register for a free key at The Odds API</a>. No FanDuel account or login is needed. The key stays in this browser tab, is never saved in your parlay history, and is sent by HTTPS to this app’s cloud gateway, which forwards it to the data provider. Requests use API credits.</p>'+
-'<div class="fdkeyline"><label>Odds API key<input type="password" id="fdKey" autocomplete="off" placeholder="Paste your API key here"></label><button class="btn primary" id="fdLoad">Load FanDuel NFL odds</button></div>'+
+'<div class="fdkeyline"><label>Odds API key<input type="password" id="fdKey" autocomplete="off" placeholder="Paste your API key here"></label><button class="btn primary" id="fdLoad">Load FanDuel NFL odds</button></div>'+ 
+'<button class="btn small" id="fdForceRefresh" type="button" style="margin-top:8px">Refresh live prices (uses 3 credits)</button>'+ 
+'<p class="fdsmall">Credit saver: recent game-line data is reused for 10 minutes on this browser. Fresh odds can move at any time. The API charges 3 credits for moneyline + spread + total on a live refresh; each individual prop-market request may use additional credits.</p>'+
 '<p id="fdStatus" class="fdsmall" role="status">Not connected.</p>'+
 '<div id="fdQuota" class="fdsmall"></div>'+
 '<h3 style="margin-top:20px">Games available from FanDuel</h3><div id="fdGames" class="fdscroll">Connect the odds feed to see scheduled games.</div></div>'+
@@ -89,23 +95,23 @@ function showGames(){
  }).join(''):'<p class="fdwarn">No current NFL events with FanDuel odds were returned. Try later.</p>';
  var s=$$('fdGame');s.innerHTML=events.map(function(g){return '<option value="'+esc(g.id)+'">'+esc(g.away_team)+' @ '+esc(g.home_team)+'</option>'}).join('')||'<option>No events</option>';
 }
-async function load(){
- key=$$('fdKey').value.trim();
- if(!key){stat('A The Odds API key is needed to access this provider’s FanDuel feed.',true);return}
- var b=$$('fdLoad');b.disabled=true;stat('Requesting current FanDuel NFL game lines…');
+async function load(force){
+ key=$('fdKey').value.trim();
+ var snapshot=cachedFeatured();
+ if(!force&&snapshot&&Date.now()-snapshot.at<CACHE_AGE_MS){useFeatured(snapshot.data,snapshot.at,true);if(snapshot.credits)$('fdQuota').textContent='Previous reading: '+snapshot.credits+' • no credits spent now.';return}
+ if(!key){stat('A The Odds API key is needed to retrieve fresh FanDuel prices. If a recent snapshot exists, it will load without spending credits.',true);return}
+ var b=$('fdLoad');b.disabled=true;$('fdForceRefresh').disabled=true;stat('Requesting current FanDuel NFL game lines… (this costs approximately 3 credits)');
  try{
  var data=await request('/odds',{markets:'h2h,spreads,totals'});
  if(!Array.isArray(data))throw Error('Unexpected game odds format');
- list=[];events=data.filter(function(g){return (g.bookmakers||[]).some(function(b){return b.key==='fanduel'})});
- events.forEach(function(g){addOffers(g,(g.bookmakers||[]).find(function(b){return b.key==='fanduel'}))});
- lastFetched=new Date().toISOString();
- showGames();renderOffers();
- stat('FanDuel odds feed connected. '+events.length+' games • '+list.length+' individual selections • refreshed '+new Date(lastFetched).toLocaleString());
- marketStat('Select a game and market. Featured moneyline, spreads, totals are already loaded.');
+ storeFeatured(data);
+ useFeatured(data,Date.now(),false);
  }catch(e){stat('Failed to retrieve FanDuel odds: '+e.message+(e instanceof TypeError?' (The browser could not reach the app’s cloud odds gateway. Check your network or security software.)':''),true);$('fdGames').textContent='No results loaded.'}
- finally{b.disabled=false}
+ finally{b.disabled=false;$('fdForceRefresh').disabled=false}
 }
-$$('fdLoad').addEventListener('click',load);
+$('fdLoad').addEventListener('click',function(){load(false)});
+$('fdForceRefresh').addEventListener('click',function(){if(!$('fdKey').value.trim()){stat('Paste your API key before requesting new live prices.',true);return}if(confirm('Refresh all FanDuel game lines now? The provider will charge approximately 3 additional API credits.'))load(true)});
+(function(){var saved=cachedFeatured();if(saved&&Date.now()-saved.at<CACHE_AGE_MS){useFeatured(saved.data,saved.at,true);if(saved.credits)$('fdQuota').textContent='Previous reading: '+saved.credits+' • no credits spent on reload.'}})();
 $$('fdGames').addEventListener('click',function(e){var button=e.target.closest('[data-fdgame]');if(!button)return;$$('fdGame').value=button.dataset.fdgame;renderOffers();$$('fdGame').scrollIntoView({behavior:'smooth',block:'center'})});
 $$('fdGame').addEventListener('change',function(){renderOffers();$$('fdMarket').innerHTML='<option value="">Click Find available markets</option>'});
 function renderOffers(){
