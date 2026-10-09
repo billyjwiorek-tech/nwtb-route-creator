@@ -250,15 +250,18 @@ function install(selected){
  var set=function(el,value){if(!el)return;el.value=value;el.dispatchEvent(new Event('input',{bubbles:true}))};
  set(get('name'),'Historical trend research • '+s.season+' W'+s.week+' • '+selected.length+' legs');
  selected.forEach(function(x,i){
-  var values={game:x.game.away+' @ '+x.game.home,market:x.market,pick:x.player+' — '+x.side+' '+x.line,prob:(100*x.rating).toFixed(2),price:x.odds!=null?moneyOdds(x.odds):''};
+  var values={game:x.game.away+' @ '+x.game.home,market:x.market,pick:x.player+' — '+x.side+' '+x.line,prob:'',price:x.odds!=null?moneyOdds(x.odds):''};
   Object.keys(values).forEach(function(field){set(document.querySelector('#legs [data-i="'+i+'"][data-field="'+field+'"]'),values[field])});
+ });
+ selected.forEach(function(x,i){
+  if(window.OddsReaderDraft&&typeof window.OddsReaderDraft.setResearch==='function')window.OddsReaderDraft.setResearch(i,{hits:x.hits,played:x.played,rating:(100*x.rating).toFixed(2)});
  });
  set(get('quote'),'');
  set(get('prob'),'');
  get('verified').checked=false;get('verified').dispatchEvent(new Event('change',{bubbles:true}));
  document.querySelector('.tabs [data-tab="builder"]').click();
  pane.hidden=true;
- get('estNote').textContent='Per-leg values imported are uncalibrated research ratings, NOT proven true probabilities. Never multiply legs from the same game. Obtain actual combined FanDuel quote.';
+ get('estNote').textContent='Historical hit rates and experimental ratings are shown for research. No modeled win probabilities have been imported. Do not calculate EV without a validated probability model and a real FanDuel quote.';
  var t=get('toast');if(t){t.textContent='Historical candidates imported. Confirm real sportsbook lines and model assumptions.';t.style.display='block';setTimeout(function(){t.style.display='none'},4500)}
 }
 get('histResults').addEventListener('click',function(e){var b=e.target.closest('[data-hist-use]');if(b){install([s.results[Number(b.dataset.histUse)]])}});
