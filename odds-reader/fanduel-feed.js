@@ -82,8 +82,9 @@ function addOffers(event,book){
  var pick=o.description?o.description+' — '+o.name:o.name;
  if(o.point!==undefined&&o.point!==null)pick+=' '+(Number(o.point)>0&&m.key==='spreads'?'+':'')+o.point;
  var entry={eventId:event.id,game:game,market:m.key,pick:pick,odds:n,updated:m.last_update||book.last_update||'',home:event.home_team,away:event.away_team,point:o.point??null,description:o.description||'',name:o.name||''};
- var id=[entry.eventId,entry.market,entry.pick,entry.odds].join('|');
- if(!list.some(function(l){return [l.eventId,l.market,l.pick,l.odds].join('|')===id}))list.push(entry);
+ var id=[entry.eventId,entry.market,entry.pick].join('|');
+ var old=list.findIndex(function(l){return [l.eventId,l.market,l.pick].join('|')===id});
+ if(old>=0)list[old]=entry;else list.push(entry);
  });
  });
 }
@@ -196,5 +197,5 @@ $$('fdGenerate').onclick=function(){
  }).join('')||'<p>None available.</p>';
 };
 $$('fdCandidates').addEventListener('click',function(e){var b=e.target.closest('[data-fd-candidate]');if(!b)return;var c=generated[Number(b.dataset.fdCandidate)];if(c)installLegs(c.legs,'FanDuel feed candidate • '+c.legs.length+' legs')});
-window.OddsReaderFanDuel={getSelections:function(){return list.map(function(l){return Object.assign({},l)})},getLastRefresh:function(){return lastFetched}};
+window.OddsReaderFanDuel={getSelections:function(){return list.map(function(l){return Object.assign({},l)})},getLastRefresh:function(){return lastFetched},getGames:function(){return events.map(function(e){return {id:e.id,home:e.home_team,away:e.away_team,commence_time:e.commence_time}})},refreshDisplay:renderOffers,ingestEventOdds:function(data){var book=(data&&data.bookmakers||[]).find(function(b){return b.key==='fanduel'});if(!book)return {markets:[],count:0};var before=list.length;addOffers(data,book);renderOffers();return {markets:(book.markets||[]).map(function(m){return m.key}),count:list.length-before};}};
 })();
