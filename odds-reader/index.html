@@ -83,8 +83,17 @@ function example(){return {name:'Eagles @ Jaguars — example SGP (Oct 11)',legs
 {game:'PHI @ JAX',market:'2+ touchdowns',pick:'Parker Washington — 2+ touchdowns',prob:'',price:''}],
 prob:'',buffer:'0',quote:'+19913',stake:'10',fee:'0',cost:'0',verified:false}}
 function blank(){return {name:'',legs:[{game:'',market:'',pick:'',prob:'',price:''},{game:'',market:'',pick:'',prob:'',price:''}],prob:'',buffer:'0',quote:'',stake:'10',fee:'0',cost:'0',verified:false}}
-function persist(){try{localStorage.setItem(KEY,JSON.stringify({draft:D,history:H}))}catch(e){show('Browser storage unavailable')}}
+var CLOUD_DELETES_KEY='oddsreader_cloud_deletes_v1',cloudDeletes={},priorDraft='',cloudMergeInProgress=false;
+try{cloudDeletes=JSON.parse(localStorage.getItem(CLOUD_DELETES_KEY)||'{}')||{}}catch(e){cloudDeletes={}}
+function persist(){
+ var newDraft=JSON.stringify(D);
+ if(!cloudMergeInProgress&&priorDraft&&newDraft!==priorDraft){D.updatedAt=Date.now();newDraft=JSON.stringify(D)}
+ priorDraft=newDraft;
+ try{localStorage.setItem(KEY,JSON.stringify({draft:D,history:H}));localStorage.setItem(CLOUD_DELETES_KEY,JSON.stringify(cloudDeletes))}catch(e){show('Browser storage unavailable')}
+ if(!cloudMergeInProgress)window.dispatchEvent(new Event('oddsreader:local-change'));
+}
 try{var s=JSON.parse(localStorage.getItem(KEY)||'null');D=s&&s.draft? s.draft:example();H=s&&Array.isArray(s.history)?s.history:[]}catch(e){D=example();H=[]}
+priorDraft=JSON.stringify(D);
 function dec(a){var n=Number(String(a||'').replace(/,/g,''));return Number.isInteger(n)&&(n>=100||n<=-100)?(n>0?1+n/100:1+100/Math.abs(n)):null}
 function fmt(a){return a==null||!Number.isFinite(Number(a))?'—':(Number(a)>0?'+':'')+Math.round(Number(a))}
 function fromP(p){if(!(p>0&&p<1))return null;var d=1/p;return d>=2?Math.round((d-1)*100):Math.round(-100/(d-1))}
@@ -192,7 +201,7 @@ $('save').onclick=function(){
  var d=dec(D.quote),p=Number(D.prob),s=Number(D.stake);
  if(!d||!(s>0)){show('A valid combined FanDuel quote and stake are required.');return}
  var ev=valid(p)&&D.prob!==''?s*d*p/100-s-(Number(D.fee)||0)-s*(Number(D.cost)||0)/100:null;
- H.unshift({id:Date.now()+Math.random(),date:new Date().toLocaleString(),name:D.name,legs:JSON.parse(JSON.stringify(D.legs)),prob:D.prob,quote:D.quote,stake:s,ev:ev,verified:D.verified,result:'PENDING',missed:[],draft:JSON.parse(JSON.stringify(D))});persist();show('Saved. Open History to review.');};
+ H.unshift({id:Date.now()+Math.random(),updatedAt:Date.now(),date:new Date().toLocaleString(),name:D.name,legs:JSON.parse(JSON.stringify(D.legs)),prob:D.prob,quote:D.quote,stake:s,ev:ev,verified:D.verified,result:'PENDING',missed:[],draft:JSON.parse(JSON.stringify(D))});persist();show('Saved. Open History to review.');};
 $('image').onchange=function(){var file=this.files[0];if(!file)return;var img=document.createElement('img');img.style='max-width:100%;max-height:320px';img.alt='Selected slip screenshot';img.src=URL.createObjectURL(file);$('preview').replaceChildren(img)};
 $('scan').onclick=async function(){
  var f=$('image').files[0];if(!f){show('Select a screenshot first');return}if(f.size>18*1024*1024){show('Image too large');return}
@@ -203,12 +212,35 @@ $('scan').onclick=async function(){
  }catch(e){$('ocrStatus').textContent='OCR could not load. You may paste text or manually enter odds.'}finally{b.disabled=false}};
 $('extract').onclick=doExtract;
 $('apply').onclick=function(){if(suggested==null){show('No reliable combined quote');return}D.quote=fmt(suggested);D.verified=false;persist();fill();go('builder');show('OCR suggestion added. Verify exact slip before saving.')};
-$('records').addEventListener('change',function(e){var i=Number(e.target.dataset.result!==undefined?e.target.dataset.result:e.target.dataset.missed);if(!H[i])return;if(e.target.dataset.result!==undefined){H[i].result=e.target.value;if(e.target.value!=='MISS')H[i].missed=[]}else if(e.target.dataset.missed!==undefined){var j=Number(e.target.dataset.idx);H[i].missed=H[i].missed||[];if(e.target.checked&&!H[i].missed.includes(j))H[i].missed.push(j);if(!e.target.checked)H[i].missed=H[i].missed.filter(function(k){return k!==j})}persist();renderHistory()});
-$('records').addEventListener('click',function(e){var load=e.target.closest('[data-load]'),del=e.target.closest('[data-delete]');if(load){D=JSON.parse(JSON.stringify(H[Number(load.dataset.load)].draft));persist();fill();go('builder')}if(del&&confirm('Delete this saved record?')){H.splice(Number(del.dataset.delete),1);persist();renderHistory()}});
+$('records').addEventListener('change',function(e){var i=Number(e.target.dataset.result!==undefined?e.target.dataset.result:e.target.dataset.missed);if(!H[i])return;if(e.target.dataset.result!==undefined){H[i].result=e.target.value;if(e.target.value!=='MISS')H[i].missed=[]}else if(e.target.dataset.missed!==undefined){var j=Number(e.target.dataset.idx);H[i].missed=H[i].missed||[];if(e.target.checked&&!H[i].missed.includes(j))H[i].missed.push(j);if(!e.target.checked)H[i].missed=H[i].missed.filter(function(k){return k!==j})}H[i].updatedAt=Date.now();persist();renderHistory()});
+$('records').addEventListener('click',function(e){var load=e.target.closest('[data-load]'),del=e.target.closest('[data-delete]');if(load){D=JSON.parse(JSON.stringify(H[Number(load.dataset.load)].draft));persist();fill();go('builder')}if(del&&confirm('Delete this saved record?')){var deleted=H.splice(Number(del.dataset.delete),1)[0];if(deleted)cloudDeletes[String(deleted.id)]=Date.now();persist();renderHistory()}});
 $('export').onclick=function(){var a=document.createElement('a'),blob=new Blob([JSON.stringify({app:'Odds Reader Lab',saved:new Date().toISOString(),history:H},null,2)],{type:'application/json'});a.href=URL.createObjectURL(blob);a.download='odds-reader-history.json';a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},1500)};
 $('importBtn').onclick=function(){$('import').click()};
-$('import').onchange=async function(){try{var o=JSON.parse(await this.files[0].text());if(!o||!Array.isArray(o.history))throw Error('Invalid history file');if(!confirm('Import '+o.history.length+' records?'))return;var ids=new Set(H.map(function(h){return h.id}));o.history.forEach(function(h){if(h&&h.id&&h.draft&&Array.isArray(h.legs)&&!ids.has(h.id)){H.push(h);ids.add(h.id)}});persist();renderHistory();show('History imported')}catch(e){show('Import failed')}};
+$('import').onchange=async function(){try{var o=JSON.parse(await this.files[0].text());if(!o||!Array.isArray(o.history))throw Error('Invalid history file');if(!confirm('Import '+o.history.length+' records?'))return;var ids=new Set(H.map(function(h){return h.id}));o.history.forEach(function(h){if(h&&h.id&&h.draft&&Array.isArray(h.legs)&&!ids.has(h.id)){H.push(Object.assign({updatedAt:Date.parse(h.date)||Date.now()},h));ids.add(h.id)}});persist();renderHistory();show('History imported')}catch(e){show('Import failed')}};
 window.OddsReaderDraft={setResearch:function(index,data){if(!D.legs[index])return;D.legs[index].research={hits:data.hits,played:data.played,rating:data.rating};D.provenanceMigrated=true;persist();renderLegs();recalc()}};
+window.OddsReaderCloudBridge={
+ read:function(){return {format:1,history:JSON.parse(JSON.stringify(H)),draft:JSON.parse(JSON.stringify(D)),deleted:JSON.parse(JSON.stringify(cloudDeletes)),providerKey:(function(){try{return localStorage.getItem('odds_reader_key_device_v1')||''}catch(e){return ''}})()}},
+ merge:function(remote){
+  if(!remote||remote.format!==1||!Array.isArray(remote.history))throw Error('Invalid cloud backup');
+  cloudMergeInProgress=true;
+  try{
+   Object.entries(remote.deleted||{}).forEach(function(pair){if(/^\d/.test(pair[0])&&Number(pair[1])>(Number(cloudDeletes[pair[0]])||0))cloudDeletes[pair[0]]=Number(pair[1])});
+   var all=new Map();
+   function insert(item){if(!item||item.id===undefined||!Array.isArray(item.legs))return;var id=String(item.id);var old=all.get(id),updated=Number(item.updatedAt)||Date.parse(item.date)||0;if(!old||(Number(old.updatedAt)||Date.parse(old.date)||0)<updated)all.set(id,item)}
+   H.forEach(insert);remote.history.forEach(insert);
+   H=Array.from(all.values()).filter(function(h){var removed=Number(cloudDeletes[String(h.id)])||0;return !removed||removed<(Number(h.updatedAt)||Date.parse(h.date)||0)}).sort(function(a,b){return (Number(b.updatedAt)||Date.parse(b.date)||0)-(Number(a.updatedAt)||Date.parse(a.date)||0)});
+   var other=remote.draft;
+   if(other&&Array.isArray(other.legs)&&(Number(other.updatedAt)||0)>(Number(D.updatedAt)||0)){D=other;priorDraft=JSON.stringify(D)}
+   var existingKey='';try{existingKey=localStorage.getItem('odds_reader_key_device_v1')||''}catch(e){}
+   if(!existingKey&&remote.providerKey&&/^[a-zA-Z0-9_-]{16,128}$/.test(remote.providerKey)){
+    try{localStorage.setItem('odds_reader_key_device_v1',remote.providerKey)}catch(e){}
+    if(window.OddsReaderFanDuel&&window.OddsReaderFanDuel.reloadSavedKey)window.OddsReaderFanDuel.reloadSavedKey();
+   }
+   persist();fill();if(!$('history').hidden)renderHistory();
+   return {records:H.length,hasProviderKey:!!(existingKey||remote.providerKey)};
+  }finally{cloudMergeInProgress=false}
+ }
+};
 fill();persist();
 })();
 </script>
