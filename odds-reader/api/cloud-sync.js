@@ -20,7 +20,7 @@ module.exports=async function(req,res){
  const prefix=PREFIX+body.id+'/';
  try{
   if(body.op==='pull'){
-   const found=await list({prefix,limit:100});
+   const found=await list({prefix,limit:1000});
    const items=(found.blobs||[]).slice().sort((a,b)=>new Date(b.uploadedAt)-new Date(a.uploadedAt)).slice(0,5);
    const snapshots=[];
    for(const item of items){
