@@ -219,7 +219,7 @@ $('importBtn').onclick=function(){$('import').click()};
 $('import').onchange=async function(){try{var o=JSON.parse(await this.files[0].text());if(!o||!Array.isArray(o.history))throw Error('Invalid history file');if(!confirm('Import '+o.history.length+' records?'))return;var ids=new Set(H.map(function(h){return h.id}));o.history.forEach(function(h){if(h&&h.id&&h.draft&&Array.isArray(h.legs)&&!ids.has(h.id)){H.push(Object.assign({updatedAt:Date.parse(h.date)||Date.now()},h));ids.add(h.id)}});persist();renderHistory();show('History imported')}catch(e){show('Import failed')}};
 window.OddsReaderDraft={setResearch:function(index,data){if(!D.legs[index])return;D.legs[index].research={hits:data.hits,played:data.played,rating:data.rating};D.provenanceMigrated=true;persist();renderLegs();recalc()}};
 window.OddsReaderCloudBridge={
- read:function(){return {format:1,history:JSON.parse(JSON.stringify(H)),draft:JSON.parse(JSON.stringify(D)),deleted:JSON.parse(JSON.stringify(cloudDeletes)),providerKey:(function(){try{return localStorage.getItem('odds_reader_key_device_v1')||''}catch(e){return ''}})()}},
+ read:function(){return {format:1,history:JSON.parse(JSON.stringify(H)),draft:JSON.parse(JSON.stringify(D)),deleted:JSON.parse(JSON.stringify(cloudDeletes)),providerKey:(function(){try{return localStorage.getItem('odds_reader_key_device_v1')||''}catch(e){return ''}})(),providerKeyUpdatedAt:(function(){try{return Number(localStorage.getItem('odds_reader_key_changed_at'))||0}catch(e){return 0}})()}},
  merge:function(remote){
   if(!remote||remote.format!==1||!Array.isArray(remote.history))throw Error('Invalid cloud backup');
   cloudMergeInProgress=true;
@@ -231,9 +231,16 @@ window.OddsReaderCloudBridge={
    H=Array.from(all.values()).filter(function(h){var removed=Number(cloudDeletes[String(h.id)])||0;return !removed||removed<(Number(h.updatedAt)||Date.parse(h.date)||0)}).sort(function(a,b){return (Number(b.updatedAt)||Date.parse(b.date)||0)-(Number(a.updatedAt)||Date.parse(a.date)||0)});
    var other=remote.draft;
    if(other&&Array.isArray(other.legs)&&(Number(other.updatedAt)||0)>(Number(D.updatedAt)||0)){D=other;priorDraft=JSON.stringify(D)}
-   var existingKey='';try{existingKey=localStorage.getItem('odds_reader_key_device_v1')||''}catch(e){}
-   if(!existingKey&&remote.providerKey&&/^[a-zA-Z0-9_-]{16,128}$/.test(remote.providerKey)){
-    try{localStorage.setItem('odds_reader_key_device_v1',remote.providerKey)}catch(e){}
+   var existingKey='',localKeyDate=0;
+   try{existingKey=localStorage.getItem('odds_reader_key_device_v1')||'';localKeyDate=Number(localStorage.getItem('odds_reader_key_changed_at'))||0}catch(e){}
+   var remoteKeyDate=Number(remote.providerKeyUpdatedAt)||0;
+   if((remoteKeyDate>localKeyDate||(!localKeyDate&&!existingKey&&remote.providerKey))&&
+      (!remote.providerKey||/^[a-zA-Z0-9_-]{16,128}$/.test(remote.providerKey))){
+    try{
+     if(remote.providerKey)localStorage.setItem('odds_reader_key_device_v1',remote.providerKey);
+     else localStorage.removeItem('odds_reader_key_device_v1');
+     localStorage.setItem('odds_reader_key_changed_at',String(remoteKeyDate||Date.now()));
+    }catch(e){}
     if(window.OddsReaderFanDuel&&window.OddsReaderFanDuel.reloadSavedKey)window.OddsReaderFanDuel.reloadSavedKey();
    }
    persist();fill();if(!$('history').hidden)renderHistory();
@@ -244,7 +251,7 @@ window.OddsReaderCloudBridge={
 fill();persist();
 })();
 </script>
-<script defer src="./fanduel-feed.js?v=20261009-savekey"></script>
+<script defer src="./fanduel-feed.js?v=20261009-sync-key-updates"></script>
 <script defer src="./historical-trends.js?v=20261009c"></script>
 <script defer src="./full-markets.js?v=20261009-reorder"></script>
 <script defer src="./cloud-sync.js?v=20261009-cloud-v2"></script>
