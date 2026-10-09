@@ -12,7 +12,7 @@ module.exports=async function(req,res){
   if(req.method!=='POST')return send(res,405,{error:'Use POST to request odds.'});
   try{
     const body=typeof req.body==='string'?JSON.parse(req.body):req.body;
-    if(!body||typeof body!=='object'||JSON.stringify(body).length>2048)return send(res,400,{error:'Invalid request.'});
+    if(!body||typeof body!=='object'||JSON.stringify(body).length>4096)return send(res,400,{error:'Invalid request.'});
     const apiKey=body.apiKey,route=body.path,params=body.params||{};
     if(typeof apiKey!=='string'||!/^[a-zA-Z0-9_-]{16,128}$/.test(apiKey))return send(res,400,{error:'Enter a valid data-provider API key.'});
     if(typeof route!=='string')return send(res,400,{error:'Invalid NFL odds request.'});
@@ -22,7 +22,7 @@ module.exports=async function(req,res){
     if(!odds&&!marketMatch&&!eventMatch)return send(res,400,{error:'Unsupported NFL odds request.'});
     const rawMarkets=typeof params.markets==='string'?params.markets:'';
     if(!marketMatch){
-      if(!rawMarkets||rawMarkets.length>160||!rawMarkets.split(',').every(m=>/^(?:h2h|spreads|totals|player_[a-z0-9_]{1,55})$/.test(m))){
+      if(!rawMarkets||rawMarkets.length>1600||rawMarkets.split(',').length>48||!rawMarkets.split(',').every(m=>/^(?:h2h|spreads|totals|player_[a-z0-9_]{1,55})$/.test(m))){
         return send(res,400,{error:'Choose supported NFL markets.'});
       }
     }
