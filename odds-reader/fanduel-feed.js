@@ -172,7 +172,28 @@ function installLegs(legs,name){
  panel.hidden=true;
  toast('FanDuel individual leg odds imported. Add independently modeled JOINT probability and actual combined bet-slip quote.');
 }
-$$('fdOffers').addEventListener('click',function(e){var b=e.target.closest('[data-fdadd]');if(!b)return;var leg=list[Number(b.dataset.fdadd)];if(!leg)return;installLegs([leg],'FanDuel selection · '+leg.game)});
+function appendLeg(l){
+ var existing=Array.from(document.querySelectorAll('#legs .leg'));
+ if(existing.some(function(div){return div.querySelector('[data-field="pick"]')?.value.trim()===l.pick && div.querySelector('[data-field="game"]')?.value.trim()===l.game})){toast('Already in the parlay.');return;}
+ var index=existing.findIndex(function(div){return !div.querySelector('[data-field="pick"]')?.value.trim()});
+ if(index<0){
+  if(existing.length>=15){toast('15-leg maximum.');return}
+  $('addLeg').click();index=document.querySelectorAll('#legs .leg').length-1;
+ }
+ var updates={game:l.game,market:l.market,pick:l.pick,price:american(l.odds),prob:''};
+ Object.keys(updates).forEach(function(field){
+  var element=document.querySelector('#legs [data-i="'+index+'"][data-field="'+field+'"]');
+  if(element){element.value=updates[field];clickEvent(element)}
+ });
+ var joint=$('prob');joint.value='';clickEvent(joint);
+ var quote=$('quote');quote.value='';clickEvent(quote);
+ var ck=$('verified');ck.checked=false;clickEvent(ck,'change');
+ var builder=tabs.querySelector('[data-tab="builder"]');if(builder)builder.click();
+ panel.hidden=true;
+ toast('FanDuel prop added to your parlay. '+(index+1)+' leg position selected. Combined quote requires bet-slip verification.');
+}
+
+$('fdOffers').addEventListener('click',function(e){var b=e.target.closest('[data-fdadd]');if(!b)return;var leg=list[Number(b.dataset.fdadd)];if(!leg)return;appendLeg(leg)});
 $$('fdGenerate').onclick=function(){
  var n=Number($$('fdCount').value);
  var buckets={};list.forEach(function(l){if(!buckets[l.eventId])buckets[l.eventId]=[];buckets[l.eventId].push(l)});
@@ -197,5 +218,5 @@ $$('fdGenerate').onclick=function(){
  }).join('')||'<p>None available.</p>';
 };
 $$('fdCandidates').addEventListener('click',function(e){var b=e.target.closest('[data-fd-candidate]');if(!b)return;var c=generated[Number(b.dataset.fdCandidate)];if(c)installLegs(c.legs,'FanDuel feed candidate • '+c.legs.length+' legs')});
-window.OddsReaderFanDuel={getSelections:function(){return list.map(function(l){return Object.assign({},l)})},getLastRefresh:function(){return lastFetched},getGames:function(){return events.map(function(e){return {id:e.id,home:e.home_team,away:e.away_team,commence_time:e.commence_time}})},refreshDisplay:renderOffers,ingestEventOdds:function(data){var book=(data&&data.bookmakers||[]).find(function(b){return b.key==='fanduel'});if(!book)return {markets:[],count:0};var before=list.length;addOffers(data,book);renderOffers();return {markets:(book.markets||[]).map(function(m){return m.key}),count:list.length-before};}};
+window.OddsReaderFanDuel={getSelections:function(){return list.map(function(l){return Object.assign({},l)})},getLastRefresh:function(){return lastFetched},addSelection:appendLeg,getGames:function(){return events.map(function(e){return {id:e.id,home:e.home_team,away:e.away_team,commence_time:e.commence_time}})},refreshDisplay:renderOffers,ingestEventOdds:function(data){var book=(data&&data.bookmakers||[]).find(function(b){return b.key==='fanduel'});if(!book)return {markets:[],count:0};var before=list.length;addOffers(data,book);renderOffers();return {markets:(book.markets||[]).map(function(m){return m.key}),count:list.length-before};}};
 })();
