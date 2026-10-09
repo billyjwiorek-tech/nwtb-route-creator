@@ -20,19 +20,20 @@ function saveDeviceKey(){
  try{
   if(storedKey&&storedKey!==value)clearPriceCaches();
   localStorage.setItem(DEVICE_KEY_STORAGE,value);
-  storedKey=value;key=value;keyStatus();return true;
+  localStorage.setItem('odds_reader_key_changed_at',String(Date.now()));
+  storedKey=value;key=value;keyStatus();window.dispatchEvent(new Event('oddsreader:local-change'));return true;
  }catch(e){stat('Browser storage is blocked. This may be a private window or site storage is disabled.',true);return false}
 }
 function deleteDeviceKey(){
  if(!confirm('Delete your Odds API key from this browser? Saved parlay history will not be removed.'))return;
- try{localStorage.removeItem(DEVICE_KEY_STORAGE)}catch(e){}
+ try{localStorage.removeItem(DEVICE_KEY_STORAGE);localStorage.setItem('odds_reader_key_changed_at',String(Date.now()))}catch(e){}
  clearPriceCaches();storedKey='';key='';$('fdKey').value='';
  events=[];list=[];generated=[];lastFetched=null;
  $('fdGames').textContent='API key deleted. Reconnect to load current games.';
  $('fdGame').innerHTML='<option value="">Load FanDuel odds first</option>';
  $('fdMarket').innerHTML='<option value="">Choose a game first</option>';
  $('fdOffers').textContent='No selections loaded.';
- $('fdQuota').textContent='';keyStatus();stat('API key deleted from this browser. No API credits used.');
+ $('fdQuota').textContent='';keyStatus();window.dispatchEvent(new Event('oddsreader:local-change'));stat('API key deleted from this browser. No API credits used.');
 }
 
 var FEATURED_CACHE_KEY='oddsreader_fanduel_featured_snapshot_1',CACHE_AGE_MS=10*60*1000;
