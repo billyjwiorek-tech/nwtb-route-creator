@@ -29,7 +29,7 @@ pane.innerHTML='<h2>Full FanDuel NFL Player Props & Alternate Lines</h2>'+
 '<div id="fdpQuota" class="fdp-muted"></div>'+
 '<h3>Live market results</h3><div class="fdp-row"><label>Category<select id="fdpFilter"><option value="">All market types</option></select></label><label>Sort<select id="fdpSort"><option value="player">By player</option><option value="market">By market</option><option value="odds">By odds</option></select></label></div>'+
 '<p class="fdp-muted" id="fdpMissing"></p><div class="fdp-results" id="fdpResults">No markets loaded yet.</div>';
-$('feed').appendChild(pane);
+var lineSection=$('feed').querySelector('.fdcols');if(lineSection)lineSection.after(pane);else $('feed').appendChild(pane);
 function chosen(){return [...new Set(groups.filter(function(g){return selected.indexOf(g.key)>=0}).flatMap(function(g){return g.markets.split(',')}))]}
 function status(message,bad){$('fdpStatus').textContent=message;$('fdpStatus').style.color=bad?'#ffaaaa':'#a9edce'}
 function updateCost(){$('fdpCost').textContent=chosen().length+' markets selected • up to '+chosen().length+' API credits for ONE game; actual cost depends on markets returned. No request is automatic.'}
