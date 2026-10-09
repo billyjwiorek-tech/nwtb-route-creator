@@ -1,8 +1,0 @@
-{
-  "name": "odds-reader-lab",
-  "version": "2.2.0",
-  "private": true,
-  "dependencies": {
-    "@vercel/blob": "^2.3.0"
-  }
-}
