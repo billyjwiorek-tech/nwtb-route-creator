@@ -76,7 +76,7 @@ panel.innerHTML=
 '<div class="card"><h2>2. Sync status</h2><div class="metric"><small>Device status</small><strong id="clBadge" style="font-size:18px">Not connected</strong></div>'+
 '<p class="hint" id="clFingerprint"></p><p class="hint" id="clLast"></p><div class="notice" id="clMessage" role="status">Not connected yet.</div>'+
 '<button class="btn primary full" id="clSync">Sync now</button><button class="btn full" id="clDisconnect">Disconnect this device</button>'+
-'<p class="hint">The app checks when reopened, after saved changes, and about once per minute while open. It does not update while closed. Browser-local records stay available offline.</p></div></div>'+
+'<p class="hint">The app checks when reopened, after saved changes, and about every 20 minutes while open (and after local changes). It does not update while closed. Browser-local records stay available offline.</p></div></div>'+
 '<div class="card" style="margin-top:14px"><h2>Security</h2><p>Private Vercel Blob storage with AES-256-GCM encryption in your browser. Device recovery keys are stored locally so you do not need to re-enter one each session. Do not use cloud sync on shared browsers. Concurrent edits can conflict; export a backup before important changes.</p></div>';
 document.querySelector('main footer').before(panel);
 function show(){
@@ -117,7 +117,7 @@ window.addEventListener('oddsreader:local-change',function(){
  if(timer)clearTimeout(timer);
  timer=setTimeout(function(){if(account&&!busy&&JSON.stringify(bridge.read())!==lastData)sync()},10000);
 });
-setInterval(function(){if(account&&!busy&&!document.hidden&&Date.now()-lastSync>=60000)sync()},60000);
-document.addEventListener('visibilitychange',function(){if(!document.hidden&&account&&Date.now()-lastSync>30000)sync()});
+setInterval(function(){if(account&&!busy&&!document.hidden&&Date.now()-lastSync>=1200000)sync()},1200000);
+document.addEventListener('visibilitychange',function(){if(!document.hidden&&account&&Date.now()-lastSync>120000)sync()});
 (async function(){try{var old=localStorage.getItem(KEY);if(old){await prepare(old);status('Recovery key restored from this device. Checking cloud…');await sync()}}catch(e){status('Stored recovery key could not be loaded: '+e.message,true)}showState()})();
 })();
