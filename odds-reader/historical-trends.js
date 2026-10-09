@@ -41,7 +41,7 @@ pane.innerHTML=[
 '<label>Lookback<select id="histLookback"><option value="3">Last 3</option><option value="5" selected>Last 5</option><option value="8">Last 8</option><option value="18">Season to date</option></select></label>',
 '<label>Window<select id="histWindow"><option value="games">Player appearances</option><option value="weeks">Calendar NFL weeks</option></select></label>',
 '<label>Stat / market<select id="histStat"></select></label>',
-'<label>Minimum games played<select id="histMin"><option value="2">2+</option><option value="3">3+</option><option value="4">4+</option><option value="5" selected>5+</option><option value="8">8+</option></select></label>',
+'<label>Minimum games played<select id="histMin"><option value="2">2+</option><option value="3" selected>3+</option><option value="4">4+</option><option value="5">5+</option><option value="8">8+</option></select></label>',
 '<label>Direction<select id="histSide"><option value="Over">Over</option><option value="Under">Under</option></select></label>',
 '<label>Stat threshold (research only)<input id="histLine" type="number" min="0" step=".5" value="49.5"></label>',
 '<label class="wide">Odds selection source<select id="histSourceMode"><option value="fanduel">Use real FanDuel lines (when feed connected)</option><option value="research">Research with threshold entered above — NOT FanDuel odds</option></select></label>',
@@ -71,7 +71,7 @@ function showTab(){
  pane.hidden=false;
  document.querySelectorAll('.tabs button').forEach(function(b){b.classList.toggle('active',b===tab)});
  window.scrollTo({top:0,behavior:'instant'});
- if(!s.loaded)refresh();
+ if(!s.loaded||!s.checkedAt||Date.now()-new Date(s.checkedAt).getTime()>6*60*60*1000)refresh();
 }
 tab.addEventListener('click',showTab);
 document.querySelectorAll('.tabs button:not(#histTab)').forEach(function(b){b.addEventListener('click',function(){pane.hidden=true;tab.classList.remove('active')})});
