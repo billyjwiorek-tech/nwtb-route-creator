@@ -53,9 +53,9 @@ textarea{min-height:140px;resize:vertical}
 a{color:#67c6ff}
 @media(max-width:760px){.grid{grid-template-columns:1fr}.cols2{grid-template-columns:1fr 1fr}header{padding:10px 14px}.headname b{font-size:14px}.card{padding:14px}.metrics{gap:7px}.metric{padding:10px}.metric strong{font-size:20px}.tabs button{padding:10px 13px}}
 </style></head><body>
-<header><div class="head"><span class="logo">OR</span><div class="headname"><b>ODDS READER LAB</b><small>Independent parlay research • Cloud-hosted V1</small></div><button class="btn small" id="example">Load example</button></div></header>
+<header><div class="head"><span class="logo">OR</span><div class="headname"><b>ODDS READER LAB</b><small>Independent parlay research • Cloud-hosted V2.3</small></div><button class="btn small" id="example">Load example</button></div></header>
 <main><div class="tabs"><button class="active" data-tab="builder">Parlay Builder</button><button data-tab="reader">Screenshot Reader</button><button data-tab="history">History & Results</button></div>
-<div class="notice"><b>What this app does:</b> Builds parlays, calculates fair odds from YOUR modeled probabilities, reads suggested odds from uploaded screenshots, and compares quotes. <b>FanDuel-listed game odds and player props are available through an optional independent data feed.</b> Exact combined parlay quotes still need bet-slip verification. No wagers are placed. Saved history currently remains local to each browser until secure account sync is configured.</div>
+<div class="notice"><b>What this app does:</b> Builds parlays, calculates fair odds from YOUR modeled probabilities, reads suggested odds from uploaded screenshots, and compares quotes. <b>FanDuel-listed game odds and player props are available through an optional independent data feed.</b> Exact combined parlay quotes still need bet-slip verification. No wagers are placed. Enable the Cloud Sync tab to share encrypted history and settings between linked devices.</div>
 <section id="builder">
 <div class="flex"><div><h1>Build & compare a parlay</h1><p class="hint">Choose exact selections, estimate probability, then verify the real combined odds from FanDuel's public bet slip.</p></div><button class="btn" id="new">+ New parlay</button></div>
 <div class="grid"><div class="stack"><div class="card"><h2>1. Parlay selections</h2><label>Parlay name<input id="name" placeholder="Sunday 4-leg parlay"></label><div id="legs"></div><button class="btn full" id="addLeg">+ Add leg</button><p class="hint">Every leg needs a game, market, and exact selection/line. Enter a modeled leg probability for different-game combination estimates.</p></div>
@@ -247,4 +247,5 @@ fill();persist();
 <script defer src="./fanduel-feed.js?v=20261009-savekey"></script>
 <script defer src="./historical-trends.js?v=20261009c"></script>
 <script defer src="./full-markets.js?v=20261009-reorder"></script>
+<script defer src="./cloud-sync.js?v=20261009-v1"></script>
 </body></html>
