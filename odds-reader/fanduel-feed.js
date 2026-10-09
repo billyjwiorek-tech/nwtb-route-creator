@@ -6,6 +6,35 @@
 'use strict';
 var api='https://api.the-odds-api.com/v4/sports/americanfootball_nfl';
 var key='',events=[],marketsByEvent={},list=[],generated=[],lastFetched=null,model={};
+var DEVICE_KEY_STORAGE='odds_reader_key_device_v1',storedKey='';
+function loadStoredKey(){try{return localStorage.getItem(DEVICE_KEY_STORAGE)||''}catch(e){return ''}}
+function clearPriceCaches(){try{sessionStorage.removeItem(FEATURED_CACHE_KEY);for(var i=sessionStorage.length-1;i>=0;i--){var k=sessionStorage.key(i);if(k&&k.indexOf('oddsreader_fdp_v1_')===0)sessionStorage.removeItem(k)}}catch(e){}}
+function keyStatus(){
+ if(!$('fdKeyStatus'))return;
+ var input=$('fdKey').value.trim();
+ $('fdKeyStatus').textContent=storedKey&&input===storedKey?'API key remembered on this browser until you delete or replace it.':'No saved key currently matching this field.';
+}
+function saveDeviceKey(){
+ var value=$('fdKey').value.trim();
+ if(!/^[A-Za-z0-9_-]{16,128}$/.test(value)){stat('Enter a valid API key before saving.',true);return false}
+ try{
+  if(storedKey&&storedKey!==value)clearPriceCaches();
+  localStorage.setItem(DEVICE_KEY_STORAGE,value);
+  storedKey=value;key=value;keyStatus();return true;
+ }catch(e){stat('Browser storage is blocked. This may be a private window or site storage is disabled.',true);return false}
+}
+function deleteDeviceKey(){
+ if(!confirm('Delete your Odds API key from this browser? Saved parlay history will not be removed.'))return;
+ try{localStorage.removeItem(DEVICE_KEY_STORAGE)}catch(e){}
+ clearPriceCaches();storedKey='';key='';$('fdKey').value='';
+ events=[];list=[];generated=[];lastFetched=null;
+ $('fdGames').textContent='API key deleted. Reconnect to load current games.';
+ $('fdGame').innerHTML='<option value="">Load FanDuel odds first</option>';
+ $('fdMarket').innerHTML='<option value="">Choose a game first</option>';
+ $('fdOffers').textContent='No selections loaded.';
+ $('fdQuota').textContent='';keyStatus();stat('API key deleted from this browser. No API credits used.');
+}
+
 var FEATURED_CACHE_KEY='oddsreader_fanduel_featured_snapshot_1',CACHE_AGE_MS=10*60*1000;
 function cachedFeatured(){try{var x=JSON.parse(sessionStorage.getItem(FEATURED_CACHE_KEY)||'null');return x&&Array.isArray(x.data)&&Number.isFinite(x.at)?x:null}catch(e){return null}}
 function storeFeatured(data){try{sessionStorage.setItem(FEATURED_CACHE_KEY,JSON.stringify({data:data,at:Date.now(),credits:$('fdQuota')?$('fdQuota').textContent:''}))}catch(e){}}
@@ -30,6 +59,9 @@ panel.innerHTML=
 '<div class="fdcols"><div class="card"><h2>1. Connect FanDuel market data</h2>'+
 '<p class="hint">This optional external service requires its own API key. You can <a target="_blank" rel="noopener noreferrer" href="https://the-odds-api.com/">register for a free key at The Odds API</a>. No FanDuel account or login is needed. The key stays in this browser tab, is never saved in your parlay history, and is sent by HTTPS to this app’s cloud gateway, which forwards it to the data provider. Requests use API credits.</p>'+
 '<div class="fdkeyline"><label>Odds API key<input type="password" id="fdKey" autocomplete="off" placeholder="Paste your API key here"></label><button class="btn primary" id="fdLoad">Load FanDuel NFL odds</button></div>'+ 
+'<div class="fdactions" style="margin:8px 0"><button class="btn small" id="fdSaveDeviceKey" type="button">Save API Key</button><button class="btn small" id="fdDeleteDeviceKey" type="button">Delete API Key</button></div>'+ 
+'<p id="fdKeyStatus" class="fdsmall">Key not yet remembered.</p>'+ 
+'<p class="fdsmall">Key is saved on this device in browser storage and can be deleted or replaced. Avoid saving on shared computers. Cross-device secure synchronization will require a separate authenticated cloud database.</p>'+ 
 '<button class="btn small" id="fdForceRefresh" type="button" style="margin-top:8px">Refresh live prices (uses 3 credits)</button>'+ 
 '<p class="fdsmall">Credit saver: recent game-line data is reused for 10 minutes on this browser. Fresh odds can move at any time. The API charges 3 credits for moneyline + spread + total on a live refresh; each individual prop-market request may use additional credits.</p>'+
 '<p id="fdStatus" class="fdsmall" role="status">Not connected.</p>'+
@@ -98,6 +130,7 @@ function showGames(){
 }
 async function load(force){
  key=$('fdKey').value.trim();
+ if(key!==storedKey&&key)saveDeviceKey();
  var snapshot=cachedFeatured();
  if(!force&&snapshot&&Date.now()-snapshot.at<CACHE_AGE_MS){useFeatured(snapshot.data,snapshot.at,true);if(snapshot.credits)$('fdQuota').textContent='Previous reading: '+snapshot.credits+' • no credits spent now.';return}
  if(!key){stat('A The Odds API key is needed to retrieve fresh FanDuel prices. If a recent snapshot exists, it will load without spending credits.',true);return}
@@ -110,6 +143,10 @@ async function load(force){
  }catch(e){stat('Failed to retrieve FanDuel odds: '+e.message+(e instanceof TypeError?' (The browser could not reach the app’s cloud odds gateway. Check your network or security software.)':''),true);$('fdGames').textContent='No results loaded.'}
  finally{b.disabled=false;$('fdForceRefresh').disabled=false}
 }
+$('fdSaveDeviceKey').addEventListener('click',function(){if(saveDeviceKey())stat('API key saved on this device. No API credits spent.')});
+$('fdDeleteDeviceKey').addEventListener('click',deleteDeviceKey);
+$('fdKey').addEventListener('input',keyStatus);
+storedKey=loadStoredKey();if(storedKey){key=storedKey;$('fdKey').value=storedKey}keyStatus();
 $('fdLoad').addEventListener('click',function(){load(false)});
 $('fdForceRefresh').addEventListener('click',function(){if(!$('fdKey').value.trim()){stat('Paste your API key before requesting new live prices.',true);return}if(confirm('Refresh all FanDuel game lines now? The provider will charge approximately 3 additional API credits.'))load(true)});
 (function(){var saved=cachedFeatured();if(saved&&Date.now()-saved.at<CACHE_AGE_MS){useFeatured(saved.data,saved.at,true);if(saved.credits)$('fdQuota').textContent='Previous reading: '+saved.credits+' • no credits spent on reload.'}})();
