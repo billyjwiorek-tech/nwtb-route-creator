@@ -80,7 +80,7 @@ panel.innerHTML=
 '<button class="btn" id="fdGenerate">Generate multigame combinations</button></div>'+
 '<p class="hint">This generator only uses loaded FanDuel individual-leg prices. It chooses one leg per game and ranks by the product of quoted *implied* probabilities. <b>That is not an independent prediction, fair probability, EV, or actual parlay price.</b> SGPs require correlated probability models plus a genuine quoted bet slip.</p>'+
 '<div id="fdCandidates"></div></div>'+
-'<div class="card" style="margin-top:14px"><b>Source integrity</b><p class="hint">Only bookmaker key <b>fanduel</b> is accepted; every displayed price includes market type and update time. The feed contains provider-reported FanDuel odds, not independently verified direct FanDuel quotes. The standalone app remains separate from NFL Edge Lab and all NWTB data.</p></div>';
+'<div class="card" style="margin-top:14px"><b>Source integrity</b><p class="hint">Only bookmaker key <b>fanduel</b> is accepted; every displayed price includes market type and update time. The feed contains provider-reported FanDuel odds, not independently verified direct FanDuel quotes. This standalone research app uses only its own odds feed and private cloud-sync service.</p></div>';
 document.querySelector('main footer').before(panel);
 function page(){
  ['builder','reader','history'].forEach(function(id){$$(id).hidden=true});
