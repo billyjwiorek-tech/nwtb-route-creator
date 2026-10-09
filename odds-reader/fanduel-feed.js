@@ -24,7 +24,7 @@ panel.innerHTML=
 '<p class="hint">Bring real FanDuel-listed NFL selections and individual American odds into the reader via The Odds API, an independent data provider. <b>No fake example lines. No automated FanDuel login or sportsbook scraping.</b></p>'+
 '<div class="notice"><b>Coverage limits:</b> This shows FanDuel prices available to the connected data provider, which may omit some alternate lines or player props. The API does not provide the exact combined FanDuel same-game-parlay quote. Confirm that price from FanDuel’s public bet slip (screenshot or shared link) before comparing EV.</div>'+
 '<div class="fdcols"><div class="card"><h2>1. Connect FanDuel market data</h2>'+
-'<p class="hint">This optional external service requires its own API key. You can <a target="_blank" rel="noopener noreferrer" href="https://the-odds-api.com/">register for a free key at The Odds API</a>. No FanDuel account or login is needed. The key stays in this browser tab, is never saved in your parlay history, and is only sent to the provider via HTTPS. Requests use API credits.</p>'+
+'<p class="hint">This optional external service requires its own API key. You can <a target="_blank" rel="noopener noreferrer" href="https://the-odds-api.com/">register for a free key at The Odds API</a>. No FanDuel account or login is needed. The key stays in this browser tab, is never saved in your parlay history, and is sent by HTTPS to this app’s cloud gateway, which forwards it to the data provider. Requests use API credits.</p>'+
 '<div class="fdkeyline"><label>Odds API key<input type="password" id="fdKey" autocomplete="off" placeholder="Paste your API key here"></label><button class="btn primary" id="fdLoad">Load FanDuel NFL odds</button></div>'+
 '<p id="fdStatus" class="fdsmall" role="status">Not connected.</p>'+
 '<div id="fdQuota" class="fdsmall"></div>'+
@@ -59,11 +59,10 @@ function usage(response){
  if(left!==null||last!==null){$$('fdQuota').textContent='Provider credits remaining: '+(left||'?')+' • Cost of last request: '+(last||'?')+'.'} }
 async function request(path,params){
  if(!key)throw Error('First enter a The Odds API key.');
- var search=new URLSearchParams(Object.assign({apiKey:key,bookmakers:'fanduel',oddsFormat:'american'},params||{}));
- var response=await fetch(api+path+'?'+search,{method:'GET',cache:'no-store',mode:'cors'});
+ var response=await fetch('./api/odds-proxy',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({apiKey:key,path:path,params:params||{}})});
  usage(response);
- if(!response.ok){var detail='';try{var d=await response.json();detail=d.message||d.error||''}catch(e){}
- throw Error('Provider returned '+response.status+(detail?': '+detail:''));}
+ if(!response.ok){var detail='';try{var d=await response.json();detail=d.error||d.message||''}catch(e){}
+ throw Error('Odds connection returned '+response.status+(detail?': '+detail:''));}
  return await response.json();
 }
 function addOffers(event,book){
@@ -103,7 +102,7 @@ async function load(){
  showGames();renderOffers();
  stat('FanDuel odds feed connected. '+events.length+' games • '+list.length+' individual selections • refreshed '+new Date(lastFetched).toLocaleString());
  marketStat('Select a game and market. Featured moneyline, spreads, totals are already loaded.');
- }catch(e){stat('Failed to retrieve FanDuel odds: '+e.message,true);$$('fdGames').textContent='No results loaded.'}
+ }catch(e){stat('Failed to retrieve FanDuel odds: '+e.message+(e instanceof TypeError?' (The browser could not reach the app’s cloud odds gateway. Check your network or security software.)':''),true);$('fdGames').textContent='No results loaded.'}
  finally{b.disabled=false}
 }
 $$('fdLoad').addEventListener('click',load);
