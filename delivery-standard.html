@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en">
-<head>
+<head><meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0"><meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>NWTB Delivery Operations — Standard</title>
@@ -31,13 +31,13 @@ button{font:inherit}.app{min-height:100vh;display:grid;grid-template-columns:230
  <button class="navbtn" data-view="chat" onclick="openView('chat')"><span class="ico">◌</span><span>Chat</span></button>
  <div class="navlabel">SYSTEM</div>
  <button class="navbtn" data-view="admin" onclick="openView('admin')"><span class="ico">⚙</span><span>Admin</span></button>
- <div class="sidefoot"><div class="online"><span class="dot"></span><span>System Online</span></div><div class="hub">Bolingbrook Operations Center</div></div>
+ <div class="sidefoot"><div class="online"><span class="dot"></span><span>System Online</span></div><div class="hub">NWTB Delivery Operations</div></div>
 </aside>
 <main class="main">
- <header class="topbar"><div><div class="crumb">NWTB / DELIVERY OPERATIONS</div><div class="title" id="pageTitle">Operations Dashboard</div></div><div class="topright"><div class="clock"><b id="clockTime"></b><span id="clockDate"></span></div><span class="edition">STANDARD EDITION</span><span class="office">BOLINGBROOK OFFICE</span></div></header>
+ <header class="topbar"><div><div class="crumb">NWTB / DELIVERY OPERATIONS</div><div class="title" id="pageTitle">Operations Dashboard</div></div><div class="topright"><div class="clock"><b id="clockTime"></b><span id="clockDate"></span></div><span class="edition">STANDARD EDITION</span><span class="office">NWTB OFFICE</span></div></header>
  <div class="content">
   <section id="dashboard" class="view active">
-   <div class="hero"><div><h1>NWTB Delivery Operations Center</h1><p>Dispatch deliveries and vendor pickups, manage driver routes, communicate with the pickup desk, and control daily operations from one workspace.</p></div><div class="heroBadge"><b>Northwest Trucks — Bolingbrook</b><span>Standard routes start and return to the Bolingbrook depot.</span></div></div>
+   <div class="hero"><div><h1>NWTB Delivery Operations Center</h1><p>Dispatch deliveries and vendor pickups, manage driver routes, communicate with the pickup desk, and control daily operations from one workspace.</p></div><div class="heroBadge"><b>Northwest Trucks Delivery Operations</b><span>Each driver starts and returns to the depot selected by Dispatch.</span></div></div>
    <div class="kpis">
     <button class="kpi" onclick="openDispatchQueue('AVAILABLE')"><span class="kpiLabel">Available Stops</span><strong id="kUn">—</strong><small>Click to open waiting stops</small></button>
     <button class="kpi" onclick="openDispatchQueue('ROUTED')"><span class="kpiLabel">Routed</span><strong id="kRt">—</strong><small>Click to open assigned stops</small></button>
@@ -46,21 +46,21 @@ button{font:inherit}.app{min-height:100vh;display:grid;grid-template-columns:230
    </div>
    <div class="grid2">
     <div class="card"><h3>Quick Actions</h3><p>Jump directly into the most common office workflows.</p><div class="actions">
-     <button class="action" onclick="openView('dispatch')"><b>Create / Assign Route</b><span>Add stops, optimize and assign a driver.</span></button>
-     <button class="action" onclick="openView('driver')"><b>Open Driver View</b><span>Preview the mobile route workflow used in the field.</span></button>
+     <button class="action" onclick="openView('dispatch')"><b>Optimize / Assign Routes</b><span>Select drivers and depots; NWTB divides all stops automatically.</span></button>
+     <button class="action" onclick="openView('driver')"><b>Open Driver View</b><span>Open the actual Standard driver app with 4-digit employee sign-in.</span></button>
      <button class="action" onclick="openView('chat')"><b>Delivery / Pickup Chat</b><span>Open the operations-only chat channel.</span></button>
      <button class="action" onclick="openView('admin')"><b>Master Data</b><span>Maintain customer and vendor directories.</span></button>
     </div></div>
     <div class="card"><h3>Operating Standards</h3><p>Rules enforced by the Delivery system.</p>
-     <div class="rule"><span class="check">✓</span><div><b>Bolingbrook standard routing</b><span>Standard routes begin and end at Northwest Trucks — Bolingbrook. Custom routes may use their own start/end points.</span></div></div>
+     <div class="rule"><span class="check">✓</span><div><b>Per-driver depot routing</b><span>Dispatch chooses Bolingbrook or Palatine for each driver. Every optimized route starts and returns to that driver’s selected depot.</span></div></div>
      <div class="rule"><span class="check">✓</span><div><b>Verified physical locations</b><span>Pickup addresses stay separate from billing addresses.</span></div></div>
      <div class="rule"><span class="check">✓</span><div><b>Road-route optimization</b><span>Invalid or missing coordinates are repaired before assignment.</span></div></div>
      <div class="rule"><span class="check">✓</span><div><b>Dedicated operations chat</b><span>Delivery / Pickup chat remains separate from Sales.</span></div></div>
     </div>
    </div>
   </section>
-  <section id="dispatch" class="view"><div class="pageIntro"><div><h2>Dispatch</h2><p>Create stops, optimize routes and assign drivers.</p></div><span class="chip">STANDARD: BOLINGBROOK START + RETURN</span></div><div class="frameWrap"><iframe id="fDispatch" src="dispatch.html?v=20260923-0825" title="Dispatch"></iframe></div></section>
-  <section id="driver" class="view"><div class="pageIntro"><div><h2>Driver View</h2><p>Preview the mobile route experience used in the field.</p></div><span class="chip">MOBILE WORKFLOW</span></div><div class="frameWrap"><iframe id="fDriver" src="driver-standard.html" title="Driver View"></iframe></div></section>
+  <section id="dispatch" class="view"><div class="pageIntro"><div><h2>Dispatch</h2><p>Create stops, optimize routes and assign drivers.</p></div><span class="chip">AUTO MULTI-DRIVER • PER-DRIVER DEPOT</span></div><div class="frameWrap"><iframe id="fDispatch" src="dispatch-native.html?v=20261014-native1" title="Dispatch"></iframe></div></section>
+  <section id="driver" class="view"><div class="pageIntro"><div><h2>Driver View</h2><p>Preview the mobile route experience used in the field.</p></div><span class="chip">4-DIGIT DRIVER SIGN-IN</span></div><div class="frameWrap"><iframe id="fDriver" src="driver-standard.html?v=20261014-native1" title="Driver View"></iframe></div></section>
   <section id="chat" class="view"><div class="pageIntro"><div><h2>Delivery / Pickup Chat</h2><p>Operations-only messaging.</p></div><span class="chip">SEPARATE FROM SALES</span></div><div class="frameWrap"><iframe id="fChat" src="dispatch.html?v=20260923-0825#chat" title="Delivery Pickup Chat"></iframe></div></section>
   <section id="admin" class="view"><div class="pageIntro"><div><h2>Administration</h2><p>Manage Delivery customer and vendor master data.</p></div><span class="chip">MASTER DATA</span></div><div class="frameWrap"><iframe id="fAdmin" src="dispatch.html?v=20260923-0825#data" title="Master Data"></iframe></div></section>
  </div>
@@ -93,5 +93,5 @@ setInterval(syncKpis,5000);
 const initial=location.hash.replace('#','');if(titles[initial])openView(initial);else openView('dashboard');
 </script>
 <script src="nwtb-system-lock-live.js?v=20260929-1200" data-control="1"></script>
-</body>
+<div style="position:fixed;right:8px;bottom:5px;font:8px Arial;color:#98a2b3;z-index:99999;pointer-events:none">NWTB STANDARD NATIVE</div></body>
 </html>
