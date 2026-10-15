@@ -152,11 +152,13 @@ const MULTI='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-multi-ro
 const LOCATION_RESOLVER='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-location-resolver';
 const KEY='sb_publishable_EqF-iooqhmngSG5BbzOxfQ_Vnf9Altc';
 const HOME={name:'Northwest Trucks - Bolingbrook',address:'201 S W Frontage Rd, Bolingbrook, IL 60440',lat:41.682487,lon:-88.072262};
-let orders=[],drivers=[],frequent=[],me=null,chatTimer=null,queueMode='AVAILABLE',multiDrivers=[],multiSelected=new Set(),multiDepots={},multiBusy=false;
+let orders=[],drivers=[],frequent=[],me=null,chatTimer=null,queueMode='AVAILABLE',multiDrivers=[],multiSelected=new Set(),multiDepots={},multiBusy=false,officeAdminPin='';
 const $=id=>document.getElementById(id);
 const token=()=>localStorage.getItem('nwtb_delivery_token')||'';
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
-async function post(url,payload,need=true){const h={'content-type':'application/json','apikey':KEY};if(need)h['x-nwtb-session']=token();const r=await fetch(url,{method:'POST',headers:h,body:JSON.stringify(payload)}),j=await r.json().catch(()=>({error:'Invalid server response'}));if(!r.ok)throw Error(j.error||'Request failed');return j}
+async function post(url,payload,need=true){const h={'content-type':'application/json','apikey':KEY};if(need)h['x-nwtb-session']=token();const r=await fetch(url,{method:'POST',headers:h,body:JSON.stringify(payload)}),j=await r.json().catch(()=>({error:'Invalid server response'}));if(!r.ok){const e=new Error(j.error||'Request failed');e.code=j.code||'';e.status=r.status;e.data=j;throw e}return j}
+function permissionProblem(e){return e?.code==='ADMIN_PIN_REQUIRED'||(e?.status===403&&/permission|admin pin|management pin|office route management|route-management/i.test(String(e?.message||'')))}
+async function officeProtectedPost(url,payload){const body=officeAdminPin?{...payload,pin:officeAdminPin}:{...payload};try{return await post(url,body)}catch(e){if(!permissionProblem(e))throw e;officeAdminPin='';const pin=prompt('ADMIN PIN REQUIRED\n\nThis office action needs elevated permission. Enter the NWTB Admin PIN to continue:');if(pin===null)throw new Error('Admin PIN required to continue.');const clean=String(pin).trim();if(!clean)throw new Error('Admin PIN required to continue.');try{const j=await post(url,{...payload,pin:clean});officeAdminPin=clean;return j}catch(e2){officeAdminPin='';if(e2?.status===403||/pin|permission/i.test(String(e2?.message||'')))throw new Error('Admin PIN was not accepted.');throw e2}}}
 function showBanner(id,msg,type='info'){const el=$(id);el.className=`banner show ${type}`;el.textContent=msg}
 function clearBanner(id){const el=$(id);el.className='banner';el.textContent=''}
 function validCoord(lat,lon){lat=Number(lat);lon=Number(lon);return Number.isFinite(lat)&&Number.isFinite(lon)&&Math.abs(lat)>1&&Math.abs(lon)>1&&lat>=20&&lat<=60&&lon>=-135&&lon<=-55}
@@ -170,12 +172,12 @@ async function loadMultiBuilder(showMessage=false){
  if(multiBusy)return;
  multiBusy=true;
  try{
-  const j=await post(MULTI,{action:'bootstrap'});
+  const j=await officeProtectedPost(MULTI,{action:'bootstrap'});
   multiDrivers=j.drivers||[];
   for(const id of [...multiSelected])if(!multiDrivers.some(d=>d.employee_number===id)){multiSelected.delete(id);delete multiDepots[id]}
   renderMultiDrivers();renderMultiQueue();updateMultiSelected();
   if(showMessage)showBanner('multiRouteMsg','Driver Queue and AVAILABLE stops refreshed.','ok')
- }catch(e){if(showMessage)showBanner('multiRouteMsg',e.message,'err')}
+ }catch(e){showBanner('multiRouteMsg',e.message,'err')}
  finally{multiBusy=false}
 }
 function renderMultiDrivers(){
@@ -204,7 +206,7 @@ async function optimizeMultiAssign(){
   if(!ids.length)throw Error('Select at least one AVAILABLE stop.');
   if(ids.length<multiSelected.size)throw Error('There are more selected drivers than selected stops.');
   btn.disabled=true;btn.textContent='OPTIMIZING…';showBanner('multiRouteMsg','Optimizing all selected stops across the Driver Queue…','info');
-  const j=await post(MULTI,{action:'optimize_and_commit',route_date:$('routeDate').value,drivers:[...multiSelected].map(id=>({employee_number:id,depot:multiDepots[id]})),order_ids:ids});
+  const j=await officeProtectedPost(MULTI,{action:'optimize_and_commit',route_date:$('routeDate').value,drivers:[...multiSelected].map(id=>({employee_number:id,depot:multiDepots[id]})),order_ids:ids});
   showBanner('multiRouteMsg','Pre-routes created and assigned to the drivers.','ok');
   $('multiRouteResults').innerHTML='<div class="multiResultGrid">'+(j.routes||[]).map(r=>'<div class="multiRoute"><b>'+esc(r.driver_display_name)+' — '+esc(r.depot)+'</b><small>'+r.stops.length+' stops • '+Number(r.estimated_miles||0).toFixed(1)+' total mi • '+fmtNativeMin(r.drive_minutes)+' drive • '+fmtNativeMin(r.service_minutes)+' service • return '+Number(r.return_miles||0).toFixed(1)+' mi / '+fmtNativeMin(r.return_minutes)+' • '+fmtNativeMin(r.estimated_minutes)+' total</small><small style="margin-top:8px">'+r.stops.map(s=>'#'+s.stop_sequence+' '+esc(s.customer_name)).join('<br>')+'</small></div>').join('')+'</div>';
   multiClearDrivers();await refreshAll();await loadMultiBuilder(false);
