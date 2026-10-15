@@ -63,12 +63,13 @@ window.viewRouteForStop=async function(orderId){
     '<div class="routeMetric"><span>Driver</span><b>'+esc(r.driver_name)+'</b></div>'+
     '<div class="routeMetric"><span>Stops</span><b>'+stops.length+'</b></div>'+
     '<div class="routeMetric"><span>Total Miles</span><b>'+(r.estimated_miles!=null?Number(r.estimated_miles).toFixed(1)+' mi':'Recalculate needed')+'</b></div>'+
-    '<div class="routeMetric"><span>Drive Time</span><b>'+(drive!=null?formatMinutes(drive):(total!=null?formatMinutes(total):'Recalculate needed'))+'</b></div>'+
+    '<div class="routeMetric"><span>Drive Time</span><b>'+(drive!=null?formatMinutes(drive):(total!=null&&svc!=null?formatMinutes(Math.max(0,total-svc)):'Recalculate needed'))+'</b></div>'+
     '<div class="routeMetric"><span>Service Time</span><b>'+(svc!=null?formatMinutes(svc):'—')+'</b></div>'+
-    '<div class="routeMetric"><span>Total Route Time</span><b>'+(total!=null?formatMinutes(total):'Recalculate needed')+'</b></div>'+
+    '<div class="routeMetric"><span>Total Route Time</span><b>'+(total!=null&&svc!=null?formatMinutes(Math.max(0,total-svc)):'Recalculate needed')+'</b></div>'+
     '<div class="routeMetric"><span>Return Depot</span><b>'+esc(String(r.depot||'BOLINGBROOK'))+'</b></div>'+
     '<div class="routeMetric"><span>Return Leg</span><b>'+(retMi!=null?retMi.toFixed(1)+' mi':'—')+(retMin!=null?' • '+formatMinutes(retMin):'')+'</b></div>'+
    '</div>'+
+   '<div class="small" style="margin-top:10px">Routing source: '+esc(r.matrix_source||'Unavailable')+' • '+(r.traffic_aware?'Traffic-adjusted estimate':'No live traffic adjustment')+'. Return leg is included in total miles and drive time.</div>'+
    '<div class="toolbar" style="margin-top:12px">'+links.map(x=>'<a class="btn blue" target="_blank" rel="noopener" href="'+x.url+'" style="text-decoration:none">'+esc(x.label)+'</a>').join('')+'</div>'+
    '<div class="officeStartReturn"><div class="stopNum">S</div><div><b>START — '+esc(r.start_name||('NWTB '+String(r.depot||'BOLINGBROOK')))+'</b><span>'+esc(r.start_address||'')+'</span></div></div>'+
    '<div class="routeStopList">'+stops.map(s=>{const o=s.delivery_orders||{};return '<div class="routeStopItem"><div class="stopNum">'+esc(s.stop_sequence)+'</div><div class="stopMain"><b>STOP '+esc(s.stop_sequence)+' — '+esc(o.customer_name||'')+'</b><span>'+esc(o.address||'')+'</span><span>'+esc(typeLabel(o.stop_type||''))+' • '+esc(o.priority||'NORMAL')+' • '+esc(s.status||o.status||'')+'</span></div><div class="stopMeta">'+esc(String(s.status||o.status||''))+'</div></div>'}).join('')+'</div>'+
