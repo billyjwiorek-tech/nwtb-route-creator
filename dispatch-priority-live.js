@@ -10,13 +10,13 @@ function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&l
 function pin(action){const p=prompt(action+'\n\nEnter management PIN:');if(p===null)return null;const v=String(p).trim();return v||null}
 function banner(text,kind='ok'){try{if(typeof window.showBanner==='function'&&document.getElementById('routeMsg'))window.showBanner('routeMsg',text,kind);else alert(text)}catch{alert(text)}}
 function installStyles(){if(document.getElementById('nwtbPriorityStyles'))return;const s=document.createElement('style');s.id='nwtbPriorityStyles';s.textContent='.priorityGuide{margin-top:14px;padding:12px;border:1px solid #f6c344;background:#fffbea;border-radius:10px;font-size:11px;color:#69410b}.priorityGuide b{color:#7a2e0e}.priorityEdit{margin-top:9px;padding-top:9px;border-top:1px dashed #d0d5dd;display:flex;gap:7px;align-items:center;flex-wrap:wrap}.priorityEdit select{width:auto;min-width:125px;min-height:34px;padding:6px 8px;font-size:11px}.priorityReopt{background:#7c3aed!important;color:#fff!important}.priorityHot{background:#b42318!important;color:#fff!important}.priorityNormal{background:#f2f4f7!important;color:#344054!important;border:1px solid #d0d5dd!important}';document.head.appendChild(s)}
-async function refreshModal(anchorOrderId){if(typeof window.viewRouteForStop==='function')await window.viewRouteForStop(anchorOrderId)}
+async function refreshModal(anchorOrderId){if(typeof window.editRoutePriorityForStop==='function')await window.editRoutePriorityForStop(anchorOrderId)}
 window.nwtbSetStopPriority=async function(routeId,stopId,anchorOrderId,selectId){const p=pin('CHANGE STOP PRIORITY + RE-OPTIMIZE REMAINING ROUTE');if(!p)return;const priority=document.getElementById(selectId)?.value||'NORMAL';try{banner('Changing priority and re-optimizing remaining stops…','info');const j=await post(PRIORITY_API,{action:'set_priority_and_reoptimize',route_id:routeId,route_stop_id:stopId,priority,pin:p});banner(j.route_status==='ACTIVE'?'Priority changed. Remaining active stops re-optimized and the driver will be alerted.':'Priority changed. Remaining planned stops re-optimized.','ok');await refreshModal(anchorOrderId);if(typeof window.refreshAll==='function')await window.refreshAll()}catch(e){banner(e.message||'Could not change priority.','err')}};
 window.nwtbReoptimizeRoute=async function(routeId,anchorOrderId){const p=pin('RE-OPTIMIZE REMAINING STOPS');if(!p)return;try{banner('Re-optimizing remaining stops…','info');const j=await post(PRIORITY_API,{action:'reoptimize_remaining',route_id:routeId,pin:p});banner(j.route_status==='ACTIVE'?'Remaining active stops re-optimized. Driver alert sent.':'Remaining planned stops re-optimized.','ok');await refreshModal(anchorOrderId);if(typeof window.refreshAll==='function')await window.refreshAll()}catch(e){banner(e.message||'Could not re-optimize route.','err')}};
-async function enhance(anchorOrderId){
+async function enhance(anchorOrderId,detail){
  installStyles();
- const body=document.getElementById('routeModalBody');if(!body)return;
- let j;try{j=await post(ROUTE_ADMIN,{action:'route_for_order',order_id:anchorOrderId})}catch{return}
+ const body=document.getElementById('routeModalBody');if(!body||body.dataset.officeRouteMode!=='editPriority')return;
+ const j=detail;
  const route=j.route,stops=j.stops||[];if(!route||!['PLANNED','ACTIVE'].includes(route.status))return;
  const pending=stops.filter(s=>s.status==='PENDING');
  const firstPanel=body.querySelector('.routeSummary')||body.firstElementChild;
@@ -24,6 +24,13 @@ async function enhance(anchorOrderId){
  const items=[...body.querySelectorAll('.routeStopItem')];
  items.forEach((el,i)=>{const s=stops[i],o=s?.delivery_orders||{};if(!s||s.status!=='PENDING'||el.querySelector('.priorityEdit'))return;const id='prio_'+String(s.id).replace(/[^a-zA-Z0-9]/g,'');const box=document.createElement('div');box.className='priorityEdit';box.innerHTML='<b style="font-size:10px">DISPATCH PRIORITY</b><select id="'+id+'"><option value="NORMAL" '+(o.priority==='NORMAL'?'selected':'')+'>NORMAL</option><option value="PRIORITY" '+(o.priority==='PRIORITY'?'selected':'')+'>PRIORITY</option><option value="HOT_SHOT" '+(o.priority==='HOT_SHOT'?'selected':'')+'>HOT SHOT</option></select><button class="btn mini '+(o.priority==='HOT_SHOT'?'priorityHot':'priorityReopt')+'" onclick="nwtbSetStopPriority(\''+route.id+'\',\''+s.id+'\',\''+anchorOrderId+'\',\''+id+'\')">SET + RE-OPTIMIZE</button>';el.appendChild(box)})
 }
-function wrap(){if(typeof window.viewRouteForStop!=='function'||window.viewRouteForStop.__priorityWrapped)return false;const old=window.viewRouteForStop;const wrapped=async function(orderId){const out=await old.apply(this,arguments);setTimeout(()=>enhance(orderId),30);return out};wrapped.__priorityWrapped=true;window.viewRouteForStop=wrapped;return true}
-installStyles();let tries=0;const timer=setInterval(()=>{tries++;if(wrap()||tries>100)clearInterval(timer)},100);if(document.readyState!=='loading')wrap();
+window.editRoutePriorityForStop=async function(orderId){
+ if(typeof window.viewRouteForStop!=='function')return;
+ const detail=await window.viewRouteForStop(orderId);if(!detail)return;
+ const body=document.getElementById('routeModalBody');body.dataset.officeRouteMode='editPriority';
+ document.getElementById('routeModalTitle').textContent='ROUTE PRIORITY EDITOR • '+detail.route.route_date;
+ const banner=body.querySelector('.banner');if(banner)banner.textContent='PRIORITY EDITING — changes require the management PIN and re-optimize remaining stops.';
+ await enhance(orderId,detail);
+};
+installStyles();
 })();

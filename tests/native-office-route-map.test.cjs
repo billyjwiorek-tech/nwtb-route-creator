@@ -18,7 +18,7 @@ assert.equal(valid({lat:null,lon:-88}),false);assert.equal(valid({lat:Infinity,l
 const admin=fs.readFileSync(path.join(__dirname,'../dispatch-route-admin-native.js'),'utf8');
 assert.ok(!/google\.com\/maps/.test(admin),'Office preview stays inside NWTB');
 assert.ok(!/route_start|driver_token|geolocation|driver-bootstrap/.test(source+admin),'Office preview cannot start routes, create driver sessions or GPS');
-for(const f of ['dispatch-native.html','dispatch-live.html']){const html=fs.readFileSync(path.join(__dirname,'..',f),'utf8');assert.ok(html.indexOf('office-route-map.js?v=20261015-officemap1')<html.indexOf('dispatch-route-admin-native.js?v=20261015-officemap1'));assert.ok(html.includes('viewOfficeRoute'));}
+for(const f of ['dispatch-native.html','dispatch-live.html']){const html=fs.readFileSync(path.join(__dirname,'..',f),'utf8');assert.ok(html.indexOf('office-route-map.js?v=20261015-officemap1')<html.indexOf('dispatch-route-admin-native.js?v=20261015-officemap2'));assert.ok(html.includes('viewOfficeRoute'));}
 console.log('PASS: saved route order and identity, depots, custom endpoints, last-stop ending, missing coordinates, no route mutations, no driver/GPS actions, native Office wiring');
 async function rendererTest(){
  const els=new Map(),lines=[],pins=[],maps=[],calls=[];let started=0;
@@ -41,10 +41,15 @@ async function rendererTest(){
 rendererTest().catch(e=>{console.error(e);process.exitCode=1});
 async function previewTest(){
  for(const [status,released,label] of [['PLANNED',false,'OFFICE ONLY — NOT RELEASED'],['PLANNED',true,'RELEASED TO DRIVER'],['ACTIVE',true,'ACTIVE ROUTE']]){
-  const elements=new Map(),requests=[];const get=id=>{if(!elements.has(id))elements.set(id,{innerHTML:'',textContent:'',classList:{add(){},remove(){}}});return elements.get(id)};
+  const elements=new Map(),requests=[];const get=id=>{if(!elements.has(id))elements.set(id,{innerHTML:'',textContent:'',dataset:{},classList:{add(){},remove(){}}});return elements.get(id)};
   const ctx={console,AbortController,setTimeout(){},document:{getElementById:get},showBanner(){},clearBanner(){},formatMinutes:n=>n+' min',typeLabel:x=>x,esc:x=>String(x??''),officeProtectedPost:async(url,request)=>{requests.push(request);return {route:{...route,status,released_to_driver:released,estimated_miles:50,estimated_minutes:120,drive_minutes:90,service_minutes:30,return_miles:10,return_minutes:20,driver_name:'Test'},stops:rows}}};ctx.window=ctx;
   vm.createContext(ctx);vm.runInContext(source,ctx);let rendered;ctx.NWTBOfficeRouteMap.html=()=>'<div id="officeRouteMap"></div>';ctx.NWTBOfficeRouteMap.render=m=>{rendered=m};
-  vm.runInContext(admin,ctx);await ctx.viewOfficeRoute('fixture-route');const html=get('routeModalBody').innerHTML;
+  vm.runInContext(admin,ctx);const previewHandler=ctx.viewRouteForStop;
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'../dispatch-priority-live.js'),'utf8'),ctx);
+  assert.equal(ctx.viewRouteForStop,previewHandler,'Priority editing must not wrap the read-only preview');
+  await ctx.viewOfficeRoute('fixture-route');const html=get('routeModalBody').innerHTML;
+  assert.equal(get('routeModalBody').dataset.officeRouteMode,'preview');
+  assert.equal(typeof ctx.editRoutePriorityForStop,'function','Priority editing remains available as an explicit action');
   assert.ok(html.includes(label));assert.ok(html.includes('120 min'));assert.ok(html.includes('90 min'));assert.ok(html.includes('30 min'));assert.ok(html.includes('officeRouteMap'));assert.ok(!html.includes('google.com'));assert.equal(JSON.stringify(requests),JSON.stringify([{action:'route_details',route_id:'fixture-route'}]));assert.equal(rendered.stops.map(p=>p.orderId).join(','),'o1,o2');
   if(status==='ACTIVE')assert.ok(!html.includes('onclick="releaseOfficeRoute')&&!html.includes('onclick="holdOfficeRoute'));
  }
