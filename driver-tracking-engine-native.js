@@ -37,7 +37,7 @@ function context(){
  try{if(typeof route!=='undefined')rid=String(route||'')}catch{}
  try{if(typeof token!=='undefined')tok=String(token||'')}catch{}
  if(!emp)emp=localStorage.getItem('nwtb_delivery_driver')||'';
- if(!tok)tok=localStorage.getItem('nwtb_delivery_token')||'';
+ if(!tok)tok=localStorage.getItem('nwtb_driver_token')||'';
  return {driver:emp,route:rid,token:tok};
 }
 function trackEl(){return $('track')}
@@ -54,7 +54,7 @@ async function freshToken(){
  if(!/^[0-9]{4}$/.test(emp))throw Error('Driver employee number is not available. Sign in again.');
  const r=await fetch(CHAT_URL,{method:'POST',cache:'no-store',headers:{'content-type':'application/json','apikey':API_KEY},body:JSON.stringify({action:'delivery_driver_login',employee_number:emp})});
  const j=await r.json().catch(()=>({}));if(!r.ok||!j.token)throw Error(j.error||'Could not refresh driver session');
- localStorage.setItem('nwtb_driver_token',j.token);localStorage.setItem('nwtb_delivery_token',j.token);
+ localStorage.setItem('nwtb_driver_token',j.token);
  try{if(typeof token!=='undefined')token=j.token}catch{}
  return j.token;
 }
