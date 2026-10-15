@@ -1,11 +1,11 @@
 (()=>{
 'use strict';
-if(window.__udpOptimizerV2)return;window.__udpOptimizerV2=true;
+if(window.__udpOptimizerV2||window.UDPRouteMap)return;window.__udpOptimizerV2=true;
 const BASE='https://khvhcmncwzywqowfodnb.supabase.co/functions/v1';
 const OLD=BASE+'/udp-routing';
 const OPT=BASE+'/udp-route-optimizer-v2';
 const KEY='sb_publishable_oTafXfr-ok1F-Kk_LEbsHg_yv8lovc-';
-const token=()=>localStorage.getItem('udp_session')||'';
+const token=()=>window.UDPSessions?.get()||localStorage.getItem(new URLSearchParams(location.search).get('view')==='driver'?'udp_driver_session':'udp_office_session')||'';
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 async function post(url,payload){const r=await fetch(url,{method:'POST',headers:{'content-type':'application/json','apikey':KEY,'x-udp-session':token()},body:JSON.stringify(payload)}),j=await r.json().catch(()=>({error:'Bad server response'}));if(!r.ok)throw Error(j.error||'Request failed');return j}
 

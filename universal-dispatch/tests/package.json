@@ -1,0 +1,9 @@
+{
+  "devDependencies": {
+    "linkedom": "0.18.13"
+  },
+  "private": true,
+  "scripts": {
+    "test": "node backend.test.cjs && node frontend.test.cjs"
+  }
+}

@@ -1,0 +1,37 @@
+(function(root){
+'use strict';
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+const valid=p=>p&&p.lat!=null&&p.lon!=null&&p.lat!==''&&p.lon!==''&&Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lon))&&Math.abs(Number(p.lat))<=90&&Math.abs(Number(p.lon))<=180&&!(Number(p.lat)===0&&Number(p.lon)===0);
+function model(r,rows){
+ const start={kind:'START',label:'START',name:r.start_name||'Start location',address:r.start_address||'',lat:r.start_lat,lon:r.start_lon};
+ const stops=(rows||[]).slice().sort((a,b)=>Number(a.stop_sequence)-Number(b.stop_sequence)).map(s=>{const o=s.delivery_orders||{};return {kind:'STOP',label:String(s.stop_sequence),id:s.id,orderId:s.order_id,name:o.customer_name||'Stop',address:o.address||'',lat:o.lat,lon:o.lon,status:s.status,priority:o.priority,type:o.stop_type}});
+ const end=r.end_mode==='LAST_STOP'?null:r.end_mode==='SAME_AS_START'?{...start,kind:'RETURN',label:'RETURN'}:{kind:'RETURN',label:'RETURN',name:r.end_name||'Return location',address:r.end_address||'',lat:r.end_lat,lon:r.end_lon};
+ return {routeId:r.id,start,stops,end,points:[start,...stops,...(end?[end]:[])],geometry:r.route_geometry,legs:r.route_leg_geometry};
+}
+let map=null,markers=[],controller=null,epoch=0;
+function destroy(){epoch++;controller?.abort();controller=null;if(map){map.remove();map=null}markers=[];}
+function markup(){return '<section class="udpRouteMap"><div class="udpMapHeader"><div><b>Saved route map</b><small>Start, numbered stops and return • No device GPS</small></div><button type="button" class="btn ghost" id="udpFitRoute">ALL STOPS</button></div><div id="udpRouteCanvas" class="map" aria-label="Saved route map"></div><div id="udpMapStatus" class="sub" role="status">Loading map…</div></section>';}
+function installStyle(){if(document.getElementById('udpMapStyle'))return;const s=document.createElement('style');s.id='udpMapStyle';s.textContent='.udpRouteMap{margin:16px 0}.udpMapHeader{display:flex;justify-content:space-between;gap:12px;align-items:center;background:#101828;color:#fff;border-radius:12px 12px 0 0;padding:13px}.udpMapHeader b,.udpMapHeader small{display:block}.udpMapHeader small{font-size:11px;color:#cbd5e1;margin-top:4px}.udpRouteMap .map{margin-top:0;border-radius:0 0 12px 12px;isolation:isolate}.udpMapPin{width:34px;height:34px;display:grid;place-items:center;background:#f58220;color:#fff;border:3px solid #fff;border-radius:50%;font-weight:900;box-shadow:0 2px 7px #0005}.udpMapPin.depot{width:68px;height:30px;background:#101828;border-radius:8px;font-size:9px}.udpMapPin.done{background:#15803d}.udpMapPin.failed{background:#b42318}.routeMetrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:14px 0}.routeMetrics>div{padding:12px;border:1px solid #e4e7ec;border-radius:10px;background:#fff}.routeMetrics small{display:block;color:#667085;font-size:10px;margin-bottom:4px}.releaseState{padding:13px;border-radius:10px;background:#fff7ed;color:#9a3412;border:1px solid #fed7aa;margin-top:12px}.releaseState.released{background:#ecfdf3;color:#067647;border-color:#abefc6}.routeFocus{border:0;background:transparent;color:#175cd3;text-align:left;font:inherit;font-weight:900;cursor:pointer}.routeStop .toolbar .btn{min-height:40px}@media(max-width:600px){.routeMetrics{grid-template-columns:repeat(2,minmax(0,1fr))}.udpMapHeader{align-items:flex-start}.udpMapHeader small{max-width:210px}.udpRouteMap .map{height:360px}.driverShell{padding:10px}.routeStop{overflow-wrap:anywhere}.routeMetrics b{font-size:13px}}';document.head.appendChild(s);}
+function focus(index){const mk=markers[index];if(map&&mk){map.setView(mk.getLatLng(),15);mk.openPopup();document.getElementById('udpRouteCanvas')?.scrollIntoView({block:'nearest',behavior:'smooth'});}}
+async function render(m,requestLeg){
+ destroy();installStyle();const version=epoch;controller=new AbortController();const signal=controller.signal,el=document.getElementById('udpMapStatus'),canvas=document.getElementById('udpRouteCanvas');
+ const status=(t,bad=false)=>{if(version===epoch&&el){el.textContent=t;el.className='sub'+(bad?' err':'')}};
+ try{
+  if(!root.L)throw Error('The map library could not load. Your saved stops remain available.');if(!canvas)return;
+  const L=root.L,located=m.points.filter(valid),first=located[0];map=L.map(canvas,{scrollWheelZoom:false}).setView(first?[Number(first.lat),Number(first.lon)]:[20,0],first?11:2);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(map);
+  const same=m.end&&valid(m.start)&&valid(m.end)&&Number(m.start.lat)===Number(m.end.lat)&&Number(m.start.lon)===Number(m.end.lon);
+  markers=m.points.map((p,i)=>{if(!valid(p))return null;const depot=p.kind!=='STOP',label=same&&i===0?'START / RETURN':p.label,cls=depot?' depot':p.status==='DELIVERED'?' done':p.status==='NOT_DELIVERED'?' failed':'';const mk=L.marker([Number(p.lat),Number(p.lon)],{icon:L.divIcon({className:'',html:'<div class="udpMapPin'+cls+'">'+esc(label)+'</div>',iconSize:depot?[74,36]:[40,40],iconAnchor:depot?[37,18]:[20,20]})}).bindPopup('<b>'+esc(p.kind==='STOP'?'STOP '+p.label:p.label)+' — '+esc(p.name)+'</b><br>'+esc(p.address));if(!(same&&i===m.points.length-1))mk.addTo(map);return mk;});if(same)markers[markers.length-1]=markers[0];
+  const fit=()=>{if(map&&located.length)map.fitBounds(L.latLngBounds(located.map(p=>[Number(p.lat),Number(p.lon)])),{padding:[35,35],maxZoom:14})};document.getElementById('udpFitRoute').onclick=fit;fit();requestAnimationFrame(()=>{if(version===epoch)map?.invalidateSize()});
+  if(located.length!==m.points.length){status('Road path unavailable: one or more saved coordinates are missing. Every stop remains in its saved order.',true);return;}
+  const draw=(coords,isReturn)=>{if(!Array.isArray(coords)||coords.length<2||coords.some(c=>!Array.isArray(c)||!valid({lat:c[1],lon:c[0]})))throw Error('Road geometry unavailable');L.polyline(coords.map(c=>[Number(c[1]),Number(c[0])]),{weight:6,opacity:.85,color:isReturn?'#f58220':'#2563eb'}).addTo(map)};
+  const legs=m.points.slice(1).map((b,i)=>({a:m.points[i],b}));
+  if(Array.isArray(m.legs)&&m.legs.length===legs.length&&m.legs.every(l=>Array.isArray(l.coordinates)&&l.coordinates.length>=2)){m.legs.forEach((l,i)=>draw(l.coordinates,legs[i].b.kind==='RETURN'));status('Showing the saved road path used by both Office and Driver.');return;}
+  if(m.geometry?.type==='LineString'&&m.geometry.coordinates?.length>1){draw(m.geometry.coordinates,false);status('Showing the saved road path used by both Office and Driver.');return;}
+  status('Loading road paths for the saved stop order…');let failed=0;
+  for(const leg of legs){if(signal.aborted||version!==epoch)return;try{if(Number(leg.a.lat)===Number(leg.b.lat)&&Number(leg.a.lon)===Number(leg.b.lon))continue;const j=await requestLeg(leg.a,leg.b,signal);if(version!==epoch)return;draw(j.geometry?.coordinates||j.geometry,leg.b.kind==='RETURN')}catch(e){if(signal.aborted)return;failed++;}}
+  status(failed?'Road path incomplete. Saved stops and metrics remain available; reconnect to retry.':'Saved stop order shown on current roads. Driver navigation can reroute from its GPS position.',failed>0);
+ }catch(e){status(e.message||'Map unavailable. Saved stops remain available.',true)}
+}
+root.UDPRouteMap={model,valid,markup,render,focus,destroy};
+})(window);
