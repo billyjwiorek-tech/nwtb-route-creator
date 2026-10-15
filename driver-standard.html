@@ -91,14 +91,13 @@ async function boot(){
  try{
   token=localStorage.getItem('nwtb_driver_token')||'';
   if(!token)return showLogin();
-  localStorage.setItem('nwtb_delivery_token',token);
   const j=await post(CHAT,{action:'whoami'});
   driver=String(j.employee_number||'');driverName=j.display_name||'';
   if(!/^[0-9]{4}$/.test(driver)||driver==='9998')throw Error('Driver session is invalid.');
   localStorage.setItem('nwtb_delivery_driver',driver);
   showDriver()
  }catch(e){
-  localStorage.removeItem('nwtb_driver_token');localStorage.removeItem('nwtb_delivery_token');localStorage.removeItem('nwtb_delivery_driver');token='';driver='';driverName='';showLogin(e.message||'Sign in again.')
+  localStorage.removeItem('nwtb_driver_token');localStorage.removeItem('nwtb_delivery_driver');token='';driver='';driverName='';showLogin(e.message||'Sign in again.')
  }
 }
 async function driverLogin(){
@@ -108,14 +107,14 @@ async function driverLogin(){
  try{
   const j=await post(CHAT,{action:'delivery_driver_login',employee_number:no},false);
   token=j.token;driver=j.employee_number;driverName=j.display_name||'';
-  localStorage.setItem('nwtb_driver_token',token);localStorage.setItem('nwtb_delivery_token',token);localStorage.setItem('nwtb_delivery_driver',driver);
+  localStorage.setItem('nwtb_driver_token',token);localStorage.setItem('nwtb_delivery_driver',driver);
   localStorage.setItem('nwtb_driver_alerts','1');alertsReady=true;showDriver()
  }catch(e){$('loginMsg').textContent=e.message||'Could not sign in.'}
  finally{btn.disabled=false}
 }
 function driverLogout(){
  stopChangePolling();route='';token='';driver='';driverName='';
- localStorage.removeItem('nwtb_driver_token');localStorage.removeItem('nwtb_delivery_token');localStorage.removeItem('nwtb_delivery_driver');
+ localStorage.removeItem('nwtb_driver_token');localStorage.removeItem('nwtb_delivery_driver');
  $('employeeNumber').value='';showLogin('Signed out. Enter your employee number.')
 }
 function driverChanged(){}
@@ -177,6 +176,6 @@ async function resumePausedRoute(){if(!confirm('Resume this route now?'))return;
 $('employeeNumber')?.addEventListener('keydown',e=>{if(e.key==='Enter')driverLogin()});
 boot();
 </script>
-<script src="driver-chat-live.js?v=20261014-native1"></script><script src="driver-priority-route-live.js?v=20261014-native1"></script><script src="driver-pod-live.js?v=20261014-native1"></script><script src="nwtb-system-lock-live.js?v=20260929-1200"></script><div style="position:fixed;right:7px;bottom:5px;font-size:8px;color:#98a2b3;pointer-events:none">NWTB STANDARD NATIVE</div>
+<script src="driver-chat-live.js?v=20261015-session2"></script><script src="driver-priority-route-live.js?v=20261015-session2"></script><script src="driver-pod-live.js?v=20261015-session2"></script><script src="nwtb-system-lock-live.js?v=20260929-1200"></script><div style="position:fixed;right:7px;bottom:5px;font-size:8px;color:#98a2b3;pointer-events:none">NWTB STANDARD NATIVE</div>
 </body>
 </html>
