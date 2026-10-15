@@ -6,7 +6,7 @@ const PUB='sb_publishable_EqF-iooqhmngSG5BbzOxfQ_Vnf9Altc';
 let open=false,poll=null,lastUnread=0,lastNotified=0,audio=null;
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 const driverNo=()=>document.getElementById('driver')?.value||localStorage.getItem('nwtb_delivery_driver')||'';
-const tok=()=>localStorage.getItem('nwtb_delivery_token')||'';
+const tok=()=>localStorage.getItem('nwtb_driver_token')||'';
 async function post(body){const r=await fetch(CHAT,{method:'POST',headers:{'content-type':'application/json','apikey':PUB,'x-nwtb-session':tok()},body:JSON.stringify(body)}),j=await r.json().catch(()=>({error:'Chat response error'}));if(!r.ok)throw Error(j.error||'Chat failed');return j}
 function tone(){try{const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;if(!audio)audio=new AC();if(audio.state==='suspended')audio.resume();const t=audio.currentTime,o=audio.createOscillator(),g=audio.createGain();o.type='sine';o.frequency.setValueAtTime(820,t);o.frequency.setValueAtTime(1080,t+.14);g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.18,t+.015);g.gain.exponentialRampToValueAtTime(.0001,t+.34);o.connect(g);g.connect(audio.destination);o.start(t);o.stop(t+.36)}catch{}}
 function notify(m){tone();if(navigator.vibrate)navigator.vibrate([180,90,260]);const text=`Dispatch: ${m.body||''}`;toast(text);if('Notification'in window&&Notification.permission==='granted'){try{const n=new Notification('NWTB — DISPATCH MESSAGE',{body:m.body||'New Dispatch message',tag:'nwtb-driver-chat',renotify:true});n.onclick=()=>{window.focus();show()}}catch{}}}
