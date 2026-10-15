@@ -3,11 +3,27 @@ const ROUTE_ADMIN='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-de
 const LOCATION_RESOLVER='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-location-resolver';
 function addRouteAdminUI(){
  const d=document;
- if(!d.getElementById('nwtbRouteAdminStyle')){const s=d.createElement('style');s.id='nwtbRouteAdminStyle';s.textContent='.rowActions{display:flex;gap:6px;flex-wrap:wrap}.mini{padding:6px 9px!important;font-size:10px!important}.modalBack{position:fixed;inset:0;background:rgba(15,23,42,.52);display:none;align-items:center;justify-content:center;z-index:1000;padding:20px}.modalBack.show{display:flex}.modal{width:min(820px,96vw);max-height:86vh;overflow:auto;background:#fff;border-radius:18px;box-shadow:0 30px 80px rgba(15,23,42,.28);border:1px solid #e4e7ec;padding:20px}.modalHead{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.routeStopList{margin-top:14px;border:1px solid #e4e7ec;border-radius:12px;overflow:hidden}.routeStopItem{padding:14px 14px;border-bottom:1px solid #eef1f4;display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:flex-start;background:#fff}.routeStopItem:last-child{border-bottom:0}.routeStopItem .stopNum{width:36px;height:36px;border-radius:999px;background:#eef4ff;color:#175cd3;display:flex;align-items:center;justify-content:center;font-weight:950;font-size:14px}.routeStopItem .stopMain b{font-size:13px;display:block}.routeStopItem .stopMain span{display:block;font-size:11px;color:#667085;margin-top:4px;line-height:1.45}.routeStopItem .stopMeta{text-align:right;font-size:10px;color:#475467;font-weight:850;white-space:nowrap}.officeStartReturn{margin-top:14px;display:grid;grid-template-columns:44px minmax(0,1fr);gap:12px;align-items:center;padding:12px 14px;border:1px solid #d0d5dd;border-radius:12px;background:#f8fafc}.officeStartReturn .stopNum{width:36px;height:36px;border-radius:999px;background:#101828;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:950}.officeStartReturn b{font-size:12px}.officeStartReturn span{display:block;color:#667085;font-size:10px;margin-top:3px}.routeChoice{display:flex;justify-content:space-between;gap:12px;align-items:center;border:1px solid #e4e7ec;border-radius:12px;padding:13px;margin-top:10px}.routeChoice b{font-size:12px}.routeChoice span{display:block;font-size:10px;color:#667085;margin-top:4px}.dangerMini{background:#fff1f0!important;color:#b42318!important;border:1px solid #fecdca!important}';d.head.appendChild(s)}
+ if(!d.getElementById('nwtbRouteAdminStyle')){const s=d.createElement('style');s.id='nwtbRouteAdminStyle';s.textContent='.rowActions{display:flex;gap:6px;flex-wrap:wrap}.mini{padding:6px 9px!important;font-size:10px!important}.modalBack{position:fixed;inset:0;background:rgba(15,23,42,.52);display:none;align-items:center;justify-content:center;z-index:1000;padding:20px}.modalBack.show{display:flex}.modal{width:min(820px,96vw);max-height:86vh;overflow:auto;background:#fff;border-radius:18px;box-shadow:0 30px 80px rgba(15,23,42,.28);border:1px solid #e4e7ec;padding:20px}.modalHead{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.routeStopList{margin-top:14px;border:1px solid #e4e7ec;border-radius:12px;overflow:hidden}.routeStopItem{padding:14px 14px;border-bottom:1px solid #eef1f4;display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:flex-start;background:#fff}.routeStopItem:last-child{border-bottom:0}.routeStopItem .stopNum{width:36px;height:36px;border-radius:999px;background:#eef4ff;color:#175cd3;display:flex;align-items:center;justify-content:center;font-weight:950;font-size:14px}.routeStopItem .stopMain b{font-size:13px;display:block}.routeStopItem .stopMain span{display:block;font-size:11px;color:#667085;margin-top:4px;line-height:1.45}.routeStopItem .stopMeta{text-align:right;font-size:10px;color:#475467;font-weight:850;white-space:nowrap}.officeStartReturn{margin-top:14px;display:grid;grid-template-columns:44px minmax(0,1fr);gap:12px;align-items:center;padding:12px 14px;border:1px solid #d0d5dd;border-radius:12px;background:#f8fafc}.officeStartReturn .stopNum{width:36px;height:36px;border-radius:999px;background:#101828;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:950}.officeStartReturn b{font-size:12px}.officeStartReturn span{display:block;color:#667085;font-size:10px;margin-top:3px}.releaseGate{margin-top:12px;padding:12px;border-radius:12px;border:1px solid #d0d5dd;background:#f8fafc}.releaseGate.officeOnly{border-color:#fdb022;background:#fffaeb;color:#93370d}.releaseGate.released{border-color:#6ce9a6;background:#ecfdf3;color:#067647}.releaseGate.active{border-color:#84adff;background:#eff8ff;color:#1849a9}.releaseGate b{display:block;font-size:12px}.releaseGate span{display:block;font-size:10px;margin-top:4px}.releaseGate .btn{margin-top:9px}.routeChoice{display:flex;justify-content:space-between;gap:12px;align-items:center;border:1px solid #e4e7ec;border-radius:12px;padding:13px;margin-top:10px}.routeChoice b{font-size:12px}.routeChoice span{display:block;font-size:10px;color:#667085;margin-top:4px}.dangerMini{background:#fff1f0!important;color:#b42318!important;border:1px solid #fecdca!important}';d.head.appendChild(s)}
  const tr=d.querySelector('#ordersBody')?.closest('table')?.querySelector('thead tr');if(tr&&!tr.querySelector('[data-actions]')){const th=d.createElement('th');th.dataset.actions='1';th.textContent='Actions';tr.appendChild(th)}
  if(!d.getElementById('routeModal')){const x=d.createElement('div');x.id='routeModal';x.className='modalBack';x.innerHTML='<div class="modal"><div class="modalHead"><div><h2 id="routeModalTitle">Route Details</h2><div id="routeModalSub" class="sub"></div></div><button class="btn ghost" onclick="closeRouteModal()">CLOSE</button></div><div id="routeModalBody"></div></div>';x.onclick=e=>{if(e.target===x)closeRouteModal()};d.body.appendChild(x)}
 }
 window.closeRouteModal=function(){document.getElementById('routeModal')?.classList.remove('show')};
+window.releaseOfficeRoute=async function(routeId){
+ if(!confirm('Release this planned route to the driver now?\n\nOnce released, it will appear in that driver\'s app.'))return;
+ try{
+  await officeProtectedPost(ROUTE_ADMIN,{action:'release_to_driver',route_id:routeId});
+  alert('Route released to driver.');
+  const first=(window.__lastOfficeRouteOrderId||'');if(first)await viewRouteForStop(first)
+ }catch(e){alert(e.message||'Could not release route.')}
+};
+window.holdOfficeRoute=async function(routeId){
+ if(!confirm('Hold this planned route from the driver?\n\nIt will disappear from the driver app until released again.'))return;
+ try{
+  await officeProtectedPost(ROUTE_ADMIN,{action:'hold_from_driver',route_id:routeId});
+  alert('Route is now office-only.');
+  const first=(window.__lastOfficeRouteOrderId||'');if(first)await viewRouteForStop(first)
+ }catch(e){alert(e.message||'Could not hold route.')}
+};
 function officeRouteLinks(r,stops){
  const depot=String(r?.depot||'BOLINGBROOK').toUpperCase();
  const depots={BOLINGBROOK:{name:'Northwest Trucks - Bolingbrook',address:'201 S W Frontage Rd, Bolingbrook, IL 60440'},PALATINE:{name:'Northwest Trucks - Palatine',address:'2120 N Rand Rd, Palatine, IL 60074'}};
@@ -25,16 +41,24 @@ function officeRouteLinks(r,stops){
  return links
 }
 window.viewRouteForStop=async function(orderId){
+ window.__lastOfficeRouteOrderId=orderId;
  try{
   showBanner('routeMsg','Loading read-only office route preview…','info');
   const j=await officeProtectedPost(ROUTE_ADMIN,{action:'route_for_order',order_id:orderId});
   clearBanner('routeMsg');
   const r=j.route,stops=j.stops||[],links=officeRouteLinks(r,stops);
+  const releaseState=r.status==='ACTIVE'
+    ?'<div class="releaseGate active"><b>ACTIVE ROUTE</b><span>This route is already active in the driver app.</span></div>'
+    :r.status==='PLANNED'&&r.released_to_driver
+      ?'<div class="releaseGate released"><b>RELEASED TO DRIVER</b><span>The driver can see this planned route now.</span><button class="btn ghost" onclick="holdOfficeRoute(\''+r.id+'\')">HOLD FROM DRIVER</button></div>'
+      :r.status==='PLANNED'
+        ?'<div class="releaseGate officeOnly"><b>OFFICE ONLY — NOT RELEASED</b><span>The driver cannot see or start this route yet.</span><button class="btn green" onclick="releaseOfficeRoute(\''+r.id+'\')">RELEASE TO DRIVER</button></div>'
+        :'<div class="releaseGate"><b>'+esc(r.status||'ROUTE')+'</b><span>No driver-release action is available for this route status.</span></div>';
   const drive=r.drive_minutes!=null?Number(r.drive_minutes):null,svc=r.service_minutes!=null?Number(r.service_minutes):null,total=r.estimated_minutes!=null?Number(r.estimated_minutes):null,retMi=r.return_miles!=null?Number(r.return_miles):null,retMin=r.return_minutes!=null?Number(r.return_minutes):null;
   document.getElementById('routeModalTitle').textContent='OFFICE ROUTE SCREEN • '+r.route_date;
   document.getElementById('routeModalSub').textContent='READ ONLY • '+r.status+' • '+r.wave+' • '+r.driver_name+' • '+(r.depot||'BOLINGBROOK')+' start + return';
   document.getElementById('routeModalBody').innerHTML=
-   '<div class="banner show ok" style="margin-top:12px"><b>READ-ONLY OFFICE PREVIEW</b> — opening this screen does not start the route, create a driver session, change route status, or affect the driver’s 4-digit login.</div>'+
+   '<div class="banner show ok" style="margin-top:12px"><b>READ-ONLY OFFICE PREVIEW</b> — opening this screen does not start the route, create a driver session, change route status, or affect the driver’s 4-digit login.</div>'+releaseState+
    '<div class="routeSummary">'+
     '<div class="routeMetric"><span>Driver</span><b>'+esc(r.driver_name)+'</b></div>'+
     '<div class="routeMetric"><span>Stops</span><b>'+stops.length+'</b></div>'+
