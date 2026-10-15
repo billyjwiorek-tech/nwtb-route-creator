@@ -1,0 +1,53 @@
+/* Office-only renderer. Consumes saved route data; never starts a driver session or GPS. */
+(function(root){
+'use strict';
+const DEPOTS={BOLINGBROOK:{name:'Northwest Trucks - Bolingbrook',address:'201 S W Frontage Rd, Bolingbrook, IL 60440',lat:41.682487,lon:-88.072262},PALATINE:{name:'Northwest Trucks - Palatine',address:'2120 N Rand Rd, Palatine, IL 60074',lat:42.148326,lon:-88.033080}};
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+const valid=p=>p&&p.lat!==null&&p.lon!==null&&p.lat!==''&&p.lon!==''&&Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lon))&&Math.abs(Number(p.lat))<=90&&Math.abs(Number(p.lon))<=180&&!(Number(p.lat)===0&&Number(p.lon)===0);
+function model(route,rows){
+ const depot=DEPOTS[String(route.depot||'BOLINGBROOK').toUpperCase()]||DEPOTS.BOLINGBROOK;
+ const custom=String(route.route_mode||'').startsWith('CUSTOM');
+ const start={kind:'START',label:'START',name:route.start_name||depot.name,address:route.start_address||depot.address,lat:route.start_lat,lon:route.start_lon};
+ if(!custom&&!valid(start))Object.assign(start,{lat:depot.lat,lon:depot.lon});
+ const stops=(rows||[]).slice().sort((a,b)=>Number(a.stop_sequence)-Number(b.stop_sequence)).map(s=>{const o=s.delivery_orders||{};return {kind:'STOP',label:String(s.stop_sequence),name:o.customer_name||'Stop',address:o.address||'',lat:o.lat,lon:o.lon,status:s.status||o.status||'PENDING',priority:o.priority||'NORMAL',type:o.stop_type||'OTHER',stopId:s.id,orderId:s.order_id};});
+ let end={kind:'RETURN',label:'RETURN',name:route.end_name||depot.name,address:route.end_address||depot.address,lat:route.end_lat,lon:route.end_lon};
+ const endMode=route.end_mode||'RETURN_DEPOT';
+ if(endMode==='LAST_STOP')end=null;
+ else if(endMode==='SAME_AS_START')end={...start,kind:'RETURN',label:'RETURN'};
+ else if(endMode==='RETURN_DEPOT'&&!valid(end))Object.assign(end,{lat:depot.lat,lon:depot.lon});
+ const points=[start,...stops,...(end?[end]:[])];
+ return {routeId:route.id,updatedAt:route.updated_at,start,end,stops,points,missing:points.filter(p=>!valid(p))};
+}
+let map=null,generation=0,controller=null,markers=[],lastModel=null;
+function destroy(){generation++;controller?.abort();controller=null;if(map){map.remove();map=null}markers=[];lastModel=null;}
+function style(){if(document.getElementById('officeRouteMapStyle'))return;const s=document.createElement('style');s.id='officeRouteMapStyle';s.textContent=`
+.modal:has(.officeRouteMapShell){width:min(1200px,98vw);max-height:94vh}.officeRouteMapShell{margin-top:16px;border:1px solid #d0d5dd;border-radius:14px;overflow:hidden;background:#f8fafc}.officeMapHead{background:#101828;color:#fff;padding:14px 16px;display:flex;gap:12px;align-items:center;justify-content:space-between}.officeMapHead b{display:block;font-size:15px}.officeMapHead small{display:block;color:#d0d5dd;font-size:11px;margin-top:4px}.officeMapHead button{background:#fff;color:#101828;border:0;border-radius:8px;padding:10px 12px;cursor:pointer;font-weight:850}.officeMapCanvas{height:480px;isolation:isolate}.officeMapStatus{padding:11px 14px;font-size:12px;line-height:1.5;background:#eef4ff;color:#1849a9}.officeMapStatus.warn{background:#fffaeb;color:#93370d}.officeMapLegend{display:flex;gap:14px;flex-wrap:wrap;padding:10px 14px;background:#fff;color:#475467;font-size:11px}.officeMapLegend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;background:#f58220}.officeMapLegend .depot{background:#101828}.officeMapLegend .done{background:#16a34a}.officeMapLegend .failed{background:#dc2626}.officeMapPin{background:#f58220;color:#fff;border:3px solid #fff;box-shadow:0 2px 7px #10182866;border-radius:50%;width:34px;height:34px;display:grid;place-items:center;font:900 13px Arial}.officeMapPin.depot{background:#101828;border-radius:9px;width:64px;height:30px;font-size:10px}.officeMapPin.done{background:#16a34a}.officeMapPin.failed{background:#dc2626}.officeMapFocus{border:0;background:transparent;padding:0;color:#175cd3;text-align:left;font:inherit;font-weight:900;cursor:pointer;text-decoration:underline;text-underline-offset:3px}.officeMapPopup{line-height:1.5}.officeMapPopup b{display:block}.officeMapPopup small{display:block;color:#667085}.officeRouteMapShell .leaflet-container{font-family:inherit}
+@media(max-width:600px){.modalBack{padding:6px}.modal:has(.officeRouteMapShell){padding:12px;width:100%;max-height:96vh}.officeMapCanvas{height:360px}.officeMapHead{padding:12px;align-items:flex-start}.officeMapHead b{font-size:13px}.officeMapHead small{font-size:10px}.routeStopItem{grid-template-columns:34px minmax(0,1fr);padding:12px 10px;gap:8px}.routeStopItem .stopMeta{grid-column:2;text-align:left}.routeSummary{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+`;document.head.appendChild(s);}
+function html(m){style();return '<section class="officeRouteMapShell" aria-label="NWTB saved driver route"><div class="officeMapHead"><div><b>NWTB • DRIVER ROUTE PREVIEW</b><small>Same saved route, numbered stops and depots • Office view only</small></div><button type="button" id="officeMapFit">ALL STOPS</button></div><div id="officeRouteMap" class="officeMapCanvas" role="region" aria-label="Route map"></div><div id="officeMapStatus" class="officeMapStatus" role="status">Loading NWTB route map…</div><div class="officeMapLegend"><span><i class="depot"></i>Start / return</span><span><i></i>Pending stop</span><span><i class="done"></i>Delivered</span><span><i class="failed"></i>Not delivered</span></div></section>';}
+let leafletPromise;
+function leaflet(){if(root.L)return Promise.resolve(root.L);if(leafletPromise)return leafletPromise;leafletPromise=new Promise((resolve,reject)=>{if(!document.getElementById('officeLeafletCSS')){const c=document.createElement('link');c.id='officeLeafletCSS';c.rel='stylesheet';c.href='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css';document.head.appendChild(c)}const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js';s.onload=()=>root.L?resolve(root.L):reject(Error('Map library unavailable'));s.onerror=()=>reject(Error('Map library could not load. Check your connection.'));document.head.appendChild(s)}).catch(e=>{leafletPromise=null;throw e});return leafletPromise;}
+function setStatus(msg,warn=false){const el=document.getElementById('officeMapStatus');if(el){el.textContent=msg;el.className='officeMapStatus'+(warn?' warn':'')}}
+function fit(){if(!map||!lastModel)return;const pts=lastModel.points.filter(valid).map(p=>[Number(p.lat),Number(p.lon)]);if(pts.length)map.fitBounds(root.L.latLngBounds(pts),{padding:[38,38],maxZoom:14});}
+function focus(index){const mk=markers[index];if(mk&&map){map.setView(mk.getLatLng(),15);mk.openPopup();document.getElementById('officeRouteMap')?.scrollIntoView({behavior:'smooth',block:'nearest'});}}
+async function render(m,requestLeg){
+ destroy();lastModel=m;const current=generation;controller=new AbortController();const signal=controller.signal;
+ try{
+  const L=await leaflet();if(current!==generation)return;
+  const canvas=document.getElementById('officeRouteMap');if(!canvas)return;
+  map=L.map(canvas,{zoomControl:true,scrollWheelZoom:false}).setView([m.start.lat||41.682487,m.start.lon||-88.072262],10);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(map);
+  const sameDepot=m.end&&valid(m.start)&&valid(m.end)&&Number(m.start.lat)===Number(m.end.lat)&&Number(m.start.lon)===Number(m.end.lon);
+  markers=m.points.map((p,i)=>{if(!valid(p))return null;const depot=p.kind!=='STOP',label=sameDepot&&i===0?'START / RETURN':p.label,cls=depot?' depot':p.status==='DELIVERED'?' done':p.status==='NOT_DELIVERED'?' failed':'';const mk=L.marker([Number(p.lat),Number(p.lon)],{icon:L.divIcon({className:'',html:'<div class="officeMapPin'+cls+'">'+esc(label)+'</div>',iconSize:depot?[70,36]:[40,40],iconAnchor:depot?[35,18]:[20,20]}),zIndexOffset:depot?700:800});if(!(sameDepot&&i===m.points.length-1))mk.addTo(map);return mk.bindPopup('<div class="officeMapPopup"><b>'+esc(p.kind==='STOP'?'STOP '+p.label:p.label)+' — '+esc(p.name)+'</b>'+esc(p.address)+(p.kind==='STOP'?'<small>'+esc(p.type.replace(/_/g,' '))+' • '+esc(p.priority)+' • '+esc(p.status)+'</small>':'')+'</div>');});
+  if(sameDepot)markers[markers.length-1]=markers[0];
+  document.getElementById('officeMapFit').onclick=fit;fit();requestAnimationFrame(()=>{if(current===generation)map?.invalidateSize()});
+  if(m.missing.length){setStatus('Road path unavailable: '+m.missing.map(p=>p.kind==='STOP'?'STOP '+p.label:p.kind).join(', ')+' need saved coordinates. No stops were skipped or reordered.',true);return;}
+  let next=0,completed=0,failed=0;const legs=m.points.slice(1).map((p,i)=>({a:m.points[i],b:p,index:i}));
+  setStatus('Drawing saved stop order on roads…');
+  async function worker(){while(next<legs.length&&current===generation){const leg=legs[next++];try{const identical=Number(leg.a.lat)===Number(leg.b.lat)&&Number(leg.a.lon)===Number(leg.b.lon);if(!identical){const j=await requestLeg(leg.a,leg.b,signal);if(current!==generation)return;const coords=j.geometry;if(!Array.isArray(coords)||coords.length<2||coords.some(c=>!Array.isArray(c)||c.length<2||!valid({lat:c[1],lon:c[0]})))throw Error('Invalid road geometry');L.polyline(coords.map(c=>[Number(c[1]),Number(c[0])]),{color:leg.b.kind==='RETURN'?'#f58220':'#2563eb',weight:6,opacity:.85}).addTo(map).bindTooltip(leg.b.kind==='RETURN'?'RETURN LEG':'TO STOP '+leg.b.label);}completed++;}catch(e){if(signal.aborted||current!==generation)return;failed++;}if(current===generation)setStatus('Drawing route: '+(completed+failed)+' / '+legs.length+' legs…');}}
+  await Promise.all([worker(),worker()]);if(current!==generation)return;
+  setStatus(failed?'Road path incomplete: '+failed+' leg(s) unavailable. Every saved stop remains shown; no straight-line substitute is presented.':'Full saved route shown: START → '+m.stops.length+' stop(s)'+(m.end?' → RETURN':' → END AT LAST STOP')+'. Stored mileage and times are unchanged. Driver navigation can reroute from its current GPS position.',failed>0);
+ }catch(e){if(current===generation)setStatus(e.message||'Map unavailable. Saved stops and release controls remain available.',true);}
+}
+root.NWTBOfficeRouteMap={model,valid,html,render,destroy,focus,fit};
+})(typeof window!=='undefined'?window:globalThis);

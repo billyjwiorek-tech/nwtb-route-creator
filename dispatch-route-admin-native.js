@@ -7,13 +7,14 @@ function addRouteAdminUI(){
  const tr=d.querySelector('#ordersBody')?.closest('table')?.querySelector('thead tr');if(tr&&!tr.querySelector('[data-actions]')){const th=d.createElement('th');th.dataset.actions='1';th.textContent='Actions';tr.appendChild(th)}
  if(!d.getElementById('routeModal')){const x=d.createElement('div');x.id='routeModal';x.className='modalBack';x.innerHTML='<div class="modal"><div class="modalHead"><div><h2 id="routeModalTitle">Route Details</h2><div id="routeModalSub" class="sub"></div></div><button class="btn ghost" onclick="closeRouteModal()">CLOSE</button></div><div id="routeModalBody"></div></div>';x.onclick=e=>{if(e.target===x)closeRouteModal()};d.body.appendChild(x)}
 }
-window.closeRouteModal=function(){document.getElementById('routeModal')?.classList.remove('show')};
+let officePreviewRequest=0;
+window.closeRouteModal=function(){officePreviewRequest++;window.NWTBOfficeRouteMap?.destroy();document.getElementById('routeModal')?.classList.remove('show')};
 window.releaseOfficeRoute=async function(routeId){
  if(!confirm('Release this planned route to the driver now?\n\nOnce released, it will appear in that driver\'s app.'))return;
  try{
   await officeProtectedPost(ROUTE_ADMIN,{action:'release_to_driver',route_id:routeId});
   alert('Route released to driver.');
-  const first=(window.__lastOfficeRouteOrderId||'');if(first)await viewRouteForStop(first)
+  if(window.__lastOfficeRouteId)await window.viewOfficeRoute(window.__lastOfficeRouteId)
  }catch(e){alert(e.message||'Could not release route.')}
 };
 window.holdOfficeRoute=async function(routeId){
@@ -21,32 +22,21 @@ window.holdOfficeRoute=async function(routeId){
  try{
   await officeProtectedPost(ROUTE_ADMIN,{action:'hold_from_driver',route_id:routeId});
   alert('Route is now office-only.');
-  const first=(window.__lastOfficeRouteOrderId||'');if(first)await viewRouteForStop(first)
+  if(window.__lastOfficeRouteId)await window.viewOfficeRoute(window.__lastOfficeRouteId)
  }catch(e){alert(e.message||'Could not hold route.')}
 };
-function officeRouteLinks(r,stops){
- const depot=String(r?.depot||'BOLINGBROOK').toUpperCase();
- const depots={BOLINGBROOK:{name:'Northwest Trucks - Bolingbrook',address:'201 S W Frontage Rd, Bolingbrook, IL 60440'},PALATINE:{name:'Northwest Trucks - Palatine',address:'2120 N Rand Rd, Palatine, IL 60074'}};
- const d=depots[depot]||depots.BOLINGBROOK;
- const start={name:r?.start_name||d.name,address:r?.start_address||d.address};
- const stopPts=(stops||[]).map(s=>{const o=s.delivery_orders||{};return{name:o.customer_name||'Stop',address:o.address||''}});
- let final={name:r?.end_name||d.name,address:r?.end_address||d.address},way=stopPts.slice();
- if(r?.end_mode==='SAME_AS_START')final={...start};
- if(r?.end_mode==='LAST_STOP'&&stopPts.length){final=stopPts[stopPts.length-1];way=stopPts.slice(0,-1)}
- const encLoc=x=>encodeURIComponent((x.name||'Location')+', '+(x.address||''));
- const links=[];if(!stopPts.length)return links;
- if(way.length<=9){links.push({label:'OPEN FULL ROUTE IN GOOGLE MAPS',url:'https://www.google.com/maps/dir/?api=1&origin='+encLoc(start)+'&destination='+encLoc(final)+'&travelmode=driving&waypoints='+way.map(encLoc).join('%7C')});return links}
- let current=start,i=0,part=1;
- while(i<way.length){const remaining=way.slice(i),last=remaining.length<=9,chunk=remaining.slice(0,last?9:10),dest=last?final:chunk[chunk.length-1],wps=last?chunk:chunk.slice(0,-1);links.push({label:'OPEN ROUTE PART '+part+(last?' — FINAL':''),url:'https://www.google.com/maps/dir/?api=1&origin='+encLoc(current)+'&destination='+encLoc(dest)+'&travelmode=driving&waypoints='+wps.map(encLoc).join('%7C')});current=dest;i+=chunk.length;part++}
- return links
-}
-window.viewRouteForStop=async function(orderId){
- window.__lastOfficeRouteOrderId=orderId;
+window.viewRouteForStop=orderId=>openOfficeRoute({action:'route_for_order',order_id:orderId});
+window.viewOfficeRoute=routeId=>openOfficeRoute({action:'route_details',route_id:routeId});
+async function openOfficeRoute(request){
+ const requestId=++officePreviewRequest;
+ window.NWTBOfficeRouteMap?.destroy();
  try{
   showBanner('routeMsg','Loading read-only office route preview…','info');
-  const j=await officeProtectedPost(ROUTE_ADMIN,{action:'route_for_order',order_id:orderId});
+  const j=await officeProtectedPost(ROUTE_ADMIN,request);
+  if(requestId!==officePreviewRequest)return;
   clearBanner('routeMsg');
-  const r=j.route,stops=j.stops||[],links=officeRouteLinks(r,stops);
+  const r=j.route,stops=(j.stops||[]).slice().sort((a,b)=>Number(a.stop_sequence)-Number(b.stop_sequence)),mapModel=window.NWTBOfficeRouteMap.model(r,stops);
+  window.__lastOfficeRouteId=r.id;
   const releaseState=r.status==='ACTIVE'
     ?'<div class="releaseGate active"><b>ACTIVE ROUTE</b><span>This route is already active in the driver app.</span></div>'
     :r.status==='PLANNED'&&r.released_to_driver
@@ -56,7 +46,7 @@ window.viewRouteForStop=async function(orderId){
         :'<div class="releaseGate"><b>'+esc(r.status||'ROUTE')+'</b><span>No driver-release action is available for this route status.</span></div>';
   const drive=r.drive_minutes!=null?Number(r.drive_minutes):null,svc=r.service_minutes!=null?Number(r.service_minutes):null,total=r.estimated_minutes!=null?Number(r.estimated_minutes):null,retMi=r.return_miles!=null?Number(r.return_miles):null,retMin=r.return_minutes!=null?Number(r.return_minutes):null;
   document.getElementById('routeModalTitle').textContent='OFFICE ROUTE SCREEN • '+r.route_date;
-  document.getElementById('routeModalSub').textContent='READ ONLY • '+r.status+' • '+r.wave+' • '+r.driver_name+' • '+(r.depot||'BOLINGBROOK')+' start + return';
+  document.getElementById('routeModalSub').textContent='READ ONLY • '+r.status+' • '+r.wave+' • '+r.driver_name+' • '+(r.depot||'BOLINGBROOK')+(mapModel.end?' • START / RETURN':' • ENDS AT LAST STOP');
   document.getElementById('routeModalBody').innerHTML=
    '<div class="banner show ok" style="margin-top:12px"><b>READ-ONLY OFFICE PREVIEW</b> — opening this screen does not start the route, create a driver session, change route status, or affect the driver’s 4-digit login.</div>'+releaseState+
    '<div class="routeSummary">'+
@@ -66,21 +56,28 @@ window.viewRouteForStop=async function(orderId){
     '<div class="routeMetric"><span>Drive Time</span><b>'+(drive!=null?formatMinutes(drive):(total!=null&&svc!=null?formatMinutes(Math.max(0,total-svc)):'Recalculate needed'))+'</b></div>'+
     '<div class="routeMetric"><span>Service Time</span><b>'+(svc!=null?formatMinutes(svc):'—')+'</b></div>'+
     '<div class="routeMetric"><span>Total Route Time</span><b>'+(total!=null?formatMinutes(total):'Recalculate needed')+'</b></div>'+
-    '<div class="routeMetric"><span>Return Depot</span><b>'+esc(String(r.depot||'BOLINGBROOK'))+'</b></div>'+
+    '<div class="routeMetric"><span>Return Depot</span><b>'+esc(mapModel.end?.name||'Ends at last stop')+'</b></div>'+
     '<div class="routeMetric"><span>Return Leg</span><b>'+(retMi!=null?retMi.toFixed(1)+' mi':'—')+(retMin!=null?' • '+formatMinutes(retMin):'')+'</b></div>'+
    '</div>'+
    '<div class="small" style="margin-top:10px">Routing source: '+esc(r.matrix_source||'Unavailable')+' • '+(r.traffic_aware?'Traffic-adjusted estimate':'No live traffic adjustment')+'. Return leg is included in total miles and drive time.</div>'+
-   '<div class="toolbar" style="margin-top:12px">'+links.map(x=>'<a class="btn blue" target="_blank" rel="noopener" href="'+x.url+'" style="text-decoration:none">'+esc(x.label)+'</a>').join('')+'</div>'+
-   '<div class="officeStartReturn"><div class="stopNum">S</div><div><b>START — '+esc(r.start_name||('NWTB '+String(r.depot||'BOLINGBROOK')))+'</b><span>'+esc(r.start_address||'')+'</span></div></div>'+
-   '<div class="routeStopList">'+stops.map(s=>{const o=s.delivery_orders||{};return '<div class="routeStopItem"><div class="stopNum">'+esc(s.stop_sequence)+'</div><div class="stopMain"><b>STOP '+esc(s.stop_sequence)+' — '+esc(o.customer_name||'')+'</b><span>'+esc(o.address||'')+'</span><span>'+esc(typeLabel(o.stop_type||''))+' • '+esc(o.priority||'NORMAL')+' • '+esc(s.status||o.status||'')+'</span></div><div class="stopMeta">'+esc(String(s.status||o.status||''))+'</div></div>'}).join('')+'</div>'+
-   '<div class="officeStartReturn"><div class="stopNum">↩</div><div><b>RETURN — '+esc(r.end_name||('NWTB '+String(r.depot||'BOLINGBROOK')))+'</b><span>'+esc(r.end_address||r.start_address||'')+(retMi!=null?' • '+retMi.toFixed(1)+' mi':'')+(retMin!=null?' • '+formatMinutes(retMin):'')+'</span></div></div>';
-  document.getElementById('routeModal').classList.add('show')
- }catch(e){clearBanner('routeMsg');showBanner('routeMsg',e.message,'err')}
-};
+   window.NWTBOfficeRouteMap.html(mapModel)+
+   '<div class="toolbar" style="margin-top:12px"><button type="button" class="btn ghost" onclick="window.viewOfficeRoute(\''+esc(r.id)+'\')">REFRESH SAVED ROUTE</button></div>'+
+   '<div class="officeStartReturn"><div class="stopNum">S</div><div><b>START — '+esc(mapModel.start.name)+'</b><span>'+esc(mapModel.start.address)+'</span></div></div>'+
+   '<div class="routeStopList">'+stops.map(s=>{const o=s.delivery_orders||{};return '<div class="routeStopItem"><div class="stopNum">'+esc(s.stop_sequence)+'</div><div class="stopMain"><button type="button" class="officeMapFocus" onclick="window.NWTBOfficeRouteMap.focus('+stops.indexOf(s)+'+1)">STOP '+esc(s.stop_sequence)+' — '+esc(o.customer_name||'')+'</button><span>'+esc(o.address||'')+'</span><span>'+esc(typeLabel(o.stop_type||''))+' • '+esc(o.priority||'NORMAL')+' • '+esc(s.status||o.status||'')+'</span></div><div class="stopMeta">'+esc(String(s.status||o.status||''))+'</div></div>'}).join('')+'</div>'+
+   (mapModel.end?'<div class="officeStartReturn"><div class="stopNum">↩</div><div><b>RETURN — '+esc(mapModel.end.name)+'</b><span>'+esc(mapModel.end.address)+(retMi!=null?' • '+retMi.toFixed(1)+' mi':'')+(retMin!=null?' • '+formatMinutes(retMin):'')+'</span></div></div>':'<div class="officeStartReturn"><div class="stopNum">E</div><div><b>END AT LAST STOP</b><span>No return leg is assigned to this route.</span></div></div>');
+  document.getElementById('routeModal').classList.add('show');
+  window.NWTBOfficeRouteMap.render(mapModel,(a,b,signal)=>officeRoadLeg(a,b,signal));
+ }catch(e){if(requestId===officePreviewRequest){clearBanner('routeMsg');showBanner('routeMsg',e.message,'err')}}
+}
+async function officeRoadLeg(a,b,signal){
+ const h={'content-type':'application/json','apikey':KEY,'x-nwtb-session':localStorage.getItem('nwtb_delivery_token')||''};
+ const response=await fetch('https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-driver-navigation',{method:'POST',headers:h,signal,body:JSON.stringify({action:'route',origin:{lat:Number(a.lat),lon:Number(a.lon)},destination:{lat:Number(b.lat),lon:Number(b.lon)}})});
+ const data=await response.json().catch(()=>({error:'Road route unavailable'}));if(!response.ok)throw Error(data.error||'Road route unavailable');return data;
+}
 window.reassignRoute=async function(routeId){const driver=document.getElementById('modalDriver').value,box=document.getElementById('modalMsg');box.className='banner show info';box.textContent='Reassigning route…';try{const j=await officeProtectedPost(ROUTE_ADMIN,{action:'reassign_route',route_id:routeId,driver_employee_number:driver});box.className='banner show ok';box.textContent='Route reassigned to '+j.driver_name+'.';await refreshAll();setTimeout(closeRouteModal,900)}catch(e){box.className='banner show err';box.textContent=e.message}};
 window.removeStopFromRoute=async function(orderId){if(!confirm('Remove this stop from its route and return it to AVAILABLE? If the route is active, the driver will receive an alert and sound.'))return;try{showBanner('routeMsg','Removing stop from route…','info');const j=await officeProtectedPost(ROUTE_ADMIN,{action:'remove_stop',order_id:orderId});closeRouteModal();showBanner('routeMsg',j.route_status==='ACTIVE'?'Stop removed. '+j.driver_name+' will be notified on the Driver Route page.':'Stop returned to the AVAILABLE queue.','ok');await refreshAll()}catch(e){showBanner('routeMsg',e.message,'err')}};
 window.unassignStop=window.removeStopFromRoute;
-window.chooseRouteForStop=async function(orderId){try{const j=await post(API,{action:'routes_list'}),routes=(j.routes||[]).filter(r=>['PLANNED','ACTIVE'].includes(r.status));document.getElementById('routeModalTitle').textContent='Add Stop to Route';document.getElementById('routeModalSub').textContent='Choose the driver route. Active drivers will be notified immediately.';document.getElementById('routeModalBody').innerHTML=routes.map(r=>{const d=(drivers||[]).find(x=>x.employee_number===r.driver_employee_number),nm=d?d.display_name:r.driver_employee_number;return '<div class="routeChoice"><div><b>'+esc(nm)+' • '+esc(r.status)+'</b><span>'+esc(r.route_date)+' • '+esc(r.wave)+' • BOLINGBROOK START/RETURN</span></div><button class="btn blue" onclick="addStopToRoute(\''+orderId+'\',\''+r.id+'\')">ADD TO ROUTE</button></div>'}).join('')||'<div class="empty">No planned or active routes are available.</div>';document.getElementById('routeModal').classList.add('show')}catch(e){showBanner('routeMsg',e.message,'err')}};
+window.chooseRouteForStop=async function(orderId){officePreviewRequest++;window.NWTBOfficeRouteMap?.destroy();try{const j=await post(API,{action:'routes_list'}),routes=(j.routes||[]).filter(r=>['PLANNED','ACTIVE'].includes(r.status));document.getElementById('routeModalTitle').textContent='Add Stop to Route';document.getElementById('routeModalSub').textContent='Choose the driver route. Active drivers will be notified immediately.';document.getElementById('routeModalBody').innerHTML=routes.map(r=>{const d=(drivers||[]).find(x=>x.employee_number===r.driver_employee_number),nm=d?d.display_name:r.driver_employee_number;return '<div class="routeChoice"><div><b>'+esc(nm)+' • '+esc(r.status)+'</b><span>'+esc(r.route_date)+' • '+esc(r.wave)+' • BOLINGBROOK START/RETURN</span></div><button class="btn blue" onclick="addStopToRoute(\''+orderId+'\',\''+r.id+'\')">ADD TO ROUTE</button></div>'}).join('')||'<div class="empty">No planned or active routes are available.</div>';document.getElementById('routeModal').classList.add('show')}catch(e){showBanner('routeMsg',e.message,'err')}};
 window.addStopToRoute=async function(orderId,routeId){try{const j=await officeProtectedPost(ROUTE_ADMIN,{action:'add_stop',order_id:orderId,route_id:routeId});closeRouteModal();showBanner('routeMsg',j.route_status==='ACTIVE'?'Stop added to '+j.driver_name+' at stop '+j.stop_sequence+'. Driver alert sent.':'Stop added to '+j.driver_name+' at stop '+j.stop_sequence+'.','ok');await refreshAll()}catch(e){showBanner('routeMsg',e.message,'err')}};
 window.renderOrders=function(){addRouteAdminUI();let active=orders.filter(o=>!['DELIVERED','CANCELED'].includes(o.status));if(queueMode==='AVAILABLE')active=active.filter(o=>o.status==='UNASSIGNED');if(queueMode==='ROUTED')active=active.filter(o=>o.status==='ROUTED');if(queueMode==='OUT')active=active.filter(o=>o.status==='OUT_FOR_DELIVERY');document.getElementById('ordersBody').innerHTML=active.map(o=>{const selectable=o.status==='UNASSIGNED',located=validCoord(o.lat,o.lon),pc=o.priority==='HOT_SHOT'?'pill hot':o.priority==='PRIORITY'?'pill priority':'pill',row=selectable?'':'class="mutedrow"';let a='—';if(o.status==='UNASSIGNED'&&located)a='<button class="btn blue mini" onclick="chooseRouteForStop(\''+o.id+'\')">ADD TO ROUTE</button>';else if(o.status==='ROUTED')a='<div class="rowActions"><button class="btn ghost mini" onclick="viewRouteForStop(\''+o.id+'\')">ROUTE SCREEN</button><button class="btn ghost mini dangerMini" onclick="removeStopFromRoute(\''+o.id+'\')">RETURN TO QUEUE</button></div>';else if(o.status==='OUT_FOR_DELIVERY')a='<div class="rowActions"><button class="btn ghost mini" onclick="viewRouteForStop(\''+o.id+'\')">ROUTE SCREEN</button><button class="btn ghost mini dangerMini" onclick="removeStopFromRoute(\''+o.id+'\')">REMOVE + NOTIFY</button></div>';return '<tr '+row+'><td>'+(selectable?'<input class="pick" type="checkbox" value="'+o.id+'" onchange="updateSelected()">':'—')+'</td><td><span class="'+typeClass(o.stop_type)+'">'+esc(typeLabel(o.stop_type))+'</span></td><td><span class="'+pc+'">'+esc(o.priority)+'</span></td><td>'+esc(o.sales_order_no||o.reference_no||'—')+'</td><td><b>'+esc(o.customer_name)+'</b><br><span class="small">'+esc(o.source_ref||o.customer_number||'')+'</span></td><td>'+esc(o.address)+'</td><td>'+esc(o.pieces)+'</td><td>'+statusPill(o.status)+'</td><td><span class="coord '+(located?'good':'bad')+'">'+(located?'READY':'NEEDS LOCATION')+'</span></td><td>'+a+'</td></tr>'}).join('')||'<tr><td colspan="10"><div class="empty">'+(queueMode==='AVAILABLE'?'No unassigned stops are waiting for dispatch.':'No stops in this view.')+'</div></td></tr>'};
 setTimeout(()=>{addRouteAdminUI();renderOrders()},250);
