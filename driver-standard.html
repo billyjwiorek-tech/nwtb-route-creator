@@ -128,10 +128,22 @@ async function loadRoutes(){
  if(!driver){showLogin('Enter your employee number.');return}
  try{
   const j=await post(ROUTE_API,{action:'driver_routes'});
-  $('routes').innerHTML=(j.routes||[]).map(r=>{
-   const depot=String(r.depot||'BOLINGBROOK').toUpperCase(),drive=r.drive_minutes!=null?' • '+Math.round(Number(r.drive_minutes))+' drive min':'',svc=r.service_minutes!=null?' • '+Math.round(Number(r.service_minutes))+' service min':'';
-   return '<div class="panel"><b>'+esc(r.route_date)+' • '+esc(depot)+' START / RETURN • '+esc(r.wave||'ROUTE')+'</b><br><span class="status '+String(r.status||'').toLowerCase()+'">'+esc(r.status||'PLANNED')+'</span>'+(r.estimated_miles?' <span class="small">• '+Number(r.estimated_miles).toFixed(1)+' mi'+drive+svc+'</span>':'')+'<br><button class="btn blue" onclick="openRoute(\''+r.id+'\')">OPEN ROUTE</button></div>'
-  }).join('')||'<div class="panel">No planned or active route assigned to your employee number.</div>'
+  const today=(()=>{const p={};for(const x of new Intl.DateTimeFormat('en-US',{timeZone:'America/Chicago',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()))p[x.type]=x.value;return p.year+'-'+p.month+'-'+p.day})();
+  const routes=(j.routes||[]).slice().sort((a,b)=>{
+   const as=String(a.status||'')==='ACTIVE'?0:1,bs=String(b.status||'')==='ACTIVE'?0:1;if(as!==bs)return as-bs;
+   const ad=String(a.route_date||''),bd=String(b.route_date||'');if(ad!==bd)return ad.localeCompare(bd);
+   return String(a.created_at||'').localeCompare(String(b.created_at||''))
+  });
+  let todayPlanned=0;
+  $('routes').innerHTML=routes.map(r=>{
+   const status=String(r.status||'PLANNED').toUpperCase(),date=String(r.route_date||''),depot=String(r.depot||'BOLINGBROOK').toUpperCase(),drive=r.drive_minutes!=null?' • '+Math.round(Number(r.drive_minutes))+' drive min':'',svc=r.service_minutes!=null?' • '+Math.round(Number(r.service_minutes))+' service min':'';
+   let label='PLANNED ROUTE',labelClass='planned';
+   if(status==='ACTIVE'){label='ACTIVE ROUTE';labelClass='active'}
+   else if(date===today){todayPlanned++;label=todayPlanned===1?'NEXT ROUTE TODAY':'PLANNED ROUTE '+todayPlanned+' TODAY'}
+   else if(date>today)label='FUTURE PRE-ROUTE';
+   const button=status==='ACTIVE'?'CONTINUE ACTIVE ROUTE':'OPEN ROUTE';
+   return '<div class="panel"><div style="font-size:11px;font-weight:950;color:'+(status==='ACTIVE'?'#067647':'#175cd3')+';margin-bottom:5px">'+esc(label)+'</div><b>'+esc(date)+' • '+esc(depot)+' START / RETURN • '+esc(r.wave||'ROUTE')+'</b><br><span class="status '+labelClass+'">'+esc(status)+'</span>'+(r.estimated_miles!=null?' <span class="small">• '+Number(r.estimated_miles).toFixed(1)+' mi'+drive+svc+'</span>':'')+'<br><button class="btn '+(status==='ACTIVE'?'green':'blue')+'" onclick="openRoute(\''+r.id+'\')">'+button+'</button></div>'
+  }).join('')||'<div class="panel">No planned or active route is assigned to your employee number.</div>'
  }catch(e){$('routes').innerHTML='<div class="panel warn">'+esc(e.message)+'</div>'}
 }
 async function openRoute(id,fromChange=false){
