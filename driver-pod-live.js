@@ -4,7 +4,7 @@ if(window.__nwtbPodLive)return;window.__nwtbPodLive=true;
 const API='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-pod';
 const KEY='sb_publishable_EqF-iooqhmngSG5BbzOxfQ_Vnf9Altc';
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
-const token=()=>localStorage.getItem('nwtb_delivery_token')||'';
+const token=()=>localStorage.getItem('nwtb_driver_token')||'';
 const selectedDriver=()=>localStorage.getItem('nwtb_delivery_driver')||'';
 let currentStop='',drawn=false,drawing=false,ctx=null,last=null;
 async function post(body){const t=token();if(!t)throw Error('Driver session is not ready. Refresh the page.');const r=await fetch(API,{method:'POST',cache:'no-store',headers:{'content-type':'application/json','apikey':KEY,'x-nwtb-session':t},body:JSON.stringify(body)});const j=await r.json().catch(()=>({error:'Invalid POD response.'}));if(!r.ok)throw Error(j.error||'Could not save proof of delivery.');return j}
