@@ -4,7 +4,7 @@ if(window.__nwtbDriverPriorityRouteLive)return;window.__nwtbDriverPriorityRouteL
 const API='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-route-priority';
 const KEY='sb_publishable_EqF-iooqhmngSG5BbzOxfQ_Vnf9Altc';
 let busy=false;
-const session=()=>localStorage.getItem('nwtb_delivery_token')||'';
+const session=()=>localStorage.getItem('nwtb_driver_token')||'';
 async function post(payload){const r=await fetch(API,{method:'POST',headers:{'content-type':'application/json','apikey':KEY,'x-nwtb-session':session()},body:JSON.stringify(payload)}),j=await r.json().catch(()=>({error:'Bad response'}));if(!r.ok)throw Error(j.error||'Request failed');return j}
 function show(ev){
  const bar=document.getElementById('routeAlert');if(bar){bar.className='alertbar show';bar.style.background='#7c3aed';bar.innerHTML='ROUTE RE-OPTIMIZED BY DISPATCH<div class="sub">'+String(ev.note||'Your remaining stop order changed.').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))+'</div>';setTimeout(()=>{bar.className='alertbar';bar.style.background=''},10000)}
