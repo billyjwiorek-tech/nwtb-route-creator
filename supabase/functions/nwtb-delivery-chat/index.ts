@@ -111,7 +111,7 @@ Deno.serve(async(req:Request)=>{
    if(error)return reply(req,{error:'Could not send seen receipt. Please try again.'},500)
   }
   const {data:receipts,error:receiptError}=await owned()
-  if(receiptError||!receipts||receipts.some((m:any)=>!m.read_by_driver_at))return reply(req,{error:'Could not confirm seen receipt. Please try again.'},500)
+  if(receiptError||!receipts||receipts.length!==ids.length||receipts.some((m:any)=>!m.read_by_driver_at))return reply(req,{error:'Could not confirm seen receipt. Please try again.'},500)
   return reply(req,{ok:true,receipts})
  }
  if(action==='mark_driver_read'){

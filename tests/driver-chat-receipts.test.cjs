@@ -77,7 +77,7 @@ function surface({office=false,messages=[message(1)],hidden=false,audioReady=tru
   await f.tick(12000);ok(f.get('nwtbDriverChatToast').classList.contains('show'),'Popup remains beyond old seven-second timeout');eq(f.sounds,0,'Suspended audio is not falsely reported as playing');
   f.tap();await settle();eq(f.sounds,1,'First user tap unlocks shared Driver audio and plays pending alert');ok(f.arms>0,'Chat arms existing Driver audio instead of a separate AudioContext');
   eq(f.notifications.length,1,'Native notification sent only once for new message');eq(f.notifications[0].title,'NWTB — DISPATCH MESSAGE','Native notification identifies Dispatch');
-  await f.click('nwtbDriverChatSeen');ok(f.messages[0].read_by_driver_at,'MESSAGE SEEN records server receipt');ok(!f.get('nwtbDriverChatToast').classList.contains('show'),'Acknowledged popup closes');ok(!f.get('nwtbDriverChatDrawer').classList.contains('show'),'MESSAGE SEEN keeps chat closed');
+  const map=f.get('mapHost');await f.click('nwtbDriverChatSeen');eq(f.get('mapHost'),map,'Acknowledgment preserves mounted navigation map');ok(f.requests.every(r=>r.url.endsWith('/nwtb-delivery-chat')),'Message buttons do not call route or GPS endpoints');ok(f.messages[0].read_by_driver_at,'MESSAGE SEEN records server receipt');ok(!f.get('nwtbDriverChatToast').classList.contains('show'),'Acknowledged popup closes');ok(!f.get('nwtbDriverChatDrawer').classList.contains('show'),'MESSAGE SEEN keeps chat closed');
   eq(f.requests.find(r=>r.body.action==='driver_acknowledge').body.message_ids,[1],'Popup acknowledges only displayed message');eq(f.local.get('nwtb_delivery_token'),'office-fixture','Driver acknowledgment preserves Office session');
  }
  {
