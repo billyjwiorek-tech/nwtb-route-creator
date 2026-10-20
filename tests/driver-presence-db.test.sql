@@ -41,4 +41,8 @@ DELETE FROM public.chat_sessions WHERE token='00000000-0000-4000-8000-0000000001
 SELECT pg_temp.require(NOT EXISTS(SELECT 1 FROM public.nwtb_driver_push_subscriptions WHERE driver_employee_number='0123'),'Driver logout removes bound phone subscriptions');
 SELECT pg_temp.require((SELECT count(*)=0 FROM public.delivery_routes WHERE driver_employee_number='0123'),'Adding driver creates no route');
 SELECT pg_temp.require((SELECT count(*)=0 FROM public.chat_sessions WHERE employee_number='0123'),'Adding driver creates no Driver session');
+SET LOCAL ROLE service_role;
+SELECT public.nwtb_add_delivery_driver('0321','Fixture Service Driver','9998');
+RESET ROLE;
+SELECT pg_temp.require((SELECT role='DRIVER' AND active FROM public.nwtb_delivery_roles WHERE employee_number='0321'),'Actual service role can execute atomic Driver registration');
 ROLLBACK;

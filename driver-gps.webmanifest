@@ -2,7 +2,7 @@
   "id": "./driver-live.html",
   "name": "NWTB Driver GPS",
   "short_name": "NWTB Driver",
-  "start_url": "./driver-live.html",
+  "start_url": "./driver-live.html?v=20261020-presence1",
   "scope": "./",
   "display": "standalone",
   "background_color": "#f4f6f8",

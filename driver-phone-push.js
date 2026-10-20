@@ -29,6 +29,7 @@ function binding(value){
  });
 }
 function decodeKey(key){const padded=key.replace(/-/g,'+').replace(/_/g,'/')+'='.repeat((4-key.length%4)%4);return Uint8Array.from(atob(padded),c=>c.charCodeAt(0))}
+function sameApplicationKey(subscription,key){const existing=subscription.options?.applicationServerKey;if(!existing)return true;const a=new Uint8Array(existing),b=decodeKey(key);return a.length===b.length&&a.every((value,index)=>value===b[index])}
 async function bindSubscription(subscription,s){
  if(!same(s)||!valid(s))return;
  await binding({employee_number:s.no,page_path:location.pathname});
@@ -49,6 +50,7 @@ async function enable(){
   if(permission!=='granted')throw Error('Notifications are blocked. Allow notifications for NWTB Driver in your phone or browser settings, then try again.');
   const registration=await register(),config=await post({action:'phone_push_config'},s);if(!same(s)||!valid(s))return;
   let subscription=await registration.pushManager.getSubscription();
+  if(subscription&&!sameApplicationKey(subscription,config.public_key)){await subscription.unsubscribe();subscription=null}
   if(!subscription)subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:decodeKey(config.public_key)});
   await bindSubscription(subscription,s);
  }catch(error){if(same(s))status(error.message||'Could not enable phone notifications.','bad')}
@@ -71,7 +73,7 @@ async function sync(){
  try{
   const registration=await register();if(!same(s))return;
   const subscription=Notification.permission==='granted'?await registration.pushManager.getSubscription():null;
-  if(subscription)await bindSubscription(subscription,s);else status('Enable phone notifications to receive Dispatch alerts while your phone is locked.');
+  if(subscription){const config=await post({action:'phone_push_config'},s);if(!sameApplicationKey(subscription,config.public_key))throw Error('Phone notification setup needs refreshing. Tap ENABLE PHONE NOTIFICATIONS.');await bindSubscription(subscription,s)}else status('Enable phone notifications to receive Dispatch alerts while your phone is locked.');
  }catch(error){if(same(s))status(error.message,'bad')}
 }
 function logout(){
