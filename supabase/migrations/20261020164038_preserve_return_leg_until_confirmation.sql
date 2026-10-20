@@ -23,6 +23,9 @@ BEGIN
  SELECT * INTO r FROM public.delivery_routes WHERE id=p_route_id FOR UPDATE;
  IF r.id IS NULL THEN RAISE EXCEPTION 'Route not found.'; END IF;
  IF r.driver_employee_number IS DISTINCT FROM p_driver_employee_number THEN RAISE EXCEPTION 'Route is assigned to another driver.'; END IF;
+ IF r.status='COMPLETED' AND (r.returned_at IS NOT NULL OR NOT public.nwtb_route_needs_return(to_jsonb(r))) THEN
+  RETURN jsonb_build_object('route_id',r.id,'route_status','COMPLETED','route_completed',true,'return_pending',false);
+ END IF;
  IF r.status <> 'ACTIVE' OR r.released_to_driver IS DISTINCT FROM true THEN RAISE EXCEPTION 'Only a released ACTIVE route can finish stops.'; END IF;
  IF r.paused_at IS NOT NULL AND (r.resumed_at IS NULL OR r.paused_at>r.resumed_at) THEN RAISE EXCEPTION 'Resume the route before finishing stops.'; END IF;
  SELECT count(*),coalesce(bool_and(coalesce(status IN ('DELIVERED','NOT_DELIVERED','SKIPPED'),false)),false)
@@ -120,6 +123,24 @@ GRANT EXECUTE ON FUNCTION public.nwtb_pending_stop_reopens_return() TO service_r
 DROP TRIGGER IF EXISTS nwtb_pending_stop_reopens_return ON public.delivery_route_stops;
 CREATE TRIGGER nwtb_pending_stop_reopens_return BEFORE INSERT OR UPDATE OF status,route_id ON public.delivery_route_stops
  FOR EACH ROW EXECUTE FUNCTION public.nwtb_pending_stop_reopens_return();
+
+-- The stop write and return transition are one transaction, including older completion callers.
+CREATE OR REPLACE FUNCTION public.nwtb_stop_update_route_phase()
+RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER
+SET search_path TO public,pg_catalog AS $fn$
+BEGIN
+ IF NEW.status IN ('DELIVERED','NOT_DELIVERED','SKIPPED')
+    AND EXISTS(SELECT 1 FROM public.delivery_routes WHERE id=NEW.route_id AND status='ACTIVE') THEN
+  PERFORM public.nwtb_finish_route_stops(NEW.route_id,(SELECT driver_employee_number FROM public.delivery_routes WHERE id=NEW.route_id));
+ END IF;
+ RETURN NEW;
+END $fn$;
+REVOKE ALL ON FUNCTION public.nwtb_stop_update_route_phase() FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.nwtb_stop_update_route_phase() TO service_role;
+DROP TRIGGER IF EXISTS nwtb_stop_update_route_phase ON public.delivery_route_stops;
+CREATE TRIGGER nwtb_stop_update_route_phase AFTER UPDATE OF status ON public.delivery_route_stops
+ FOR EACH ROW WHEN (OLD.status IS DISTINCT FROM NEW.status)
+ EXECUTE FUNCTION public.nwtb_stop_update_route_phase();
 
 CREATE OR REPLACE FUNCTION public.nwtb_finalize_pod(p_pod_id uuid, p_stop_id uuid, p_driver_employee_number text, p_driver_display_name text, p_recipient_name text, p_notes text, p_lat double precision, p_lon double precision, p_accuracy_m double precision, p_captured_at timestamp with time zone, p_signature_path text, p_signature_sha256 text, p_photo_path text, p_photo_sha256 text)
  RETURNS jsonb

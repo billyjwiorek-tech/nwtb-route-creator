@@ -28,6 +28,7 @@ BEGIN
  j:=public.nwtb_finish_route_stops(r,'1001');
  PERFORM fixture_assert(j->>'return_pending'='false' AND (SELECT status='ACTIVE' AND returning_started_at IS NULL FROM public.delivery_routes WHERE id=r),'unfinished stops keep normal ACTIVE state');
  UPDATE public.delivery_route_stops SET status='DELIVERED' WHERE id=s2;
+ PERFORM fixture_assert((SELECT status='ACTIVE' AND returning_started_at IS NOT NULL FROM public.delivery_routes WHERE id=r),'stop transaction enters return even without a follow-up Edge RPC');
  j:=public.nwtb_finish_route_stops(r,'1001');
  PERFORM fixture_assert(j->>'return_pending'='true' AND j->>'route_completed'='false','last stop begins return without route completion');
  PERFORM fixture_assert((SELECT status='ACTIVE' AND returning_started_at IS NOT NULL AND returned_at IS NULL FROM public.delivery_routes WHERE id=r),'return leg stays ACTIVE with arrival unconfirmed');
