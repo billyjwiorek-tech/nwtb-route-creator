@@ -1,0 +1,18 @@
+{
+  "id": "./driver-live.html",
+  "name": "NWTB Driver GPS",
+  "short_name": "NWTB Driver",
+  "start_url": "./driver-live.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f6f8",
+  "theme_color": "#101828",
+  "icons": [
+    {
+      "src": "./nwt-logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

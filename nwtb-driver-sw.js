@@ -1,7 +1,7 @@
-const CACHE='nwtb-driver-shell-v6-chat-seen';
+const CACHE='nwtb-driver-shell-v7-driver-presence-push';
 const DB='nwtb-driver-offline-v1';
 const STORE='api_cache';
-const SHELL=['./driver-chat-live.js?v=20261020-chatseen1','./driver-live.html','./driver-standard.html','./driver-pod-live.js','./driver-navigation-native.js?v=20261020-map1','./driver-mobile-nav-fix.js?v=20261020-map1','./driver-route-pins-native.js?v=20261020-map1','./driver-ios-map-fallback.js?v=20261020-map1','./driver-exceptions-live.js','./driver-offline-live.js','./driver-depot-support-live.js','./driver-profiles-live.js','./nwtb-system-lock-live.js'];
+const SHELL=['./driver-chat-live.js?v=20261020-presence1','./driver-phone-push.js?v=20261020-presence1','./driver-tracking-engine-native.js?v=20261020-presence1','./driver-gps.webmanifest','./driver-standard.webmanifest','./driver-live.html','./driver-standard.html','./driver-pod-live.js','./driver-navigation-native.js?v=20261020-map1','./driver-mobile-nav-fix.js?v=20261020-map1','./driver-route-pins-native.js?v=20261020-map1','./driver-ios-map-fallback.js?v=20261020-map1','./driver-exceptions-live.js','./driver-offline-live.js','./driver-depot-support-live.js','./driver-profiles-live.js','./nwtb-system-lock-live.js'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>Promise.allSettled(SHELL.map(x=>c.add(x)))).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',e=>{e.waitUntil((async()=>{for(const k of await caches.keys())if(k.startsWith('nwtb-driver-shell-')&&k!==CACHE)await caches.delete(k);await self.clients.claim()})())});
 function openDb(){return new Promise((res,rej)=>{const r=indexedDB.open(DB,3);r.onupgradeneeded=()=>{const db=r.result;if(!db.objectStoreNames.contains(STORE))db.createObjectStore(STORE);if(!db.objectStoreNames.contains('write_queue')){const s=db.createObjectStore('write_queue',{keyPath:'id'});s.createIndex('created_at','created_at')}};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
@@ -21,5 +21,23 @@ self.addEventListener('notificationclick',event=>{
   const driverClient=clients.find(client=>{try{const u=new URL(client.url);return u.origin===target.origin&&u.pathname===target.pathname}catch{return false}});
   if(driverClient){await driverClient.focus();driverClient.postMessage({type:'NWTB_OPEN_DRIVER_CHAT'})}
   else await self.clients.openWindow(target.href);
+ })());
+});
+
+self.addEventListener('push',event=>{
+ event.waitUntil((async()=>{
+  let payload;try{payload=event.data?.json()}catch{payload={}}
+  const binding=await dbGet('driver-push-binding-v1').catch(()=>null);
+  const owned=!!binding&&binding.employee_number===String(payload?.driver_employee_number||'');
+  const validType=['NWTB_DRIVER_CHAT','NWTB_DRIVER_PUSH_TEST'].includes(payload?.type);
+  const allowedPaths=['/nwtb-route-creator/driver-live.html','/nwtb-route-creator/driver-standard.html'];
+  const path=owned&&allowedPaths.includes(binding.page_path)?binding.page_path:'/nwtb-route-creator/driver-live.html';
+  const title=owned&&validType?payload.type==='NWTB_DRIVER_PUSH_TEST'?'NWTB — PHONE ALERT TEST':'NWTB — DISPATCH MESSAGE':'NWTB — DISPATCH UPDATE';
+  const options={body:owned&&validType?String(payload.body||'Open Dispatch Chat.').slice(0,300):'Open NWTB Driver to check Dispatch updates.',tag:'nwtb-driver-chat',renotify:true,requireInteraction:true,silent:false,icon:'./nwt-logo.svg',data:{url:path,message_id:owned?payload?.message_id:null}};
+  await self.registration.showNotification(title,options);
+  if(owned&&payload.type==='NWTB_DRIVER_CHAT'){
+   const windows=await self.clients.matchAll({type:'window',includeUncontrolled:true});
+   for(const client of windows){try{const url=new URL(client.url);if(url.origin===self.location.origin&&allowedPaths.includes(url.pathname))client.postMessage({type:'NWTB_DRIVER_PUSH_MESSAGE',driver_employee_number:binding.employee_number,message_id:payload.message_id})}catch{}}
+  }
  })());
 });

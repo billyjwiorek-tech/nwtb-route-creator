@@ -24,6 +24,7 @@ let lastSentAt=0;
 let sending=false;
 let wakeLock=null;
 let recoveries=0;
+let owner='',manualStop=false,linkedRoute='';
 
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#039;'}[m]));
@@ -32,13 +33,18 @@ function meters(a,b){if(!a||!b)return Infinity;const R=6371008.8,dLat=rad(b.lat-
 function bearing(a,b){if(!a||!b)return null;const y=Math.sin(rad(b.lon-a.lon))*Math.cos(rad(b.lat));const x=Math.cos(rad(a.lat))*Math.sin(rad(b.lat))-Math.sin(rad(a.lat))*Math.cos(rad(b.lat))*Math.cos(rad(b.lon-a.lon));const v=(Math.atan2(y,x)*180/Math.PI+360)%360;return Number.isFinite(v)?v:null}
 function nowTime(){return new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit',second:'2-digit'})}
 function context(){
- let emp='',rid='',tok='';
- try{if(typeof driver!=='undefined')emp=String(driver||'')}catch{}
- try{if(typeof route!=='undefined')rid=String(route||'')}catch{}
- try{if(typeof token!=='undefined')tok=String(token||'')}catch{}
- if(!emp)emp=localStorage.getItem('nwtb_delivery_driver')||'';
- if(!tok)tok=localStorage.getItem('nwtb_driver_token')||'';
- return {driver:emp,route:rid,token:tok};
+ let emp='';try{if(typeof driver!=='undefined')emp=String(driver||'')}catch{}
+ const saved=localStorage.getItem('nwtb_delivery_driver')||'',tok=localStorage.getItem('nwtb_driver_token')||'';
+ if(!emp)emp=saved;
+ const r=window.__nwtbDriverTrackingRoute;
+ return {driver:emp,token:tok,savedDriver:saved,route:r?.status==='ACTIVE'?String(r.id||''):'',record:r,
+  paused:!!r&&(r.paused===true||!!r.paused_at&&(!r.resumed_at||new Date(r.paused_at)>new Date(r.resumed_at)))};
+}
+function ownerKey(c){return c.driver+'|'+c.token}
+function sameContext(c){const current=context();return c.driver===current.driver&&c.token===current.token}
+function eligible(c=context()){
+ try{if(window.top!==window.self||window.frameElement)return false}catch{return false}
+ return window.__nwtbDriverSignedIn===true&&window.__nwtbDriverTrackingRoute!==undefined&&/^\d{4}$/.test(c.driver)&&c.driver!=='9998'&&c.driver===c.savedDriver&&!!c.token&&!c.paused;
 }
 function trackEl(){return $('track')}
 function status(text,kind='info'){
@@ -46,38 +52,51 @@ function status(text,kind='info'){
  const color=kind==='ok'?'#176b3a':kind==='bad'?'#b42318':kind==='warn'?'#b54708':'#175cd3';
  e.innerHTML=`<span style="font-weight:900;color:${color}">${esc(ENGINE)}: ${esc(text)}</span>`;
 }
-function queueRead(){try{const q=JSON.parse(localStorage.getItem(QUEUE_KEY)||'[]');return Array.isArray(q)?q:[]}catch{return []}}
-function queueWrite(q){try{localStorage.setItem(QUEUE_KEY,JSON.stringify(q.slice(-MAX_QUEUE)))}catch{}}
-function enqueue(p){const q=queueRead();q.push(p);queueWrite(q)}
+function queueKey(){return QUEUE_KEY+':'+context().driver}
+function queueRead(){try{
+ const own=localStorage.getItem(queueKey());
+ if(own){const q=JSON.parse(own);return Array.isArray(q)?q:[]}
+ const legacy=JSON.parse(localStorage.getItem(QUEUE_KEY)||'[]');
+ const mine=Array.isArray(legacy)?legacy.filter(p=>p.driver_employee_number===context().driver):[];
+ if(mine.length){localStorage.setItem(queueKey(),JSON.stringify(mine));localStorage.setItem(QUEUE_KEY,JSON.stringify(legacy.filter(p=>p.driver_employee_number!==context().driver)))}
+ return mine;
+}catch{return []}}
+function queueWrite(q){try{localStorage.setItem(queueKey(),JSON.stringify(q.slice(-MAX_QUEUE)))}catch{}}
+function enqueue(p){if(p.driver_employee_number!==context().driver)return;const q=queueRead();q.push(p);queueWrite(q)}
 async function freshToken(){
- const emp=localStorage.getItem('nwtb_delivery_driver')||'';
+ const original=context();if(!running||!eligible(original))throw Error('Driver session is no longer active.');
+ const emp=original.driver;
  if(!/^[0-9]{4}$/.test(emp))throw Error('Driver employee number is not available. Sign in again.');
  const r=await fetch(CHAT_URL,{method:'POST',cache:'no-store',headers:{'content-type':'application/json','apikey':API_KEY},body:JSON.stringify({action:'delivery_driver_login',employee_number:emp})});
  const j=await r.json().catch(()=>({}));if(!r.ok||!j.token)throw Error(j.error||'Could not refresh driver session');
+ if(!running||!eligible()||!sameContext(original)){if(j.token)fetch(CHAT_URL,{method:'POST',headers:{'content-type':'application/json','apikey':API_KEY,'x-nwtb-session':j.token},body:JSON.stringify({action:'logout'})}).catch(()=>{});throw Error('Driver session changed.')}
  localStorage.setItem('nwtb_driver_token',j.token);
  try{if(typeof token!=='undefined')token=j.token}catch{}
  return j.token;
 }
-async function upload(payload,allowRefresh=true){
- let ctx=context(),tok=ctx.token;if(!tok)tok=await freshToken();
+async function upload(payload,allowRefresh=true,expected=context()){
+ if(!running||!eligible()||!sameContext(expected)||payload.driver_employee_number!==expected.driver)throw Object.assign(Error('Driver session changed.'),{status:403});
+ let ctx=expected,tok=ctx.token;
  let r=await fetch(TRACK_URL,{method:'POST',headers:{'content-type':'application/json','apikey':API_KEY,'x-nwtb-session':tok},body:JSON.stringify(payload)});
- if(r.status===401&&allowRefresh){tok=await freshToken();r=await fetch(TRACK_URL,{method:'POST',headers:{'content-type':'application/json','apikey':API_KEY,'x-nwtb-session':tok},body:JSON.stringify(payload)})}
- const j=await r.json().catch(()=>({}));if(!r.ok)throw Error(j.error||'GPS upload failed');return j;
+ if(r.status===401&&allowRefresh&&running&&eligible()&&sameContext(ctx)){tok=await freshToken();r=await fetch(TRACK_URL,{method:'POST',headers:{'content-type':'application/json','apikey':API_KEY,'x-nwtb-session':tok},body:JSON.stringify(payload)})}
+ const j=await r.json().catch(()=>({}));if(!r.ok)throw Object.assign(Error(j.error||'GPS upload failed'),{status:r.status});return j;
 }
-function makePayload(fix){const c=context();return {action:'location_update',driver_employee_number:c.driver,route_id:c.route,lat:fix.lat,lon:fix.lon,accuracy_m:fix.accuracy,heading_deg:fix.heading,speed_mps:fix.speed,captured_at:fix.captured_at}}
+function makePayload(fix){const c=context();return {action:'location_update',driver_employee_number:c.driver,route_id:c.route||null,lat:fix.lat,lon:fix.lon,accuracy_m:fix.accuracy,heading_deg:fix.heading,speed_mps:fix.speed,captured_at:fix.captured_at}}
 async function flushQueue(){
- if(sending||!navigator.onLine)return;const ctx=context();if(!ctx.driver||!ctx.route)return;
+ if(sending||!navigator.onLine)return;const ctx=context();if(!eligible(ctx))return;
  const q=queueRead();if(!q.length)return;sending=true;
  try{
   const keep=[];
   for(let i=0;i<q.length;i++){
-   try{await upload(q[i])}catch(e){keep.push(...q.slice(i));break}
+   if(!running||!eligible()||!sameContext(ctx))return;
+   if(q[i].driver_employee_number!==ctx.driver)continue;
+   try{await upload(q[i],true,ctx)}catch(e){if(e.status===400||e.status===403||e.status===404)continue;keep.push(...q.slice(i));break}
   }
-  queueWrite(keep);
+  if(sameContext(ctx))queueWrite(keep);
  }finally{sending=false}
 }
 async function sendFix(fix,force=false){
- const ctx=context();if(!ctx.driver||!ctx.route){status('WAITING FOR ACTIVE ROUTE','warn');return}
+ const ctx=context();if(!running||!eligible(ctx))return;
  const age=Date.now()-lastSentAt,move=meters(lastSent,fix);
  if(!force){
   if(age<SEND_INTERVAL_MS)return;
@@ -86,13 +105,15 @@ async function sendFix(fix,force=false){
  const payload=makePayload(fix);lastSentAt=Date.now();lastSent={lat:fix.lat,lon:fix.lon};
  if(!navigator.onLine){enqueue(payload);status(`OFFLINE — SAVING GPS • ${queueRead().length} queued`,'warn');return}
  try{
-  await flushQueue();await upload(payload);
+  await flushQueue();if(!sameContext(ctx)||!running||!eligible())return;await upload(payload,true,ctx);
+  if(!sameContext(ctx)||!running)return;
   const acc=Number.isFinite(fix.accuracy)?` • ±${Math.round(fix.accuracy)} m`:'';
-  status(`LIVE • ${nowTime()}${acc}`,'ok');
- }catch(e){enqueue(payload);status(`UPLOAD DELAYED — SAVING GPS • ${queueRead().length} queued`,'warn')}
+  status(`LIVE • ${ctx.route?'ON ROUTE':'SIGNED IN — NO ACTIVE ROUTE'} • ${nowTime()}${acc}`,'ok');
+ }catch(e){if(!sameContext(ctx)||!running)return;if(e.status===403){status('DRIVER GPS NOT AUTHORIZED','bad');return}enqueue(payload);status(`UPLOAD DELAYED — SAVING GPS • ${queueRead().length} queued`,'warn')}
 }
-function normalizePosition(p){const c=p.coords||{},lat=Number(c.latitude),lon=Number(c.longitude);let heading=Number.isFinite(Number(c.heading))?Number(c.heading):null;if(heading===null&&lastFix&&Number.isFinite(lat)&&Number.isFinite(lon)&&meters(lastFix,{lat,lon})>=4)heading=bearing(lastFix,{lat,lon});return {lat,lon,accuracy:Number(c.accuracy),heading,speed:Number.isFinite(Number(c.speed))?Math.max(0,Number(c.speed)):null,captured_at:new Date(p.timestamp||Date.now()).toISOString()}}
+function normalizePosition(p){const c=p.coords||{},lat=Number(c.latitude),lon=Number(c.longitude);let heading=c.heading!=null&&Number.isFinite(Number(c.heading))?Number(c.heading):null;if(heading===null&&lastFix&&Number.isFinite(lat)&&Number.isFinite(lon)&&meters(lastFix,{lat,lon})>=4)heading=bearing(lastFix,{lat,lon});return {lat,lon,accuracy:Number(c.accuracy),heading,speed:c.speed!=null&&Number.isFinite(Number(c.speed))?Math.max(0,Number(c.speed)):null,captured_at:new Date(p.timestamp||Date.now()).toISOString()}}
 function onFix(p){
+ if(!running||!eligible())return;
  const f=normalizePosition(p);if(!Number.isFinite(f.lat)||!Number.isFinite(f.lon))return;
  lastFix=f;lastFixAt=Date.now();recoveries=0;sendFix(f,false);
 }
@@ -104,17 +125,18 @@ function onError(e){
 function startWatch(){
  if(!running||!navigator.geolocation||watch!==null)return;
  status('STARTING…','info');
- watch=navigator.geolocation.watchPosition(onFix,onError,{enableHighAccuracy:true,maximumAge:2000,timeout:15000});
- navigator.geolocation.getCurrentPosition(onFix,()=>{}, {enableHighAccuracy:true,maximumAge:0,timeout:12000});
+ const identity=ownerKey(context()),receive=p=>{if(identity===ownerKey(context()))onFix(p)};
+ watch=navigator.geolocation.watchPosition(receive,onError,{enableHighAccuracy:true,maximumAge:2000,timeout:15000});
+ navigator.geolocation.getCurrentPosition(receive,()=>{}, {enableHighAccuracy:true,maximumAge:0,timeout:12000});
 }
 function clearWatch(){if(watch!==null&&navigator.geolocation){try{navigator.geolocation.clearWatch(watch)}catch{}watch=null}}
 function scheduleRecovery(delay=1000){if(!running)return;setTimeout(()=>{if(!running)return;clearWatch();recoveries++;startWatch()},delay)}
 async function getWakeLock(){
- try{if('wakeLock'in navigator&&document.visibilityState==='visible'){if(!wakeLock||wakeLock.released)wakeLock=await navigator.wakeLock.request('screen')}}catch{}
+ try{if(context().route&&'wakeLock'in navigator&&document.visibilityState==='visible'){if(!wakeLock||wakeLock.released)wakeLock=await navigator.wakeLock.request('screen')}}catch{}
 }
 function releaseWakeLock(){try{if(wakeLock&&!wakeLock.released)wakeLock.release()}catch{}wakeLock=null}
 function healthCheck(){
- if(!running)return;const age=Date.now()-lastFixAt;
+ if(!running)return;if(!eligible()){stop(false);return}const age=Date.now()-lastFixAt;
  if(!lastFixAt){status('SEARCHING FOR GPS…','info');return}
  if(age>HARD_STALE_MS){status('GPS LOST — RESTARTING','bad');scheduleRecovery(0);return}
  if(age>STALE_MS){status('GPS DELAYED — REACQUIRING','warn');scheduleRecovery(0);return}
@@ -126,15 +148,27 @@ function startTimers(){
  if(!heartbeatTimer)heartbeatTimer=setInterval(heartbeat,HEARTBEAT_MS);
 }
 function stopTimers(){if(healthTimer){clearInterval(healthTimer);healthTimer=null}if(heartbeatTimer){clearInterval(heartbeatTimer);heartbeatTimer=null}}
-function start(){
- const ctx=context();if(!ctx.driver){status('SELECT DRIVER','warn');return}
- if(!ctx.route){status('OPEN OR START A ROUTE','warn');return}
+function start(explicit=true){
+ const ctx=context();if(explicit)manualStop=false;
+ if(!eligible(ctx)){if(ctx.paused)status('ROUTE PAUSED','warn');return}
+ if(manualStop)return;
  if(!navigator.geolocation){status('GPS NOT SUPPORTED','bad');return}
- if(running){getWakeLock();return}
- running=true;lastFixAt=0;recoveries=0;startTimers();startWatch();getWakeLock();
- window.__nwtbBuiltInTracker={engine:ENGINE,running:true,receiver:'NWTB_NATIVE'};
+ if(running){if(ctx.route)getWakeLock();else releaseWakeLock();return}
+ owner=ownerKey(ctx);running=true;lastFixAt=0;recoveries=0;startTimers();startWatch();getWakeLock();
+ window.__nwtbBuiltInTracker={engine:ENGINE,running:true,receiver:'NWTB_NATIVE',mode:ctx.route?'ROUTE':'SIGNED_IN'};
 }
-function stop(){running=false;clearWatch();stopTimers();releaseWakeLock();window.__nwtbBuiltInTracker={engine:ENGINE,running:false,receiver:'NWTB_NATIVE'};status('OFF','warn')}
+function stop(explicit=true){if(explicit)manualStop=true;running=false;clearWatch();stopTimers();releaseWakeLock();window.__nwtbBuiltInTracker={engine:ENGINE,running:false,receiver:'NWTB_NATIVE'};status('OFF','warn')}
+function sync(){
+ const ctx=context(),key=ownerKey(ctx);
+ if(key!==owner){if(running)stop(false);owner=key;manualStop=false;lastFix=null;lastSent=null;lastSentAt=0;lastFixAt=0;linkedRoute=''}
+ if(!eligible(ctx)){if(running)stop(false);return}
+ if(!running&&!manualStop)start(false);
+ if(running){
+  if(ctx.route)getWakeLock();else releaseWakeLock();
+  window.__nwtbBuiltInTracker={engine:ENGINE,running:true,receiver:'NWTB_NATIVE',mode:ctx.route?'ROUTE':'SIGNED_IN'};
+  if(linkedRoute!==ctx.route){linkedRoute=ctx.route;if(lastFix)sendFix(lastFix,true)}
+ }
+}
 
 window.addEventListener('online',()=>{if(running){status('CONNECTION RESTORED — SENDING SAVED GPS','info');flushQueue();if(lastFix)sendFix(lastFix,true)}});
 window.addEventListener('offline',()=>{if(running)status('OFFLINE — GPS WILL BE SAVED','warn')});
@@ -145,7 +179,11 @@ try{if(typeof startTracking==='function')startTracking=start}catch{window.startT
 try{if(typeof stopTracking==='function')stopTracking=stop}catch{window.stopTracking=stop}
 window.nwtbStartBuiltInTracking=start;
 window.nwtbStopBuiltInTracking=stop;
+window.nwtbSyncBuiltInTracking=sync;
+window.nwtbContinueIdleTracking=()=>{window.__nwtbDriverTrackingRoute=null;sync()};
+window.addEventListener('storage',sync);
 
-setInterval(()=>{try{const ctx=context(),txt=$('routes')?.textContent||'';if(!running&&ctx.driver&&ctx.route&&/ACTIVE/i.test(txt))start()}catch{}},5000);
+setInterval(()=>{try{sync()}catch{}},5000);
+setTimeout(sync,0);
 
 })();

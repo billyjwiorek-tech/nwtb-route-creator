@@ -15,7 +15,7 @@ function backend({employee='1234',authenticated=true,killed=false,updateFailure=
  }
  const q=new Proxy({}, {get(_,key){if(key==='then')return resolve=>Promise.resolve(result()).then(resolve);if(key==='maybeSingle'||key==='single')return ()=>Promise.resolve(result(true));return(...args)=>{if(['eq','is','in'].includes(key))filters.push([key,...args]);if(key==='update')values=args[0];return q}}});return q}};
  const ctx=vm.createContext({Deno:{env:{get:()=>undefined},serve:f=>handler=f},createClient:()=>db,Request,Response,Date,Set,Map,console});
- vm.runInContext(stripTypeScriptTypes(read('supabase/functions/nwtb-delivery-chat/index.ts').replace(/^import .*\n/,'')),ctx);
+ vm.runInContext(stripTypeScriptTypes(read('supabase/functions/nwtb-delivery-chat/index.ts').replace(/^import .*\n/gm,'')),ctx);
  return {messages,writes,async request(body){const response=await handler(new Request('https://fixture.invalid',{method:'POST',headers:{'content-type':'application/json','x-nwtb-session':'fixture'},body:JSON.stringify(body)}));return {status:response.status,body:await response.json()}}};
 }
 function surface({office=false,messages=[message(1)],hidden=false,audioReady=true,native=false}={}){
@@ -116,7 +116,7 @@ function surface({office=false,messages=[message(1)],hidden=false,audioReady=tru
   const {document}=parseHTML(read(file));ok(document.getElementById('fChat').getAttribute('src').startsWith('dispatch-native.html?'),'Office Chat opens current native Dispatch');ok(document.getElementById('fChat').getAttribute('src').endsWith('#chat'),'Office Chat opens private Driver conversations');
  }
  for(const file of ['driver-live.html','driver-standard.html']){
-  const html=read(file);ok(html.includes('driver-chat-live.js?v=20261020-chatseen1'),'Both Driver editions load final message controls');ok(html.includes('window.nwtbDriverMessageSound=function()'),'Both editions share their unlocked route-alert audio');for(const script of html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g))new vm.Script(script[1]);
+  const html=read(file);ok(html.includes('driver-chat-live.js?v=20261020-presence1'),'Both Driver editions load final message controls');ok(html.includes('window.nwtbDriverMessageSound=function()'),'Both editions share their unlocked route-alert audio');for(const script of html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g))new vm.Script(script[1]);
  }
  for(const file of ['driver-chat-live.js','dispatch-chat-live.js','nwtb-driver-sw.js'])new vm.Script(read(file));
  console.log(checks+' Driver chat acknowledgment and notification checks passed; synthetic data only.');

@@ -7,13 +7,14 @@ async function reconcile(){
  busy=true;
  try{
   const j=await post(API,{action:'routes_list'});
-  const active=(j.routes||[]).filter(r=>['PLANNED','ACTIVE'].includes(String(r.status||'').toUpperCase()));
+  const active=(j.routes||[]).filter(r=>r.status==='ACTIVE'||r.status==='PLANNED'&&r.released_to_driver===true);
+  active.sort((a,b)=>(a.status==='ACTIVE'?0:1)-(b.status==='ACTIVE'?0:1)||String(a.route_date||'').localeCompare(String(b.route_date||''))||String(a.id).localeCompare(String(b.id)));
   const ids=new Set(active.map(r=>String(r.id)));
-  live=(live||[]).filter(r=>ids.has(String(r.route_id||''))&&r.route&&['PLANNED','ACTIVE'].includes(String(r.route.status||'').toUpperCase()));
+  live=(live||[]).map(r=>{const current=active.find(a=>a.driver_employee_number===r.driver_employee_number)||(ids.has(String(r.route_id||''))?active.find(a=>a.id===r.route_id):null);if(current){const route={...(r.route_id===current.id?r.route||{}:{}),...current};return {...r,route,route_id:route.id,marker_type:'VAN'}}return r.logged_in===true?{...r,route:null,route_id:null,marker_type:'PERSON'}:null}).filter(Boolean);
   if(typeof renderMap==='function')renderMap();
   if(typeof renderDrivers==='function')renderDrivers();
   const u=document.getElementById('updated');
-  if(u&&active.length===0)u.textContent='Updated '+new Date().toLocaleTimeString()+' • No active routes';
+  if(u&&active.length===0)u.textContent='Updated '+new Date().toLocaleTimeString()+' • '+live.filter(r=>r.logged_in).length+' logged-in driver(s) • No released or active routes';
  }catch(e){console.warn('Active route guard failed',e)}finally{busy=false}
 }
 function install(){

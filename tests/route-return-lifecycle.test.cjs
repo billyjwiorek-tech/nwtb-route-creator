@@ -10,7 +10,7 @@ function backend(file,{employee='1234',authenticated=true,status='ACTIVE',assign
  const db={from(table){let filters=[],mutation=null;function result(single=false){let rows=[];
  if(table==='chat_sessions')rows=authenticated?[{token:'fixture-session',employee_number:employee,expires_at:'2099-01-01',employees:{active:true,display_name:'Fixture driver'}}]:[];
  else if(table==='employees')rows=[{employee_number:employee,display_name:'Fixture driver',active:true},{employee_number:assigned,display_name:'Assigned fixture',active:true}];
- else if(table==='nwtb_delivery_roles')rows=[{employee_number:employee,role:'DRIVER',active:true}];
+ else if(table==='nwtb_delivery_roles')rows=[{employee_number:employee,role:'DRIVER',active:true},{employee_number:assigned,role:'DRIVER',active:true}];
  else if(table==='nwtb_system_control')rows=[{id:1,state:killed?'KILLED':'RUNNING'}];
  else if(table==='delivery_routes')rows=[route];
  else if(table==='delivery_route_stops')rows=[stop];
@@ -56,21 +56,21 @@ async function endpointTests(){
  }
 }
 function driver(file,{status='ACTIVE',pending=false,paused=false,returning=true,custom=false}={}){
- const {window:dom}=parseHTML('<html><body><div id="routes"></div></body></html>'),document=dom.document,requests=[],alerts=[];let allow=true,fail=false,loads=0,gpsStops=0,navStops=0;
+ const {window:dom}=parseHTML('<html><body><div id="routes"></div></body></html>'),document=dom.document,requests=[],alerts=[];let allow=true,fail=false,loads=0,gpsStops=0,navStops=0,idleContinuations=0;
  const r={id:'fixture-route',status,depot:'BOLINGBROOK',end_mode:custom?'CUSTOM':'RETURN_DEPOT',end_name:custom?'Fixture return location':'Northwest Trucks - Bolingbrook',returning_started_at:returning?'2026-10-20T16:00:00Z':null,returned_at:null,paused};
  const stops=[{id:'fixture-stop',stop_sequence:1,status:pending?'PENDING':'DELIVERED',delivery_orders:{customer_name:'Fixture stop',address:'Fixture address'}}];
  const html=read(file),start=html.indexOf('async function openRoute('),end=html.indexOf('async function startRoute(');
  ok(start>0&&end>start,'Actual Driver route functions found');
- const ctx=vm.createContext({window:{nwtbStopNavigation(){navStops++},nwtbStopBuiltInTracking(){gpsStops++}},document,route:'fixture-route',currentRouteState:{status},currentPaused:false,API:'fixture-base',ROUTE_API:'fixture-track',$:id=>document.getElementById(id),esc:s=>String(s??''),routeLinks:()=>[],routeEndpoints:()=>({label:'START / RETURN',depot:'BOLINGBROOK'}),startChangePolling(){},confirm:()=>allow,alert:e=>alerts.push(e),async loadRoutes(){loads++},async post(url,body){requests.push({url,body});if(body.action==='route_get')return {route:r,stops};if(body.action==='driver_route_state')return {route:r};if(fail)throw Error('Fixture connection failure');return {ok:true,route_status:'COMPLETED'}}});
+ const ctx=vm.createContext({window:{nwtbStopNavigation(){navStops++},nwtbStopBuiltInTracking(){gpsStops++},nwtbContinueIdleTracking(){idleContinuations++}},document,route:'fixture-route',currentRouteState:{status},currentPaused:false,API:'fixture-base',ROUTE_API:'fixture-track',$:id=>document.getElementById(id),esc:s=>String(s??''),routeLinks:()=>[],routeEndpoints:()=>({label:'START / RETURN',depot:'BOLINGBROOK'}),startChangePolling(){},confirm:()=>allow,alert:e=>alerts.push(e),async loadRoutes(){loads++},async post(url,body){requests.push({url,body});if(body.action==='route_get')return {route:r,stops};if(body.action==='driver_route_state')return {route:r};if(fail)throw Error('Fixture connection failure');return {ok:true,route_status:'COMPLETED'}}});
  vm.runInContext(html.slice(start,end),ctx,{filename:file});
- return {ctx,document,requests,alerts,setAllow:v=>allow=v,setFailure:v=>fail=v,counts:()=>({loads,gpsStops,navStops})};
+ return {ctx,document,requests,alerts,setAllow:v=>allow=v,setFailure:v=>fail=v,counts:()=>({loads,gpsStops,navStops,idleContinuations})};
 }
 async function driverTests(){
  for(const file of ['driver-live.html','driver-standard.html']){
   let f=driver(file);await f.ctx.openRoute('fixture-route');ok(f.document.getElementById('nwtbFinishReturn'),'Returning driver sees explicit finish-return button');ok(f.document.getElementById('routes').textContent.includes('RETURNING TO NWTB'));eq(f.counts().gpsStops,0,'Displaying a return never changes GPS');ok(!f.requests.some(x=>x.body.action==='route_start_driver'),'Opening return never restarts route');
   f.setAllow(false);await f.ctx.confirmReturn();eq(f.requests.filter(x=>x.body.action==='route_return_driver').length,0,'Cancel arrival leaves route open');eq(f.counts().loads,0);
   f.setAllow(true);f.setFailure(true);await f.ctx.confirmReturn();eq(f.counts().gpsStops,0,'Rejected arrival keeps tracking');eq(f.counts().loads,0);eq(f.alerts.at(-1),'Fixture connection failure');
-  f.setFailure(false);await f.ctx.confirmReturn();eq(f.requests.at(-1).body.returned,true);eq(f.counts().loads,1);eq(f.counts().gpsStops,1,'Only successful confirmation stops tracking');eq(f.counts().navStops,1);
+  f.setFailure(false);await f.ctx.confirmReturn();eq(f.requests.at(-1).body.returned,true);eq(f.counts().loads,1);eq(f.counts().gpsStops,file==='driver-live.html'?0:1,'Successful GPS arrival keeps signed-in presence; Standard completion remains unchanged');if(file==='driver-live.html')eq(f.counts().idleContinuations,1,'Only successful arrival returns GPS to signed-in presence');eq(f.counts().navStops,1);
   for(const options of [{status:'PLANNED'},{pending:true},{paused:true},{returning:false}]){f=driver(file,options);await f.ctx.openRoute('fixture-route');eq(f.document.getElementById('nwtbFinishReturn'),null,'No finish control before return or while paused');}
   f=driver(file,{custom:true});await f.ctx.openRoute('fixture-route');ok(f.document.getElementById('routes').textContent.includes('RETURN LEG IN PROGRESS'),'Custom return preserves its own destination');
  }
@@ -85,7 +85,7 @@ async function trackerTests(){
  const gpsBefore=intervals.length;vm.runInContext(read('tracker-gps-status.js'),ctx);intervals[gpsBefore]();
  eq(document.querySelector('.nwtbReturnPhase').textContent,'RETURNING TO NWTB','Office driver card labels the return');ok(popup.includes('RETURNING TO NWTB'),'Map popup labels return instead of completed route');ok(document.querySelector('.gpsLive'),'Freshness display preserved');
  eq(cardRows[0].route_id,'fixture-route');
- const core=read('tracker-live-core.html');ok(core.includes('tracker-gps-status.js?v=20261020-returnleg1'));ok(read('delivery-live.html').includes('tracker-live.html?v=20261020-returnleg1'));
+ const core=read('tracker-live-core.html');ok(core.includes('tracker-gps-status.js?v=20261020-presence1'));ok(read('delivery-live.html').includes('tracker-live.html?v=20261020-presence1'));
  const swContext=vm.createContext({self:{addEventListener(){}},console});vm.runInContext(read('nwtb-driver-sw.js'),swContext);
  eq(swContext.isDriverRead('https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-delivery-tracking',JSON.stringify({action:'route_return_driver'})),false,'Return confirmation cannot be faked from offline read cache');
 }

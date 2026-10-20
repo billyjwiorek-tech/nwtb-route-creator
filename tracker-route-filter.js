@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-function currentRouteDriver(r){return !!(r&&r.route_id&&r.route&&['PLANNED','ACTIVE'].includes(String(r.route.status||'').toUpperCase()));}
+function currentRouteDriver(r){return !!(r&&(r.logged_in===true||r.route_id&&r.route&&(r.route.status==='ACTIVE'||r.route.status==='PLANNED'&&r.route.released_to_driver===true)));}
 function install(){
   if(typeof renderMap!=='function'||typeof renderDrivers!=='function'||typeof live==='undefined')return false;
   if(window.__nwtbRouteOnlyTrackerInstalled)return true;

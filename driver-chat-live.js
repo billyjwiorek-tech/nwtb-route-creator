@@ -41,7 +41,7 @@ function armAudio(){
 function notify(m){
  if(!tone())pendingTone=Number(m.id);else pendingTone=0;
  try{navigator.vibrate?.([180,90,260])}catch{}
- if(!('Notification'in window)||Notification.permission!=='granted')return;
+ if(window.nwtbDriverPushEnabled||!('Notification'in window)||Notification.permission!=='granted')return;
  const options={body:String(m.body||'New Dispatch message'),tag:'nwtb-driver-chat',renotify:true,data:{url:location.pathname}};
  const fallback=()=>{try{const n=new Notification('NWTB — DISPATCH MESSAGE',options);n.onclick=()=>{window.focus();show()}}catch{}};
  try{const registration=navigator.serviceWorker?.getRegistration?.();
@@ -127,7 +127,7 @@ function boot(){
  document.addEventListener('visibilitychange',()=>{if(visible()){if(open)load();check()}});
  window.addEventListener('focus',()=>{if(visible()){if(open)load();check()}});
  window.addEventListener('pageshow',()=>check());window.addEventListener('storage',()=>check());
- navigator.serviceWorker?.addEventListener?.('message',e=>{if(e.data?.type==='NWTB_OPEN_DRIVER_CHAT')show()});
+ navigator.serviceWorker?.addEventListener?.('message',e=>{if(e.data?.type==='NWTB_OPEN_DRIVER_CHAT')show();else if(e.data?.type==='NWTB_DRIVER_PUSH_MESSAGE'&&e.data.driver_employee_number===driverNo())check()});
  if(location.hash==='#chat')show();
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();

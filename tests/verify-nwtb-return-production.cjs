@@ -5,7 +5,7 @@ const files = [
  'delivery-live.html','delivery-standard.html','driver-live.html','driver-standard.html',
  'dispatch-native.html','dispatch-live.html','dispatch.html','dispatch-route-admin-native.js',
  'tracker-live.html','tracker-live-core.html','tracker-gps-status.js',
- 'office-pause-alerts.js','nwtb-driver-sw.js','driver-chat-live.js','dispatch-chat-live.js'
+ 'office-pause-alerts.js','nwtb-driver-sw.js','driver-chat-live.js','dispatch-chat-live.js','tracker-driver-presence.js','tracker-live-van.js','tracker-route-filter.js','tracker-active-route-guard.js','driver-tracking-engine-native.js','driver-phone-push.js','dispatch-driver-tools.js','dispatch-tools-hub-live.js','driver-gps.webmanifest','driver-standard.webmanifest'
 ];
 async function main(){
  const expected = new Map(files.map(path => [path, fs.readFileSync(path,'utf8')]));

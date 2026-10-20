@@ -1,0 +1,73 @@
+'use strict';
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),{parseHTML}=require('linkedom');
+const read=p=>fs.readFileSync(require('node:path').join(__dirname,'..',p),'utf8'),settle=async()=>{for(let i=0;i<90;i++)await Promise.resolve()};
+let checks=0;const ok=(v,m)=>{assert.ok(v,m);checks++},eq=(a,b,m)=>{assert.deepEqual(a,b,m);checks++};
+function timers(){
+ let now=1800000000000,id=0;const all=new Map();
+ const add=(fn,ms,interval=false)=>{const n=++id;all.set(n,{fn,ms:Math.max(1,ms||1),at:now+Math.max(1,ms||1),interval});return n};
+ async function tick(ms){const until=now+ms;await settle();for(let steps=0;steps<1000;steps++){let next;for(const pair of all)if(pair[1].at<=until&&(!next||pair[1].at<next[1].at))next=pair;if(!next)break;const [n,t]=next;now=t.at;if(t.interval)t.at+=t.ms;else all.delete(n);await t.fn();await settle()}now=until;await settle()}
+ class Clock extends Date{static now(){return now}}
+ return {setTimeout:(f,m)=>add(f,m),setInterval:(f,m)=>add(f,m,true),clearTimeout:n=>all.delete(n),clearInterval:n=>all.delete(n),tick,Date:Clock,now:()=>now};
+}
+function fleetUI(){
+ const clock=timers(),{document,window:dom}=parseHTML(read('tests/fixtures/office-tracker-base.html')),events={},map={removed:[],fitBounds(){},removeLayer(x){this.removed.push(x)},setView(){return this},getZoom:()=>12};
+ Object.defineProperty(document,'readyState',{value:'complete'});
+ const window={document,frameElement:null,matchMedia:()=>({matches:false}),addEventListener:(name,fn)=>events[name]=fn};
+ const markersCreated=[];
+ const L={divIcon:o=>o,latLngBounds:()=>({pad(){return this}}),marker(position,opts){const popup={content:'',getContent(){return this.content},setContent(value){this.content=value;return this}};const marker={position,options:opts,addTo(){return this},bindPopup(value){popup.content=value;return this},setPopupContent(value){popup.content=value;return this},getPopup:()=>popup,setIcon(value){this.options.icon=value;return this},setLatLng(value){this.position=value;return this},getLatLng(){return this.position},bindTooltip(value,options){this.tooltip={value,options};return this},getTooltip(){return this.tooltip},setTooltipContent(value){this.tooltip.value=value;return this},openPopup(){this.open=true;return this}};markersCreated.push(marker);return marker}};
+ const ctx=vm.createContext({window,document,L,Map,Set,Date:clock.Date,console,...clock,localStorage:{getItem:()=>null},fetch:async()=>({ok:true,json:async()=>({})})});
+ const inline=[...read('tests/fixtures/office-tracker-base.html').matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)][0][1];
+ vm.runInContext(inline.replace(/boot\(\);\s*$/,''),ctx);ctx.fixtureMap=map;ctx.fixtureRoutes=[];ctx.fixtureRows=[];
+ vm.runInContext("map=fixtureMap;post=async()=>({routes:fixtureRoutes,stops:[]});",ctx);
+ for(const file of ['tracker-driver-presence.js','tracker-route-filter.js','tracker-gps-status.js','tracker-live-van.js','tracker-active-route-guard.js'])vm.runInContext(read(file),ctx,{filename:file});
+ return {ctx,document,clock,markersCreated,async rows(rows,routes=[]){ctx.fixtureRows=rows;ctx.fixtureRoutes=routes;vm.runInContext('live=fixtureRows;renderMap();renderDrivers()',ctx);await clock.tick(300)},marker:id=>vm.runInContext("markers.get('"+id+"')",ctx)};
+}
+function gpsUI({embedded=false,verified=true}={}){
+ const clock=timers(),{document,window:dom}=parseHTML('<html><body><div id="track"></div><div id="routes"></div></body></html>'),watches=new Map(),cleared=[],requests=[],local=new Map([['nwtb_driver_token','fixture-driver'],['nwtb_delivery_driver','1234'],['nwtb_delivery_token','fixture-office']]);let id=0;
+ const localStorage={getItem:k=>local.get(k)||null,setItem:(k,v)=>local.set(k,String(v)),removeItem:k=>local.delete(k)};
+ const position=()=>({timestamp:clock.now(),coords:{latitude:41.69,longitude:-88.06,accuracy:3,heading:null,speed:null}});
+ const navigator={onLine:true,geolocation:{watchPosition(fn){const n=++id;watches.set(n,fn);return n},clearWatch:n=>{cleared.push(n);watches.delete(n)},getCurrentPosition(fn){fn(position())}}};
+ const window={document,localStorage,navigator,frameElement:embedded?{}:null,__nwtbDriverSignedIn:verified,__nwtbDriverTrackingRoute:null,addEventListener:document.addEventListener.bind(document)};window.self=window;window.top=embedded?{}:window;
+ const ctx=vm.createContext({window,document,navigator,localStorage,driver:'1234',token:'fixture-driver',Date:clock.Date,console,fetch:async(url,init)=>{requests.push({url,token:init.headers['x-nwtb-session'],body:JSON.parse(init.body)});return {ok:true,status:200,json:async()=>({ok:true})}},...clock});
+ vm.runInContext(read('driver-tracking-engine-native.js'),ctx);
+ return {ctx,window,document,clock,watches,cleared,requests,local,position};
+}
+function driverTools({embedded=false}={}){
+ const clock=timers(),{document,window:dom}=parseHTML('<html><head></head><body><section id="dispatchTab"></section></body></html>'),{document:parent}=parseHTML('<html><head></head><body><section id="drivers" class="view"></section></body></html>'),local=new Map([['nwtb_delivery_token','fixture-office'],['nwtb_driver_token','fixture-driver']]),calls=[],views=[];let fail=false,pinRequired=false,prompts=0,driverLoads=0,multiLoads=0;
+ Object.defineProperty(document,'readyState',{value:'complete'});Object.defineProperty(parent,'readyState',{value:'complete'});
+ dom.HTMLElement.prototype.focus=function(){};dom.HTMLElement.prototype.click=function(){return this.onclick?.()};
+ const host={document:parent,openView:name=>views.push(name),addEventListener(){},prompt:()=>{prompts++;return 'fixture-pin'}};
+ const window={document,frameElement:embedded?{id:'fDispatch'}:null,addEventListener(){},getComputedStyle:el=>({display:el.style.display||'block'}),prompt:()=>{prompts++;return 'fixture-pin'},loadDrivers:async()=>driverLoads++,loadMultiBuilder:async()=>multiLoads++};window.self=window;window.top=embedded?host:window;
+ const context=vm.createContext({window,document,localStorage:{getItem:k=>local.get(k)||null},console,Promise,...clock,fetch:async(url,init)=>{const body=JSON.parse(init.body);calls.push({url,token:init.headers['x-nwtb-session'],body});if(fail)return {ok:false,status:409,json:async()=>({error:'Employee number already exists.'})};if(pinRequired&&!body.pin)return {ok:false,status:403,json:async()=>({code:'ADMIN_PIN_REQUIRED',error:'Admin PIN required.'})};return {ok:true,status:200,json:async()=>({ok:true,driver:{employee_number:body.employee_number,display_name:body.display_name,role:'DRIVER'}})}}});
+ vm.runInContext(read('dispatch-driver-tools.js'),context);vm.runInContext(read('dispatch-tools-hub-live.js'),context);
+ return {window,document,hostDocument:embedded?parent:document,clock,calls,views,local,setFail:v=>fail=v,setPinRequired:v=>pinRequired=v,get prompts(){return prompts},loads:()=>({driverLoads,multiLoads}),async save(name,no){const d=embedded?parent:document;d.getElementById('ndtDriverName').value=name;d.getElementById('ndtEmployeeNumber').value=no;d.getElementById('ndtAddForm').onsubmit({preventDefault(){}});await settle()}};
+}
+(async()=>{
+ const f=fleetUI(),base={driver_employee_number:'1234',display_name:'Fixture Driver',logged_in:true,session_online:true,lat:41.69,lon:-88.06,captured_at:new Date(f.clock.now()).toISOString(),location_source:'WEB_DRIVER',tracking_engine:'NWTB_BUILTIN',has_location:true,route_id:null,route:null};
+ await f.rows([base]);const marker=f.marker('1234');ok(marker,'Route-free logged-in driver appears on actual tracker map');ok(marker.options.icon.className.includes('nwtbPersonMarker'),'Route-free marker uses approved paper-doll icon');ok(marker.options.icon.html.includes('fill="#fff"'),'Person is white');ok(marker.options.icon.html.includes('fill="#f58220"'),'Body lettering is NWTB orange');eq([...marker.options.icon.html.matchAll(/<text[^>]*>(.)<\/text>/g)].map(x=>x[1]),['N','W','T','B'],'NWTB reads vertically down body');ok(f.document.getElementById('drivers').textContent.includes('LOGGED IN • NO ACTIVE ROUTE'));ok(marker.getPopup().getContent().includes('LAST FIX'));
+ const released={id:'released-route',driver_employee_number:'1234',status:'PLANNED',released_to_driver:true,wave:'MORNING',depot:'BOLINGBROOK'};
+ await f.rows([{...base,route:released,route_id:released.id}], [released]);ok(f.marker('1234').options.icon.html.includes('nwtbVanShell'),'Release switches same driver to van');eq(f.marker('1234'),marker,'Marker identity preserved through route release');ok(f.document.getElementById('drivers').textContent.includes('ROUTE RELEASED'));
+ const active={...released,status:'ACTIVE',returning_started_at:new Date().toISOString(),returned_at:null,end_mode:'RETURN_DEPOT'};
+ await f.rows([{...base,route:active,route_id:active.id}], [active]);ok(f.marker('1234').options.icon.html.includes('nwtbVanShell'),'Return leg keeps van');ok(f.marker('1234').getPopup().getContent().includes('RETURNING TO NWTB'));
+ await f.rows([base],[]);ok(f.marker('1234').options.icon.className.includes('nwtbPersonMarker'),'No released route after arrival switches back to person');
+ await f.rows([{...base,lat:null,lon:null,captured_at:null,has_location:false}],[]);eq(f.marker('1234'),undefined,'Missing GPS cannot draw false 0,0 marker');ok(f.document.getElementById('drivers').textContent.includes('WAITING FOR DRIVER GPS'),'Driver remains listed while GPS unavailable');
+ await f.rows([{...base,captured_at:new Date(f.clock.now()-900000).toISOString()}],[]);ok(f.document.querySelector('.gpsStale'),'Old GPS is labeled stale');ok(f.marker('1234').options.icon.html.includes('#98a2b3'),'Old fix uses gray status dot');
+ await f.rows([]);eq(f.marker('1234'),undefined,'Driver removed after no eligible login or route remains');
+ let gps=gpsUI();await gps.clock.tick(5);eq(gps.watches.size,1,'Verified top-level GPS app reports while signed in without route');ok(gps.requests.length>0);eq(gps.requests[0].body.route_id,null,'Idle GPS does not invent a route');eq(gps.requests[0].body.speed_mps,null,'Missing native speed stays unknown');eq(gps.local.get('nwtb_delivery_token'),'fixture-office','GPS never overwrites Office session');ok(gps.requests.every(r=>r.body.action==='location_update'),'Idle reporting never starts a route or creates a session');
+ gps.window.__nwtbDriverTrackingRoute={id:'fixture-active',status:'ACTIVE'};gps.window.nwtbSyncBuiltInTracking();await settle();eq(gps.watches.size,1,'Starting route uses same GPS watch');eq(gps.requests.at(-1).body.route_id,'fixture-active');
+ gps.window.nwtbContinueIdleTracking();await settle();eq(gps.watches.size,1,'Arrival confirmation keeps signed-in location reporting');eq(gps.requests.at(-1).body.route_id,null,'Arrival returns GPS to route-free presence');
+ gps.window.__nwtbDriverTrackingRoute={id:'fixture-active',status:'ACTIVE',paused:true};gps.window.nwtbSyncBuiltInTracking();eq(gps.watches.size,0,'Pause still stops GPS');
+ gps.window.__nwtbDriverTrackingRoute={id:'fixture-active',status:'ACTIVE',paused:false};gps.window.nwtbSyncBuiltInTracking();await settle();eq(gps.watches.size,1,'Resume restarts GPS');
+ gps.window.nwtbStopBuiltInTracking();await gps.clock.tick(6000);eq(gps.watches.size,0,'Explicit GPS stop is respected by background sync');
+ gps.window.nwtbStartBuiltInTracking();await settle();eq(gps.watches.size,1,'Explicit tracking start still works');
+ gps.local.delete('nwtb_driver_token');gps.window.nwtbSyncBuiltInTracking();eq(gps.watches.size,0,'Logout stops GPS even if page retains old lexical token');eq(gps.local.get('nwtb_delivery_token'),'fixture-office');
+ for(const options of [{embedded:true},{verified:false}]){gps=gpsUI(options);await gps.clock.tick(6000);eq(gps.watches.size,0,'Office preview and unverified cached login never start GPS');eq(gps.requests.length,0,'Preview never creates Driver session')}
+ let tools=driverTools();await tools.clock.tick(1000);tools.document.getElementById('nwtbToolsHubBtn').onclick();ok(tools.document.getElementById('nthGrid').textContent.includes('ADD DRIVER'));ok(tools.document.getElementById('nthGrid').textContent.includes('SHOW DRIVERS'));
+ await tools.save('Fixture Added Driver','0123');eq(tools.calls[0].body.employee_number,'0123','Add Driver preserves 4-digit leading zero');eq(tools.calls[0].token,'fixture-office');eq(tools.loads(),{driverLoads:1,multiLoads:1},'Saved driver refreshes route selectors and multi-driver queue');ok(tools.hostDocument.getElementById('ndtDriverStatus').textContent.includes('Driver added'));
+ await tools.save('Reserved Fixture','9998');eq(tools.calls.length,1,'Reserved employee rejected before network');eq(tools.local.get('nwtb_driver_token'),'fixture-driver','Office form preserves Driver token');
+ tools.setFail(true);await tools.save('Conflicting Fixture','0123');ok(tools.hostDocument.getElementById('ndtDriverStatus').textContent.includes('already exists'));eq(tools.hostDocument.getElementById('ndtDriverName').value,'Conflicting Fixture','Failed save preserves form for correction');
+ tools=driverTools();tools.setPinRequired(true);await tools.save('PIN Fixture','0421');eq(tools.prompts,1,'Protected Add Driver prompts for temporary Admin PIN');eq(tools.calls.length,2,'PIN retries intended action');eq(tools.calls[1].body.pin,'fixture-pin');eq(tools.local.get('nwtb_delivery_token'),'fixture-office');
+ tools.window.nwtbShowDrivers();ok(tools.hostDocument.getElementById('ndtDriversMap').getAttribute('src').startsWith('tracker-live.html'),'Standalone and Standard Office show NWTB map');ok(!tools.hostDocument.getElementById('ndtDriversMap').getAttribute('src').includes('google'));
+ tools=driverTools({embedded:true});tools.window.nwtbShowDrivers();eq(tools.views,['drivers'],'GPS Office Show Drivers opens existing native map tab');
+ console.log(checks+' NWTB figure/van, native map, idle GPS and Dispatch Tools checks passed; no production requests.');
+})().catch(e=>{console.error(e);process.exitCode=1});

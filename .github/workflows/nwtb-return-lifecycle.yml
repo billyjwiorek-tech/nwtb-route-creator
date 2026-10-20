@@ -1,10 +1,10 @@
 name: NWTB return lifecycle
 on:
   push:
-    branches: [main, fix/nwtb-return-leg-lifecycle-20261020, fix/nwtb-driver-chat-seen-20261020]
-    paths: ['driver-*.html', 'driver-*.js', 'tracker*.html', 'tracker*.js', 'office-pause-alerts.js', 'delivery-*.html', 'dispatch*.html', 'dispatch-route-admin-native.js', 'dispatch-chat-live.js', 'supabase/**', 'tests/**', '.github/workflows/nwtb-return-lifecycle.yml']
+    branches: [main, fix/nwtb-return-leg-lifecycle-20261020, fix/nwtb-driver-chat-seen-20261020, feat/nwtb-driver-presence-20261020]
+    paths: ['driver-*.html', 'driver-*.js', '*.webmanifest', 'nwtb-driver-sw.js', 'dispatch-*.js', 'tracker*.html', 'tracker*.js', 'office-pause-alerts.js', 'delivery-*.html', 'dispatch*.html', 'dispatch-route-admin-native.js', 'dispatch-chat-live.js', 'supabase/**', 'tests/**', '.github/workflows/nwtb-return-lifecycle.yml']
   pull_request:
-    paths: ['driver-*.html', 'driver-*.js', 'tracker*.html', 'tracker*.js', 'office-pause-alerts.js', 'delivery-*.html', 'dispatch*.html', 'dispatch-route-admin-native.js', 'supabase/**', 'tests/**', '.github/workflows/nwtb-return-lifecycle.yml']
+    paths: ['driver-*.html', 'driver-*.js', '*.webmanifest', 'nwtb-driver-sw.js', 'dispatch-*.js', 'tracker*.html', 'tracker*.js', 'office-pause-alerts.js', 'delivery-*.html', 'dispatch*.html', 'dispatch-route-admin-native.js', 'supabase/**', 'tests/**', '.github/workflows/nwtb-return-lifecycle.yml']
 permissions:
   contents: read
 jobs:
@@ -38,6 +38,13 @@ jobs:
           psql "$FIXTURE_DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/route-return-fixture-schema.sql
           psql "$FIXTURE_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$route_migration_path"
           psql "$FIXTURE_DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/route-return-db.test.sql
+      - name: Validate registration and push storage in disposable database
+        run: |
+          driver_migration_path=$(find supabase/migrations -maxdepth 1 -type f -name '*_add_driver_and_phone_push.sql' -print -quit)
+          test -n "$driver_migration_path"
+          psql "$FIXTURE_DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/driver-presence-fixture-schema.sql
+          psql "$FIXTURE_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$driver_migration_path"
+          psql "$FIXTURE_DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/driver-presence-db.test.sql
   production-bytes:
     if: github.ref == 'refs/heads/main'
     needs: lifecycle
