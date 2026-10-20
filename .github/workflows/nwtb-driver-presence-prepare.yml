@@ -1,0 +1,22 @@
+name: NWTB driver presence preparation
+on:
+  push:
+    branches: [feat/nwtb-driver-presence-20261020]
+    paths: ['.github/workflows/nwtb-driver-presence-prepare.yml']
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Generate migration filename with the pinned Supabase CLI
+        run: |
+          npx --yes supabase@2.121.0 --version
+          npx --yes supabase@2.121.0 migration --help
+          npx --yes supabase@2.121.0 migration new --help
+          npx --yes supabase@2.121.0 migration new add_driver_and_phone_push
+          find supabase/migrations -maxdepth 1 -name '*_add_driver_and_phone_push.sql' -print
