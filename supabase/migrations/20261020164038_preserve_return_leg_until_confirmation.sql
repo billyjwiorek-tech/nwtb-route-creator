@@ -219,7 +219,7 @@ begin
     'return_pending',coalesce((v_finish->>'return_pending')::boolean,false)
   );
 end;
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public.nwtb_submit_delivery_exception(p_stop_id uuid, p_driver_employee_number text, p_reason_code text, p_reason_label text, p_notes text DEFAULT NULL::text, p_lat double precision DEFAULT NULL::double precision, p_lon double precision DEFAULT NULL::double precision, p_accuracy_m double precision DEFAULT NULL::double precision, p_occurred_at timestamp with time zone DEFAULT now())
  RETURNS delivery_exceptions
@@ -283,7 +283,7 @@ begin
   end if;
   return v_exception;
 end;
-$function$
+$function$;
 
 
 REVOKE ALL ON FUNCTION public.nwtb_finalize_pod(uuid,uuid,text,text,text,text,double precision,double precision,double precision,timestamptz,text,text,text,text) FROM PUBLIC,anon,authenticated;
