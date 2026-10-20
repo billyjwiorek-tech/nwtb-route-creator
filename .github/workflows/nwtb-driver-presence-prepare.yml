@@ -13,10 +13,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Generate migration filename with the pinned Supabase CLI
+      - name: Resolve pinned phone-push fixture dependencies
         run: |
-          npx --yes supabase@2.121.0 --version
-          npx --yes supabase@2.121.0 migration --help
-          npx --yes supabase@2.121.0 migration new --help
-          npx --yes supabase@2.121.0 migration new add_driver_and_phone_push
-          find supabase/migrations -maxdepth 1 -name '*_add_driver_and_phone_push.sql' -print
+          npm install --prefix tests --package-lock-only --ignore-scripts --no-audit --no-fund --save-exact web-push@3.6.7
+          node -e "const fs=require('node:fs');console.log('NWTB_LOCK_START'+JSON.stringify(JSON.parse(fs.readFileSync('tests/package-lock.json','utf8')))+'NWTB_LOCK_END')"
