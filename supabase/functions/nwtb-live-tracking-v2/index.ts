@@ -86,7 +86,7 @@ Deno.serve(async(req:Request)=>{
   })
   drivers.sort((a:any,b:any)=>String(a.display_name).localeCompare(String(b.display_name)))
 
-  return reply(req,{ok:true,engine:'NWTB_LIVE_TRACKING_V2',drivers})
+  return reply(req,{ok:true,engine:'NWTB_LIVE_TRACKING_V2',drivers:input?.include_unlocated===true?drivers:drivers.filter((d:any)=>d.has_location),unlocated_driver_count:drivers.filter((d:any)=>!d.has_location).length})
  }
 
  return reply(req,{error:'Unknown live tracking action.'},400)

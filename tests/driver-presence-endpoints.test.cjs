@@ -2,7 +2,7 @@
 const assert=require('node:assert/strict'),{endpoint,point,route,iso,now}=require('./driver-presence-fixtures.cjs');
 let checks=0;const ok=(v,m)=>{assert.ok(v,m);checks++},eq=(a,b,m)=>{assert.deepEqual(a,b,m);checks++};
 const live='supabase/functions/nwtb-live-tracking-v2/index.ts',roles='supabase/functions/nwtb-admin-roles/index.ts';
-async function fleet(options={}){const api=endpoint(live,options),response=await api.call({action:'locations_latest'});return {api,response,driver:response.body.drivers?.find(d=>d.driver_employee_number==='1234')}}
+async function fleet(options={}){const api=endpoint(live,options),response=await api.call({action:'locations_latest',include_unlocated:true});return {api,response,driver:response.body.drivers?.find(d=>d.driver_employee_number==='1234')}}
 (async()=>{
  let f=await fleet({routes:[],locations:[point('1234',{route_id:'completed-old-route'})]});eq(f.response.status,200);eq(f.driver.marker_type,'PERSON','Logged-in route-free driver is a person');eq(f.driver.route_id,null,'Historic GPS route ID cannot pretend to be assigned');eq(f.driver.route,null);eq(f.driver.logged_in,true);eq(f.driver.has_location,true);eq(f.api.writes.filter(w=>w.table==='delivery_routes').length,0,'Viewing fleet never changes routes');
  f=await fleet({routes:[route({status:'PLANNED',released_to_driver:false})]});eq(f.driver.marker_type,'PERSON','Office-only planned route cannot change driver marker');eq(f.driver.route,null,'Office-only route is not linked to driver presence');
@@ -11,6 +11,7 @@ async function fleet(options={}){const api=endpoint(live,options),response=await
  f=await fleet({routes:[route({returning_started_at:iso(now),end_mode:'RETURN_DEPOT'})]});eq(f.driver.marker_type,'VAN','Return leg keeps van');eq(f.driver.route.tracking_status,'RETURNING');
  f=await fleet({routes:[route({status:'COMPLETED',returned_at:iso(now)})]});eq(f.driver.marker_type,'PERSON','Confirmed completion returns logged-in driver to person');
  f=await fleet({routes:[],locations:[]});eq(f.driver.has_location,false,'Logged-in driver without GPS remains listed');eq(f.driver.lat,null,'No invented depot or zero coordinate');eq(f.driver.lon,null);
+ const legacy=endpoint(live,{routes:[],locations:[]});const oldView=await legacy.call({action:'locations_latest'});eq(oldView.body.drivers.length,0,'Older map clients never receive null coordinates');eq(oldView.body.unlocated_driver_count,1);
  f=await fleet({routes:[],noDriverSession:true});eq(f.driver,undefined,'Logged-out route-free driver is not labeled logged in');
  f=await fleet({noDriverSession:true});eq(f.driver.marker_type,'VAN','Existing external GPS fallback for active routes remains available');eq(f.driver.logged_in,false,'External tracking does not fake Driver login');
  for(const options of [{roleActive:false},{employeeActive:false}]){f=await fleet(options);eq(f.driver,undefined,'Inactive employee or Driver role excluded')}

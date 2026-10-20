@@ -52,7 +52,7 @@ function personIcon(r){
 }
 
 function rowHeading(r){
- const id=String(r?.driver_employee_number||'');let h=Number(r?.heading_deg);const now={lat:Number(r?.lat),lon:Number(r?.lon)};
+ const id=String(r?.driver_employee_number||'');let h=r?.heading_deg==null?NaN:Number(r.heading_deg);const now={lat:Number(r?.lat),lon:Number(r?.lon)};
  const previousHeading=Number(prevHeading.get(id)??0);
  if(!Number.isFinite(h)){
   const prev=prevPos.get(id);if(prev&&good(now.lat,now.lon)&&meters(prev,now)>=4)h=bearing(prev,now)
