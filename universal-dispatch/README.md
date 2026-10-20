@@ -12,6 +12,20 @@ GPS starts only after a driver's explicit START, RESUME or CONTINUE action on an
 
 Office and Driver use different session storage keys. Read caches are hashed by session and only ongoing routes can be viewed from cache while offline. Release, start and delivery outcomes always require an online authenticated request.
 
+## Driver completion and proof
+
+The next stop shows ARRIVED, COMPLETE and NOT COMPLETED. COMPLETE opens the proof-of-delivery form: recipient name and either a signature or photo are required; notes and capture location are optional. Photos are resized before upload. Proof, stop/order status, route completion and the audit event save in one database transaction. Retrying a successful submission returns the original receipt rather than replacing or duplicating it. Office and Driver can explicitly view recorded receipts. Images are stored privately behind the existing authenticated API and are not included in normal route-list responses.
+
+The form clears the recipient, notes, image selection and signature between stops, and resets its submit button after errors or subsequent deliveries. The existing company employee-number/PIN login remains in place.
+
+## GPS and navigation
+
+Office displays the phone GPS estimate, capture age and location accuracy. Unknown speed remains unknown. Speed is hidden for fixes older than 20 seconds or with missing/poor location accuracy; a fresh timestamp alone is not a guarantee of speed accuracy. Locations remain tied to the same driver's ACTIVE route. A recent accurate fix within 500 feet of the pending stop displays NEAR NEXT STOP and does not complete it automatically.
+
+The GPS edition checks for delayed fixes, requests a fresh location after interruptions, and uses a screen wake lock when supported. Browser and operating-system restrictions can still suspend GPS when the app is in the background or the phone is locked; real device testing is required. Tracking starts only after START, RESUME or CONTINUE. Standard has no background tracking.
+
+NAVIGATE NEXT provides an in-app road map, turn guidance, optional spoken directions and rerouting to the same assigned stop when a reliable fix is off course. Navigation rerouting does not alter the saved delivery route, its release state, or Office metrics. Pausing/finishing a route or signing out stops tracking and navigation.
+
 ## Entry points
 
 - Office: `./`
@@ -39,6 +53,6 @@ npm --prefix tests test
 
 The backend tests run the actual handler source with an in-memory database/OSRM fixture. The frontend tests run the actual application and shared map/session modules in a DOM fixture. They cover release visibility, ownership, permissions, identical Office/Driver geometry, GPS activation, Standard behavior, session separation and offline restrictions. They do not create production data.
 
-`tests/database-release-gate.sql` copies the live tables and functions to temporary objects, verifies database enforcement, then rolls back. Run only against the Universal project. It does not insert production operational records.
+`tests/database-release-gate.sql` and `tests/database-pod.sql` copy the live tables and functions to temporary objects, verifies database enforcement, then roll back. Run only against the Universal project. They do not insert production operational records.
 
 After publishing, verify the GitHub Pages run for the exact main commit, compare served frontend files and deployed Edge Function source, and inspect the Office/Driver entry screens. Real mobile GPS, delivery outcomes, POD and chat still need a company-configured device test.

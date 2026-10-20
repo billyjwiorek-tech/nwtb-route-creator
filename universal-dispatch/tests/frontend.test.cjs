@@ -17,8 +17,8 @@ const r={id:'fixture-route',driver_user_id:'driver-id',route_date:'2030-01-01',c
 const stops=[{id:'fixture-stop',order_id:'order-1',stop_sequence:1,status:'PENDING',delivery_orders:{customer_name:'Fixture Stop',address:'Stop address',lat:41.1,lon:-87.9,priority:'NORMAL',stop_type:'DELIVERY'}}];
 function fixture(search=''){
  const {window}=parseHTML('<!doctype html><html><head></head><body><div id="app"><div id="v"></div></div></body></html>');
- const calls=[],lines=[],gps={started:0,cleared:0};let setup=true,online=true;
- const navigator={get onLine(){return online},geolocation:{watchPosition(){gps.started++;return 0},clearWatch(){gps.cleared++},getCurrentPosition(){throw Error('Unexpected GPS fix')}}};
+ const calls=[],lines=[],gps={started:0,cleared:0,fixes:0,allowFix:false};let setup=true,online=true,receipt=null;window.HTMLCanvasElement.prototype.getContext=()=>({clearRect(){},beginPath(){},moveTo(){},lineTo(){},stroke(){}});window.HTMLCanvasElement.prototype.toDataURL=()=> 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jPZkAAAAASUVORK5CYII=';window.HTMLCanvasElement.prototype.getBoundingClientRect=()=>({left:0,top:0,width:300,height:100});
+ const navigator={get onLine(){return online},geolocation:{watchPosition(){gps.started++;return 0},clearWatch(){gps.cleared++},getCurrentPosition(fn){if(!gps.allowFix)throw Error('Unexpected GPS fix');gps.fixes++;fn({coords:{latitude:40,longitude:-90,accuracy:3}})}}};
  const localStorage={getItem:k=>store.get(k)??null,setItem:(k,v)=>store.set(k,String(v)),removeItem:k=>store.delete(k)};
  const instance={setView(){return this},fitBounds(){return this},invalidateSize(){},remove(){}};
  window.L={map:()=>instance,tileLayer:()=>({addTo(){}}),divIcon:x=>x,marker:p=>({bindPopup(){return this},addTo(){return this},getLatLng:()=>p,openPopup(){}}),latLngBounds:x=>x,polyline:(p,o)=>{lines.push({points:p,options:o});return {addTo(){}}}};
@@ -36,6 +36,8 @@ function fixture(search=''){
    case 'route_pause':r.status='PAUSED';r.updated_at+='p';data={route:structuredClone(r)};break;
    case 'route_resume':r.status='ACTIVE';r.updated_at+='a';data={route:structuredClone(r)};break;
    case 'route_priority_changes':data={events:[]};break;
+   case 'stop_complete':receipt={...p.pod,pod_number:1};stops[0].status='DELIVERED';r.status='COMPLETED';r.updated_at+='done';data={ok:true,route_complete:true,pod_number:1};break;
+   case 'pod_get':data={ok:true,pod:receipt};break;
    case 'logout':break;
    case 'orders_list':data={orders:[]};break;
    case 'drivers_list':data={drivers:[]};break;
@@ -45,9 +47,9 @@ function fixture(search=''){
   return {ok:status===200,status,json:async()=>structuredClone(data)};
  };
  const ctx=vm.createContext({window,document:window.document,location:{search},navigator,localStorage,crypto:webcrypto,TextEncoder,TextDecoder,Uint8Array,URLSearchParams,AbortController,fetch,console,TypeError,Date,JSON,Number,Promise,setTimeout:()=>1,clearTimeout(){},setInterval:()=>1,clearInterval(){},requestAnimationFrame:f=>f(),confirm:()=>true,prompt:()=>null,alert:t=>{throw Error('Unexpected alert: '+t)}});
- for(const name of ['session-store.js','route-map.js'])vm.runInContext(fs.readFileSync(path.join(root,name),'utf8'),ctx,{filename:name});
- ctx.UDPSessions=window.UDPSessions;ctx.UDPRouteMap=window.UDPRouteMap;vm.runInContext(entry,ctx,{filename:'index.html'});
- return {test:window.__test,doc:window.document,calls,lines,gps,sessions:window.UDPSessions,map:window.UDPRouteMap,setSetup:v=>setup=v,setOnline:v=>online=v};
+ for(const name of ['session-store.js','route-map.js','driver-pod.js','driver-gps.js','driver-navigation.js'])vm.runInContext(fs.readFileSync(path.join(root,name),'utf8'),ctx,{filename:name});
+ ctx.UDPSessions=window.UDPSessions;ctx.UDPRouteMap=window.UDPRouteMap;ctx.UDPDriverGPS=window.UDPDriverGPS;ctx.UDPDriverPOD=window.UDPDriverPOD;ctx.UDPDriverNavigation=window.UDPDriverNavigation;vm.runInContext(entry,ctx,{filename:'index.html'});
+ return {pod:window.UDPDriverPOD,test:window.__test,doc:window.document,calls,lines,gps,sessions:window.UDPSessions,map:window.UDPRouteMap,setSetup:v=>setup=v,setOnline:v=>online=v};
 }
 (async()=>{
  const office=fixture();office.test.fixture({user:users.office,company,token:'office-token'});
@@ -74,6 +76,11 @@ function fixture(search=''){
  await office.test.editRouteDetails(r.id);ok(office.doc.querySelector('.setPriority')&&!office.doc.querySelector('#releaseToggle'),'Editor is separate from preview');
  const standard=fixture('?view=driver&edition=standard');standard.test.fixture({user:users.driver,company,token:'driver-token'});r.status='PLANNED';await standard.test.driverHome();await standard.doc.querySelector('#startR').onclick();
  equal(standard.gps.started,0,'Standard START does not run live GPS');
+ await driver.test.driverRoute();const beforeComplete=driver.calls.filter(c=>c.action==='stop_complete').length;driver.doc.querySelector('.done').onclick();
+ ok(!driver.doc.querySelector('.udpPodOverlay').hidden,'COMPLETE opens actual POD form');equal(driver.calls.filter(c=>c.action==='stop_complete').length,beforeComplete,'Opening POD does not complete delivery');equal(driver.gps.fixes,0,'Opening POD does not request location');
+ driver.doc.querySelector('#udpPodReceiver').value='Fixture Recipient';const signature=driver.doc.querySelector('#udpPodSignature');signature.onpointerdown({preventDefault(){},clientX:1,clientY:1});signature.onpointermove({preventDefault(){},clientX:20,clientY:10});signature.onpointerup();driver.gps.allowFix=true;await driver.doc.querySelector('#udpPodSubmit').onclick();
+ equal(driver.calls.filter(c=>c.action==='stop_complete').length,beforeComplete+1,'Explicit SAVE POD performs one completion');equal(r.status,'COMPLETED','Last stop completes route');equal(driver.test.state().gpsWatch,null,'Final stop stops GPS');
+ await office.test.openRouteDetails(r.id);ok(office.doc.querySelector('.viewPOD'),'Office has read-only receipt action after completion');
  await driver.test.signOut();equal(store.get('udp_office_session'),'office-token','Driver logout leaves Office session');equal(store.get('udp_driver_session'),undefined,'Driver logout clears only Driver session');
  equal(store.get('nwtb_delivery_token'),'nwtb-office-preserved');equal(store.get('nwtb_driver_token'),'nwtb-driver-preserved');
  store.delete('udp_office_session');store.set('udp_session','driver-token');const legacy=fixture();await legacy.test.boot();

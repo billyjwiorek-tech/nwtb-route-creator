@@ -4,6 +4,6 @@
   },
   "private": true,
   "scripts": {
-    "test": "node backend.test.cjs && node frontend.test.cjs"
+    "test": "node backend.test.cjs && node frontend.test.cjs && node driver-modules.test.cjs"
   }
 }
