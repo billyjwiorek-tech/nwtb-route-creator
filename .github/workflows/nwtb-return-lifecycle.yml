@@ -1,8 +1,8 @@
 name: NWTB return lifecycle
 on:
   push:
-    branches: [main, fix/nwtb-return-leg-lifecycle-20261020]
-    paths: ['driver-*.html', 'driver-*.js', 'tracker*.html', 'tracker*.js', 'office-pause-alerts.js', 'delivery-*.html', 'dispatch*.html', 'dispatch-route-admin-native.js', 'supabase/**', 'tests/**', '.github/workflows/nwtb-return-lifecycle.yml']
+    branches: [main, fix/nwtb-return-leg-lifecycle-20261020, fix/nwtb-driver-chat-seen-20261020]
+    paths: ['driver-*.html', 'driver-*.js', 'tracker*.html', 'tracker*.js', 'office-pause-alerts.js', 'delivery-*.html', 'dispatch*.html', 'dispatch-route-admin-native.js', 'dispatch-chat-live.js', 'supabase/**', 'tests/**', '.github/workflows/nwtb-return-lifecycle.yml']
   pull_request:
     paths: ['driver-*.html', 'driver-*.js', 'tracker*.html', 'tracker*.js', 'office-pause-alerts.js', 'delivery-*.html', 'dispatch*.html', 'dispatch-route-admin-native.js', 'supabase/**', 'tests/**', '.github/workflows/nwtb-return-lifecycle.yml']
 permissions:

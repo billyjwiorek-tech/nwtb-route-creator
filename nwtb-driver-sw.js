@@ -1,7 +1,7 @@
-const CACHE='nwtb-driver-shell-v5-return-leg';
+const CACHE='nwtb-driver-shell-v6-chat-seen';
 const DB='nwtb-driver-offline-v1';
 const STORE='api_cache';
-const SHELL=['./driver-live.html','./driver-standard.html','./driver-pod-live.js','./driver-navigation-native.js?v=20261020-map1','./driver-mobile-nav-fix.js?v=20261020-map1','./driver-route-pins-native.js?v=20261020-map1','./driver-ios-map-fallback.js?v=20261020-map1','./driver-exceptions-live.js','./driver-offline-live.js','./driver-depot-support-live.js','./driver-profiles-live.js','./nwtb-system-lock-live.js'];
+const SHELL=['./driver-chat-live.js?v=20261020-chatseen1','./driver-live.html','./driver-standard.html','./driver-pod-live.js','./driver-navigation-native.js?v=20261020-map1','./driver-mobile-nav-fix.js?v=20261020-map1','./driver-route-pins-native.js?v=20261020-map1','./driver-ios-map-fallback.js?v=20261020-map1','./driver-exceptions-live.js','./driver-offline-live.js','./driver-depot-support-live.js','./driver-profiles-live.js','./nwtb-system-lock-live.js'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>Promise.allSettled(SHELL.map(x=>c.add(x)))).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',e=>{e.waitUntil((async()=>{for(const k of await caches.keys())if(k.startsWith('nwtb-driver-shell-')&&k!==CACHE)await caches.delete(k);await self.clients.claim()})())});
 function openDb(){return new Promise((res,rej)=>{const r=indexedDB.open(DB,3);r.onupgradeneeded=()=>{const db=r.result;if(!db.objectStoreNames.contains(STORE))db.createObjectStore(STORE);if(!db.objectStoreNames.contains('write_queue')){const s=db.createObjectStore('write_queue',{keyPath:'id'});s.createIndex('created_at','created_at')}};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
@@ -10,3 +10,16 @@ async function dbGet(k){const db=await openDb();return new Promise((res,rej)=>{c
 function isDriverRead(url,body){if(!url.includes('ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/'))return false;let a='';try{a=JSON.parse(body||'{}').action||''}catch{};return url.includes('/nwtb-delivery-tracking')&&['driver_routes','driver_route_state','route_changes'].includes(a)||url.includes('/nwtb-delivery')&&['drivers','route_get'].includes(a)||url.includes('/nwtb-delivery-profiles')&&a==='for_orders'}
 async function postKey(req,body){const session=req.headers.get('x-nwtb-session')||'';const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(session));const identity=Array.from(new Uint8Array(digest),x=>x.toString(16).padStart(2,'0')).join('');return 'session-v2|'+identity+'|'+req.url+'|'+body}
 self.addEventListener('fetch',e=>{const req=e.request;if(req.method==='GET'){e.respondWith((async()=>{const cache=await caches.open(CACHE);try{const r=await fetch(req);if((r&&r.ok)||r.type==='opaque')cache.put(req,r.clone()).catch(()=>{});return r}catch{const c=await cache.match(req);if(c)return c;if(req.mode==='navigate')return await cache.match('./driver-live.html')||await cache.match('./driver-standard.html');throw new Error('offline')}})());return}if(req.method==='POST'){e.respondWith((async()=>{const body=await req.clone().text();if(!isDriverRead(req.url,body))return fetch(req);const key=await postKey(req,body);try{const r=await fetch(req);if(r.ok){const text=await r.clone().text();await dbPut(key,{text,status:r.status,ts:Date.now()}).catch(()=>{})}return r}catch{const c=await dbGet(key).catch(()=>null);if(c)return new Response(c.text,{status:200,headers:{'content-type':'application/json','cache-control':'no-store','x-nwtb-offline':'1','x-nwtb-offline-age':String(Date.now()-c.ts)}});return new Response(JSON.stringify({error:'OFFLINE_NO_CACHED_DATA'}),{status:503,headers:{'content-type':'application/json'}})}})())}});
+self.addEventListener('notificationclick',event=>{
+ if(event.notification.tag!=='nwtb-driver-chat')return;
+ event.notification.close();
+ event.waitUntil((async()=>{
+  const target=new URL(event.notification.data?.url||'./driver-live.html',self.registration.scope);
+  if(target.origin!==self.location.origin||!/^\/nwtb-route-creator\/driver-(live|standard)\.html$/.test(target.pathname))return;
+  target.hash='chat';
+  const clients=await self.clients.matchAll({type:'window',includeUncontrolled:true});
+  const driverClient=clients.find(client=>{try{const u=new URL(client.url);return u.origin===target.origin&&u.pathname===target.pathname}catch{return false}});
+  if(driverClient){await driverClient.focus();driverClient.postMessage({type:'NWTB_OPEN_DRIVER_CHAT'})}
+  else await self.clients.openWindow(target.href);
+ })());
+});
