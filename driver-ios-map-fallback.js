@@ -3,7 +3,6 @@
 if(window.__nwtbIosMapFallbackV2)return;window.__nwtbIosMapFallbackV2=true;
 const IS_IOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 if(!IS_IOS)return;
-const NAV_MATCH='nwtb-driver-navigation';
 const TILE=256;
 let box=null,tiles=null,svg=null,van=null,badge=null,gpsWatch=null,lastGps=null,lastHeading=0,route=[],timer=null,active=false,lastRenderKey='';
 const rad=x=>x*Math.PI/180,deg=x=>x*180/Math.PI;
@@ -13,9 +12,11 @@ function world(lat,lon,z){lat=clampLat(lat);const n=Math.pow(2,z),x=(lon+180)/36
 function toLocal(lat,lon,z,cx,cy,w,h){const p=world(lat,lon,z);return{x:p.x-cx+w/2,y:p.y-cy+h/2}}
 function currentZoom(){const sp=Number(lastGps?.speed||0);return sp>22?14:sp>10?15:16}
 function ensure(){
- const map=document.getElementById('nwtbNavMap');if(!map||box)return !!box;
+ const map=document.getElementById('nwtbNavMap');if(!map)return false;
+ if(box&&box.parentNode===map)return true;
+ if(box){box.remove();box=null;lastRenderKey=''}
  map.style.position='relative';map.style.overflow='hidden';
- const s=document.createElement('style');s.id='nwtbIosStableMapStyle';s.textContent=`
+ const s=document.getElementById('nwtbIosStableMapStyle')||document.createElement('style');s.id='nwtbIosStableMapStyle';s.textContent=`
  #nwtbIosStableMap{position:absolute;inset:0;z-index:50000;background:#dfe7ec;overflow:hidden;display:none}#nwtbIosStableMap.show{display:block!important}
  #nwtbIosStableTiles{position:absolute;inset:0;overflow:hidden;background:#dfe7ec}#nwtbIosStableTiles img{position:absolute;width:256px;height:256px;max-width:none!important;max-height:none!important;user-select:none;-webkit-user-drag:none}
  #nwtbIosStableSvg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:hidden}
@@ -44,9 +45,9 @@ function renderOverlay(z,cx,cy,w,h){
 function render(){if(!active||!lastGps||!ensure())return;const r=box.getBoundingClientRect(),w=Math.max(1,Math.round(r.width)),h=Math.max(1,Math.round(r.height));if(w<150||h<180)return;const z=currentZoom(),c=world(lastGps.lat,lastGps.lon,z),key=`${z}:${Math.round(c.x)}:${Math.round(c.y)}:${w}:${h}:${route.length}`;if(key!==lastRenderKey){renderTiles(z,c.x,c.y,w,h);renderOverlay(z,c.x,c.y,w,h);lastRenderKey=key}else renderOverlay(z,c.x,c.y,w,h);van.style.transform=`translate(-50%,-50%) rotate(${lastHeading-90}deg)`;badge.textContent=route.length?'NWTB ROUTE • STABLE MAP':'NWTB GPS • STABLE MAP'}
 function startGps(){if(gpsWatch!==null||!navigator.geolocation)return;gpsWatch=navigator.geolocation.watchPosition(p=>{const next={lat:Number(p.coords.latitude),lon:Number(p.coords.longitude),speed:Number(p.coords.speed)||0};if(lastGps){const d=Math.abs(lastGps.lat-next.lat)+Math.abs(lastGps.lon-next.lon);if(d>.000015)lastHeading=bearing(lastGps,next)}if(Number.isFinite(Number(p.coords.heading)))lastHeading=Number(p.coords.heading);lastGps=next;render()},()=>{},{enableHighAccuracy:true,maximumAge:1000,timeout:15000})}
 function activate(){if(!ensure())return;active=true;box.classList.add('show');startGps();render();if(!timer)timer=setInterval(render,900)}
-function deactivate(){active=false;if(box)box.classList.remove('show');if(timer){clearInterval(timer);timer=null}}
+function deactivate(){active=false;if(box)box.classList.remove('show');if(timer){clearInterval(timer);timer=null}if(gpsWatch!==null){navigator.geolocation?.clearWatch(gpsWatch);gpsWatch=null}}
 function inspect(){const panel=document.getElementById('nwtbNavPanel');if(panel&&panel.classList.contains('show'))activate();else deactivate()}
-const origFetch=window.fetch.bind(window);window.fetch=async function(input,init){const res=await origFetch(input,init);try{const url=typeof input==='string'?input:(input?.url||'');if(url.includes(NAV_MATCH)){const j=await res.clone().json();if(Array.isArray(j?.geometry)&&j.geometry.length){route=j.geometry;lastRenderKey='';render()}}}catch{}return res};
+document.addEventListener('nwtb-navigation-route',e=>{route=Array.isArray(e.detail?.geometry)?e.detail.geometry:[];lastRenderKey='';render()});
 let tries=0;const finder=setInterval(()=>{const panel=document.getElementById('nwtbNavPanel');if(panel){new MutationObserver(inspect).observe(panel,{attributes:true,attributeFilter:['class','style']});inspect();clearInterval(finder)}else if(++tries>200)clearInterval(finder)},100);
 window.addEventListener('resize',()=>{lastRenderKey='';render()},{passive:true});window.addEventListener('orientationchange',()=>setTimeout(()=>{lastRenderKey='';render()},250),{passive:true});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){inspect();setTimeout(()=>{lastRenderKey='';render()},200)}});
 })();

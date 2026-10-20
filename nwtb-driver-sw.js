@@ -1,7 +1,7 @@
-const CACHE='nwtb-driver-shell-v3-releasegate';
+const CACHE='nwtb-driver-shell-v4-map-lifecycle';
 const DB='nwtb-driver-offline-v1';
 const STORE='api_cache';
-const SHELL=['./driver-live.html','./driver-standard.html','./driver-pod-live.js','./driver-exceptions-live.js','./driver-offline-live.js','./driver-depot-support-live.js','./driver-profiles-live.js','./nwtb-system-lock-live.js'];
+const SHELL=['./driver-live.html','./driver-standard.html','./driver-pod-live.js','./driver-navigation-native.js?v=20261020-map1','./driver-mobile-nav-fix.js?v=20261020-map1','./driver-route-pins-native.js?v=20261020-map1','./driver-ios-map-fallback.js?v=20261020-map1','./driver-exceptions-live.js','./driver-offline-live.js','./driver-depot-support-live.js','./driver-profiles-live.js','./nwtb-system-lock-live.js'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>Promise.allSettled(SHELL.map(x=>c.add(x)))).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',e=>{e.waitUntil((async()=>{for(const k of await caches.keys())if(k.startsWith('nwtb-driver-shell-')&&k!==CACHE)await caches.delete(k);await self.clients.claim()})())});
 function openDb(){return new Promise((res,rej)=>{const r=indexedDB.open(DB,3);r.onupgradeneeded=()=>{const db=r.result;if(!db.objectStoreNames.contains(STORE))db.createObjectStore(STORE);if(!db.objectStoreNames.contains('write_queue')){const s=db.createObjectStore('write_queue',{keyPath:'id'});s.createIndex('created_at','created_at')}};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}

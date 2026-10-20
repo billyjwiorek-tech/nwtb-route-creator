@@ -2,7 +2,7 @@
 const NAV='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-driver-navigation';
 const DEPOTS_NAV={BOLINGBROOK:{name:'Northwest Trucks - Bolingbrook',address:'201 S W Frontage Rd, Bolingbrook, IL 60440',lat:41.682487,lon:-88.072262},PALATINE:{name:'Northwest Trucks - Palatine',address:'2120 N Rand Rd, Palatine, IL 60074',lat:42.148326,lon:-88.033080}};function depotTarget(r){const d=DEPOTS_NAV[String(r?.depot||'BOLINGBROOK').toUpperCase()]||DEPOTS_NAV.BOLINGBROOK;if(validCoord(r?.end_lat,r?.end_lon))return{name:r.end_name||d.name,address:r.end_address||d.address,lat:Number(r.end_lat),lon:Number(r.end_lon),final:true};if(validCoord(r?.start_lat,r?.start_lon))return{name:r.start_name||d.name,address:r.start_address||d.address,lat:Number(r.start_lat),lon:Number(r.start_lon),final:true};return{...d,final:true}}
 const NEAR_STOP_M=152.4,ARRIVAL_M=6.096,ARRIVAL_SOFT_MAX_M=30,TRAFFIC_REFRESH_MS=90000;
-let navMap=null,navLine=null,navPos=null,navGlow=null,navDest=null,navWatch=null,navTarget=null,navSteps=[],navStepIndex=0,navRouteCoords=[],navLastReroute=0,navLastSpoken='',navRouteId='',navRouteMeta=null,baseFinish=null,arrivalFor='',arrivalHits=0;
+let navMap=null,navPanel=null,navLine=null,navPos=null,navGlow=null,navDest=null,navWatch=null,navTarget=null,navSteps=[],navStepIndex=0,navRouteCoords=[],navLastReroute=0,navLastSpoken='',navRouteId='',navRouteMeta=null,arrivalFor='',arrivalHits=0,navGeneration=0;
 let navTrafficAware=false,navRouteSource='',navEtaAnchorS=0,navEtaAnchorAt=0,navLastTrafficCheck=0,navTrafficBusy=false;
 
 const hav=(a,b)=>{const R=6371008.8,p=Math.PI/180,dLat=(b.lat-a.lat)*p,dLon=(b.lon-a.lon)*p,x=Math.sin(dLat/2)**2+Math.cos(a.lat*p)*Math.cos(b.lat*p)*Math.sin(dLon/2)**2;return 2*R*Math.asin(Math.sqrt(x))};
@@ -67,9 +67,19 @@ function arrivalThreshold(gps={}){
 }
 
 function ensurePanel(){
- ensureStyle();let p=document.getElementById('nwtbNavPanel');if(p)return p;p=document.createElement('div');p.id='nwtbNavPanel';p.innerHTML=`<div class="navTop"><small id="nwtbNavMode">NWTB TURN-BY-TURN</small><div id="nwtbTurn" class="navTurn">Ready</div><div class="navMeta"><span><b id="nwtbTurnDist">—</b> to turn</span><span><b id="nwtbEta">—</b> ETA</span><span><b id="nwtbRemain">—</b> remaining</span></div></div><div id="nwtbNavBanner" class="navBanner">Navigation ready</div><div id="nwtbNavMap" class="navMap"></div><div class="navActions"><button class="btn navVoice" onclick="window.nwtbRepeatTurn()">🔊 REPEAT TURN</button><button class="btn ghost" onclick="window.nwtbRecenter()">⌖ RECENTER</button><button class="btn navEnd" onclick="window.nwtbStopNavigation()">END NAVIGATION</button></div>`;const routes=document.getElementById('routes');if(routes)routes.prepend(p);return p
+ ensureStyle();const routes=document.getElementById('routes');let host=document.getElementById('nwtbNavigationHost');
+ if(!host&&routes){host=document.createElement('div');host.id='nwtbNavigationHost';routes.parentNode.insertBefore(host,routes)}
+ let p=document.getElementById('nwtbNavPanel')||navPanel;if(p){if(host&&p.parentNode!==host)host.appendChild(p);return p}p=document.createElement('div');navPanel=p;p.id='nwtbNavPanel';p.innerHTML=`<div class="navTop"><small id="nwtbNavMode">NWTB TURN-BY-TURN</small><div id="nwtbTurn" class="navTurn">Ready</div><div class="navMeta"><span><b id="nwtbTurnDist">—</b> to turn</span><span><b id="nwtbEta">—</b> ETA</span><span><b id="nwtbRemain">—</b> remaining</span></div></div><div id="nwtbNavBanner" class="navBanner">Navigation ready</div><div id="nwtbNavMap" class="navMap"></div><div class="navActions"><button class="btn navVoice" onclick="window.nwtbRepeatTurn()">🔊 REPEAT TURN</button><button class="btn ghost" onclick="window.nwtbRecenter()">⌖ RECENTER</button><button class="btn navEnd" onclick="window.nwtbStopNavigation()">END NAVIGATION</button></div>`;if(host)host.appendChild(p);return p
 }
-function initMap(lat,lon){const p=ensurePanel();p.classList.add('show');if(!window.L){document.getElementById('nwtbNavBanner').className='navBanner warn';document.getElementById('nwtbNavBanner').textContent='Map library failed to load. Turn instructions will still work.';return}if(!navMap){navMap=L.map('nwtbNavMap',{zoomControl:true}).setView([lat,lon],15);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(navMap)}setTimeout(()=>navMap.invalidateSize(),80)}
+function initMap(lat,lon){
+ const p=ensurePanel();p.classList.add('show');
+ if(!window.L){document.getElementById('nwtbNavBanner').className='navBanner warn';document.getElementById('nwtbNavBanner').textContent='Map library failed to load. Turn instructions will still work.';return}
+ const el=document.getElementById('nwtbNavMap');
+ // A same-named replacement div is a different map container. Never draw into a detached one.
+ if(navMap&&navMap.getContainer()!==el){try{navMap.remove()}catch{}navMap=null;navLine=null;navPos=null;navGlow=null;navDest=null;window.__nwtbNavMapInstance=null}
+ if(!navMap){navMap=L.map(el,{zoomControl:true,zoomAnimation:false,fadeAnimation:false,markerZoomAnimation:false}).setView([lat,lon],15);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors',updateWhenIdle:true,keepBuffer:3}).addTo(navMap);window.__nwtbNavMapInstance=navMap}
+ const current=navMap;setTimeout(()=>{if(current===navMap&&el.isConnected)current.invalidateSize({pan:false,animate:false})},80)
+}
 function drawRoute(current){if(!navMap||!window.L)return;if(navLine)navMap.removeLayer(navLine);if(navRouteCoords.length){const ll=navRouteCoords.map(c=>[c[1],c[0]]);navLine=L.polyline(ll,{weight:7,opacity:.8}).addTo(navMap);const b=navLine.getBounds();if(b.isValid())navMap.fitBounds(b,{padding:[28,28],maxZoom:16})}clearNearGlow();if(navPos)navMap.removeLayer(navPos);navPos=L.circleMarker([current.lat,current.lon],{radius:9,weight:4,fillOpacity:1}).addTo(navMap).bindTooltip('You',{permanent:false});if(navDest)navMap.removeLayer(navDest);navDest=L.marker([navTarget.lat,navTarget.lon]).addTo(navMap).bindPopup(navTarget.name||'Destination')}
 async function navPost(payload){const h={'content-type':'application/json','apikey':KEY,'x-nwtb-session':token};const r=await fetch(NAV,{method:'POST',headers:h,body:JSON.stringify(payload)}),j=await r.json().catch(()=>({error:'Navigation response error'}));if(!r.ok)throw Error(j.error||'Navigation failed');return j}
 function currentStep(){return navSteps[Math.min(navStepIndex,Math.max(0,navSteps.length-1))]||null}
@@ -85,15 +95,17 @@ function updateDisplay(pos,forceSpeak=false,gps={}){
 }
 function distanceToRoute(pos){if(!navRouteCoords.length)return Infinity;let best=Infinity;const stride=Math.max(1,Math.floor(navRouteCoords.length/180));for(let i=0;i<navRouteCoords.length;i+=stride){const c=navRouteCoords[i],d=hav(pos,{lat:c[1],lon:c[0]});if(d<best)best=d}return best}
 function applyRoute(j,pos,announce=false){
+ document.dispatchEvent(new CustomEvent('nwtb-navigation-route',{detail:{geometry:j.geometry||[]}}));
  navSteps=j.steps||[];navRouteCoords=j.geometry||[];navStepIndex=0;navTrafficAware=!!j.traffic_aware;navRouteSource=j.source||'';navEtaAnchorS=Number(j.duration_s)||0;navEtaAnchorAt=Date.now();navLastTrafficCheck=Date.now();setRoutingMode();drawRoute(pos);document.getElementById('nwtbEta').textContent=eta(navEtaAnchorS);document.getElementById('nwtbRemain').textContent=feet(j.distance_m);updateDisplay(pos,announce)
 }
-async function reroute(pos,announce=false){if(!navTarget)return;const now=Date.now();if(now-navLastReroute<12000)return;navLastReroute=now;document.getElementById('nwtbNavBanner').textContent=navTrafficAware?'LIVE TRAFFIC • Recalculating fastest route…':'Calculating route…';try{const j=await navPost({action:'route',origin:pos,destination:{lat:navTarget.lat,lon:navTarget.lon}});applyRoute(j,pos,announce)}catch(e){document.getElementById('nwtbNavBanner').className='navBanner warn';document.getElementById('nwtbNavBanner').textContent=e.message}}
+async function reroute(pos,announce=false){if(!navTarget)return;const generation=navGeneration,target=navTarget,now=Date.now();if(now-navLastReroute<12000)return;navLastReroute=now;document.getElementById('nwtbNavBanner').textContent=navTrafficAware?'LIVE TRAFFIC • Recalculating fastest route…':'Calculating route…';try{const j=await navPost({action:'route',origin:pos,destination:{lat:target.lat,lon:target.lon}});if(generation!==navGeneration)return;applyRoute(j,pos,announce)}catch(e){if(generation!==navGeneration)return;document.getElementById('nwtbNavBanner').className='navBanner warn';document.getElementById('nwtbNavBanner').textContent=e.message}}
 async function trafficRefresh(pos){
  if(!navTarget||!navTrafficAware||navTrafficBusy||Date.now()-navLastTrafficCheck<TRAFFIC_REFRESH_MS)return;navTrafficBusy=true;navLastTrafficCheck=Date.now();
- try{const j=await navPost({action:'route',origin:pos,destination:{lat:navTarget.lat,lon:navTarget.lon}});if(j?.traffic_aware)applyRoute(j,pos,false)}catch(e){console.warn('Live traffic refresh failed',e)}finally{navTrafficBusy=false}
+ const generation=navGeneration,target=navTarget;
+ try{const j=await navPost({action:'route',origin:pos,destination:{lat:target.lat,lon:target.lon}});if(generation===navGeneration&&j?.traffic_aware)applyRoute(j,pos,false)}catch(e){console.warn('Live traffic refresh failed',e)}finally{if(generation===navGeneration)navTrafficBusy=false}
 }
-function startNavWatch(){if(navWatch!==null||!navigator.geolocation)return;navWatch=navigator.geolocation.watchPosition(p=>{const c=p.coords,pos={lat:c.latitude,lon:c.longitude};window.__nwtbLastSpeedMps=c.speed||0;if(navPos&&navMap)navPos.setLatLng([pos.lat,pos.lon]);updateDisplay(pos,false,{accuracy:c.accuracy,speed:c.speed});if(navMap&&document.visibilityState==='visible')navMap.panTo([pos.lat,pos.lon],{animate:true,duration:.4});const off=distanceToRoute(pos);if(off>120&&Date.now()-navLastReroute>25000)reroute(pos,true);else if(navTrafficAware)trafficRefresh(pos)},e=>{const b=document.getElementById('nwtbNavBanner');if(b){b.className='navBanner warn';b.textContent='Navigation GPS: '+e.message}},{enableHighAccuracy:true,maximumAge:3000,timeout:15000})}
-async function beginNavigation(target,routeId){navTarget=target;navRouteId=routeId||route||'';navLastSpoken='';navStepIndex=0;arrivalFor='';arrivalHits=0;navTrafficAware=false;navRouteSource='';navEtaAnchorS=0;navEtaAnchorAt=0;navLastTrafficCheck=0;navTrafficBusy=false;hideArrival();clearNearGlow();const p=ensurePanel();p.classList.add('show');setRoutingMode();document.getElementById('nwtbNavBanner').className='navBanner';document.getElementById('nwtbNavBanner').textContent='Getting your location…';if(!navigator.geolocation){document.getElementById('nwtbNavBanner').className='navBanner warn';document.getElementById('nwtbNavBanner').textContent='This phone/browser does not provide GPS.';return}navigator.geolocation.getCurrentPosition(async g=>{const pos={lat:g.coords.latitude,lon:g.coords.longitude};initMap(pos.lat,pos.lon);await reroute(pos,true);startNavWatch();try{if(typeof requestWakeLock==='function')requestWakeLock()}catch{}},e=>{document.getElementById('nwtbNavBanner').className='navBanner warn';document.getElementById('nwtbNavBanner').textContent='Allow Location access to use NWTB navigation: '+e.message},{enableHighAccuracy:true,maximumAge:3000,timeout:15000})}
+function startNavWatch(){if(navWatch!==null||!navigator.geolocation)return;navWatch=navigator.geolocation.watchPosition(p=>{if(!navTarget)return;const c=p.coords,pos={lat:c.latitude,lon:c.longitude};window.__nwtbLastSpeedMps=c.speed||0;if(navPos&&navMap)navPos.setLatLng([pos.lat,pos.lon]);updateDisplay(pos,false,{accuracy:c.accuracy,speed:c.speed});if(navMap&&document.visibilityState==='visible')navMap.panTo([pos.lat,pos.lon],{animate:true,duration:.4});const off=distanceToRoute(pos);if(off>120&&Date.now()-navLastReroute>25000)reroute(pos,true);else if(navTrafficAware)trafficRefresh(pos)},e=>{const b=document.getElementById('nwtbNavBanner');if(b){b.className='navBanner warn';b.textContent='Navigation GPS: '+e.message}},{enableHighAccuracy:true,maximumAge:3000,timeout:15000})}
+async function beginNavigation(target,routeId){const generation=++navGeneration;navLastReroute=0;navRouteCoords=[];navTarget=target;navRouteId=routeId||route||'';navLastSpoken='';navStepIndex=0;arrivalFor='';arrivalHits=0;navTrafficAware=false;navRouteSource='';navEtaAnchorS=0;navEtaAnchorAt=0;navLastTrafficCheck=0;navTrafficBusy=false;hideArrival();clearNearGlow();const p=ensurePanel();p.classList.add('show');setRoutingMode();document.getElementById('nwtbNavBanner').className='navBanner';document.getElementById('nwtbNavBanner').textContent='Getting your location…';if(!navigator.geolocation){document.getElementById('nwtbNavBanner').className='navBanner warn';document.getElementById('nwtbNavBanner').textContent='This phone/browser does not provide GPS.';return}navigator.geolocation.getCurrentPosition(async g=>{if(generation!==navGeneration)return;const pos={lat:g.coords.latitude,lon:g.coords.longitude};initMap(pos.lat,pos.lon);await reroute(pos,true);if(generation!==navGeneration)return;startNavWatch();try{if(typeof requestWakeLock==='function')requestWakeLock()}catch{}},e=>{if(generation!==navGeneration)return;document.getElementById('nwtbNavBanner').className='navBanner warn';document.getElementById('nwtbNavBanner').textContent='Allow Location access to use NWTB navigation: '+e.message},{enableHighAccuracy:true,maximumAge:3000,timeout:15000})}
 
 async function targetForStop(stop){const o=stop?.delivery_orders||{};let lat=Number(o.lat),lon=Number(o.lon);if(!validCoord(lat,lon)){try{const g=await post(API,{action:'geocode',address:o.address});lat=Number(g.lat);lon=Number(g.lon)}catch{}}if(!validCoord(lat,lon))throw Error('This stop does not have a usable physical location.');return {name:o.customer_name||'Stop',address:o.address||'',lat,lon,stop_id:stop.id}}
 async function finalTarget(r){
@@ -105,36 +117,41 @@ async function finalTarget(r){
  return null
 }
 async function navigateNext(routeId){
- const fresh=await post(API,{action:'route_get',route_id:routeId});navRouteMeta=fresh.route||navRouteMeta;const next=(fresh.stops||[]).find(s=>s.status==='PENDING');if(next){await beginNavigation(await targetForStop(next),routeId);return}
+ const fresh=await post(API,{action:'route_get',route_id:routeId});if(routeId!==route)return;navRouteMeta=fresh.route||navRouteMeta;const next=(fresh.stops||[]).find(s=>s.status==='PENDING');if(navRouteMeta?.paused||!['ACTIVE','COMPLETED'].includes(navRouteMeta?.status)||next&&navRouteMeta?.status!=='ACTIVE')throw Error('Start or resume this assigned route before navigating.');if(next){await beginNavigation(await targetForStop(next),routeId);return}
  const end=await finalTarget(navRouteMeta);if(end){await beginNavigation(end,routeId);document.getElementById('nwtbNavBanner').textContent=bannerText(`All stops complete — returning to ${end.name}`);speak(`All stops complete. Returning to ${end.name}`)}else{window.nwtbStopNavigation();speak('Route complete')}
 }
 
-window.nwtbCompleteNext=async()=>{if(!navTarget?.stop_id||!baseFinish)return;const id=navTarget.stop_id;hideArrival();clearNearGlow();arrivalHits=0;try{await baseFinish(id,'DELIVERED');await new Promise(r=>setTimeout(r,250));await navigateNext(navRouteId)}catch(e){alert(e.message||e)}};
-window.nwtbNotCompleted=async()=>{if(!navTarget?.stop_id||!baseFinish)return;const id=navTarget.stop_id;hideArrival();clearNearGlow();arrivalHits=0;try{await baseFinish(id,'NOT_DELIVERED');await new Promise(r=>setTimeout(r,250));await navigateNext(navRouteId)}catch(e){alert(e.message||e)}};
+window.nwtbCompleteNext=async()=>{if(!navTarget?.stop_id||typeof window.finish!=='function')return;const id=navTarget.stop_id;hideArrival();clearNearGlow();arrivalHits=0;try{await window.finish(id,'DELIVERED')}catch(e){alert(e.message||e)}};
+window.nwtbNotCompleted=async()=>{if(!navTarget?.stop_id||typeof window.finish!=='function')return;const id=navTarget.stop_id;hideArrival();clearNearGlow();arrivalHits=0;try{await window.finish(id,'NOT_DELIVERED')}catch(e){alert(e.message||e)}};
+// Called only after the POD/exception endpoint acknowledges the saved outcome.
+window.nwtbAfterStopSaved=async stopId=>{const id=route,advance=!!navTarget&&navRouteId===id&&navTarget.stop_id===stopId;if(!id)return;await window.openRoute(id);if(advance&&route===id)await navigateNext(id)};
+window.nwtbDriverViewChanged=id=>{if(!id||navRouteId&&navRouteId!==id)window.nwtbStopNavigation()};
 window.nwtbRepeatTurn=()=>{const s=currentStep();if(s)speak(instruction(s)+' '+(document.getElementById('nwtbTurnDist')?.textContent||''))};
 window.nwtbRecenter=()=>{if(navMap&&navPos)navMap.setView(navPos.getLatLng(),16)};
-window.nwtbStopNavigation=()=>{if(navWatch!==null){navigator.geolocation.clearWatch(navWatch);navWatch=null}clearNearGlow();navTarget=null;navSteps=[];navRouteCoords=[];navStepIndex=0;arrivalFor='';arrivalHits=0;navTrafficAware=false;navRouteSource='';navEtaAnchorS=0;navEtaAnchorAt=0;navLastTrafficCheck=0;navTrafficBusy=false;hideArrival();try{speechSynthesis.cancel()}catch{}const p=document.getElementById('nwtbNavPanel');if(p)p.classList.remove('show')};
+window.nwtbStopNavigation=()=>{navGeneration++;navRouteId='';if(navWatch!==null){navigator.geolocation.clearWatch(navWatch);navWatch=null}clearNearGlow();navTarget=null;navSteps=[];navRouteCoords=[];navStepIndex=0;arrivalFor='';arrivalHits=0;navTrafficAware=false;navRouteSource='';navEtaAnchorS=0;navEtaAnchorAt=0;navLastTrafficCheck=0;navTrafficBusy=false;hideArrival();try{speechSynthesis.cancel()}catch{}const p=document.getElementById('nwtbNavPanel');if(p)p.classList.remove('show')};
 
 async function decorateRoute(routeId){
  try{
-  const j=await post(API,{action:'route_get',route_id:routeId});navRouteMeta=j.route||null;const stops=j.stops||[];
+  const j=await post(API,{action:'route_get',route_id:routeId});if(routeId!==route)return;navRouteMeta=j.route||null;const stops=j.stops||[];
   document.querySelectorAll('#routes .stop').forEach((el,i)=>{
     const stop=stops[i];if(!stop)return;
-    [...el.querySelectorAll('a,button')].forEach(x=>{const t=(x.textContent||'').trim();if(/NAVIGATE/i.test(t)||t==='COMPLETE')x.remove()});
+    [...el.querySelectorAll('a,button')].forEach(x=>{const t=(x.textContent||'').trim();if(/NAVIGATE/i.test(t))x.remove()});
     const bad=[...el.querySelectorAll('button')].find(b=>/NOT COMPLETED/i.test(b.textContent||''));if(bad){bad.classList.add('nwtbException');bad.textContent='NOT COMPLETED'}
   });
   const panel=document.querySelector('#routes > .panel');if(panel){
     panel.querySelectorAll('a.btn.return').forEach(a=>a.remove());
-    [...panel.querySelectorAll('button')].filter(b=>/START ROUTE/i.test(b.textContent||'')).forEach(b=>{
-      const nb=document.createElement('button');nb.className='btn nwtbFullRouteBtn';nb.textContent='ROUTE FULL ROUTE IN NWTB';nb.onclick=async()=>{try{if(typeof window.startRoute==='function')await window.startRoute(routeId);else if(typeof startRoute==='function')await startRoute(routeId);await new Promise(r=>setTimeout(r,500));await navigateNext(routeId)}catch(e){alert(e.message||e)}};b.replaceWith(nb)
-    })
+    const planned=j.route?.status==='PLANNED',active=j.route?.status==='ACTIVE'&&!j.route?.paused;
+    const start=[...panel.querySelectorAll('button')].find(b=>/START ROUTE/i.test(b.textContent||''));
+    if((planned&&start||active)&&!panel.querySelector('.nwtbFullRouteBtn')){
+      const nb=document.createElement('button');nb.className='btn nwtbFullRouteBtn';nb.textContent=planned?'START ROUTE + NWTB NAVIGATION':'CONTINUE NWTB NAVIGATION';nb.onclick=async()=>{try{window.nwtbPrimeVoice?.();if(planned)await window.startRoute(routeId);await navigateNext(routeId)}catch(e){alert(e.message||e)}};if(start)start.replaceWith(nb);else panel.appendChild(nb)
+    }
   }
  }catch(e){console.warn('Navigation decoration failed',e)}
 }
 
 function install(){
- const originalOpen=window.openRoute;if(typeof originalOpen!=='function')return false;baseFinish=window.finish;
- window.openRoute=async function(id,fromChange=false){const r=await originalOpen.apply(this,arguments);setTimeout(()=>decorateRoute(id),100);return r};
+ const originalOpen=window.openRoute;if(typeof originalOpen!=='function')return false;
+ window.openRoute=async function(id,fromChange=false){window.nwtbDriverViewChanged(id);const r=await originalOpen.apply(this,arguments);setTimeout(()=>decorateRoute(id),100);return r};
  return true
 }
 let tries=0;const t=setInterval(()=>{if(install()||++tries>80)clearInterval(t)},100);

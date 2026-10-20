@@ -32,6 +32,7 @@
    <button class="btn ghost" onclick="driverLogout()">LOG OUT</button>
    <div id="alertStatus" class="alertstatus small">Route-change alerts are not enabled on this page yet.</div>
   </div>
+  <div id="nwtbNavigationHost"></div>
   <div id="routes"></div>
  </div>
 </div>
@@ -113,7 +114,7 @@ async function driverLogin(){
  finally{btn.disabled=false}
 }
 function driverLogout(){
- try{window.nwtbStopBuiltInTracking?.()}catch{};stopChangePolling();route='';token='';driver='';driverName='';
+ try{window.nwtbStopNavigation?.();window.nwtbStopBuiltInTracking?.()}catch{};stopChangePolling();route='';token='';driver='';driverName='';
  localStorage.removeItem('nwtb_driver_token');localStorage.removeItem('nwtb_delivery_driver');
  $('employeeNumber').value='';showLogin('Signed out. Enter your employee number.')
 }
@@ -123,6 +124,7 @@ async function enableAlerts(test=false){try{const AC=window.AudioContext||window
 function playAlertTone(urgent=true){if(!alertsReady)return;try{if(!audioCtx){const AC=window.AudioContext||window.webkitAudioContext;if(AC)audioCtx=new AC()}if(!audioCtx)return;const t=audioCtx.currentTime;[[0,880,.18],[.24,urgent?1100:660,.22]].forEach(([off,f,d])=>{const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.frequency.value=f;o.type='square';g.gain.setValueAtTime(.0001,t+off);g.gain.exponentialRampToValueAtTime(.22,t+off+.01);g.gain.exponentialRampToValueAtTime(.0001,t+off+d);o.connect(g);g.connect(audioCtx.destination);o.start(t+off);o.stop(t+off+d+.02)})}catch{}}
 function showRouteAlert(ev){const added=ev.event_type==='STOP_ADDED_ACTIVE',bar=$('routeAlert');bar.className='alertbar show '+(added?'add':'remove');bar.innerHTML=(added?'STOP ADDED TO YOUR ROUTE':'STOP REMOVED FROM YOUR ROUTE')+'<div class="sub">'+esc(ev.note||'Your route was updated by Dispatch.')+'</div>';playAlertTone(true);if(navigator.vibrate)navigator.vibrate(added?[250,120,250,120,450]:[500,180,500]);if('Notification'in window&&Notification.permission==='granted'){try{new Notification(added?'NWTB — STOP ADDED':'NWTB — STOP REMOVED',{body:ev.note||'Dispatch changed your route.',tag:'nwtb-route-'+route,renotify:true})}catch{}}setTimeout(()=>{bar.className='alertbar'},9000)}
 async function loadRoutes(){
+ window.nwtbDriverViewChanged?.('');
  stopChangePolling();
  if(!driver){showLogin('Enter your employee number.');return}
  try{
@@ -165,7 +167,7 @@ async function openRoute(id,fromChange=false){
  }catch(e){alert(e.message)}
 }
 async function startRoute(id){await enableAlerts(false);try{await post(ROUTE_API,{action:'route_start_driver',route_id:id});route=id;await openRoute(id);setTimeout(()=>window.nwtbStartBuiltInTracking?.(),120)}catch(e){alert(e.message)}}
-async function finish(id,status){if(currentPaused){alert('This route is paused. Resume the route before completing stops.');return}let note='';if(status==='NOT_DELIVERED')note=prompt('Reason / note:')||'';try{await post(ROUTE_API,{action:'stop_status_driver',stop_id:id,status,note});openRoute(route)}catch(e){alert(e.message)}}
+async function finish(id,status){if(currentPaused){alert('This route is paused. Resume the route before completing stops.');return}let note='';if(status==='NOT_DELIVERED')note=prompt('Reason / note:')||'';try{await post(ROUTE_API,{action:'stop_status_driver',stop_id:id,status,note});if(window.nwtbAfterStopSaved)await window.nwtbAfterStopSaved(id);else await openRoute(route)}catch(e){alert(e.message)}}
 function startChangePolling(id){stopChangePolling();changeTimer=setInterval(()=>checkRouteChanges(id),5000);checkRouteChanges(id)}
 function stopChangePolling(){if(changeTimer){clearInterval(changeTimer);changeTimer=null}}
 async function checkRouteChanges(id){if(!id||id!==route||!driver)return;const key='nwtb_route_event_'+id,last=Number(localStorage.getItem(key)||0);try{const j=await post(ROUTE_API,{action:'route_changes',route_id:id,after_id:last}),events=j.events||[];if(!events.length)return;for(const ev of events){showRouteAlert(ev);localStorage.setItem(key,String(ev.id))}await openRoute(id,true)}catch(e){console.warn('Route change check failed',e)}}
@@ -176,5 +178,5 @@ async function resumePausedRoute(){if(!confirm('Resume this route now?'))return;
 $('employeeNumber')?.addEventListener('keydown',e=>{if(e.key==='Enter')driverLogin()});
 boot();
 </script>
-<script src="driver-custom-navigation-native.js?v=20261014-native1"></script><script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js?v=20261014"></script><script>window.haversine=window.haversine||function(a,b){const R=6371008.8,p=Math.PI/180,dLat=(b.lat-a.lat)*p,dLon=(b.lon-a.lon)*p,x=Math.sin(dLat/2)**2+Math.cos(a.lat*p)*Math.cos(b.lat*p)*Math.sin(dLon/2)**2;return 2*R*Math.asin(Math.sqrt(x))};</script><script src="driver-tracking-engine-native.js?v=20261015-session2"></script><script src="driver-nav-van-overlay.js?v=20260924-0725"></script><script src="driver-mobile-nav-fix.js?v=20260924-1155"></script><script src="driver-chat-live.js?v=20261015-session2"></script><script src="driver-navigation-native.js?v=20261014-native1"></script><script src="driver-voice-live.js?v=20260925-0745"></script><script src="driver-alerts-auto-live.js?v=20260925-0800"></script><script src="driver-route-pins-native.js?v=20261015-session2"></script><script src="driver-ios-map-fallback.js?v=20260925-0745"></script><script src="driver-priority-route-live.js?v=20261015-session2"></script><script src="driver-pod-live.js?v=20261015-releasegate2"></script><script src="nwtb-system-lock-live.js?v=20260929-1200"></script><div style="position:fixed;right:7px;bottom:5px;font-size:8px;color:#98a2b3;pointer-events:none;z-index:99999">NWTB GPS NATIVE</div></body>
+<script src="driver-custom-navigation-native.js?v=20261014-native1"></script><script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js?v=20261014"></script><script>window.haversine=window.haversine||function(a,b){const R=6371008.8,p=Math.PI/180,dLat=(b.lat-a.lat)*p,dLon=(b.lon-a.lon)*p,x=Math.sin(dLat/2)**2+Math.cos(a.lat*p)*Math.cos(b.lat*p)*Math.sin(dLon/2)**2;return 2*R*Math.asin(Math.sqrt(x))};</script><script src="driver-tracking-engine-native.js?v=20261015-session2"></script><script src="driver-nav-van-overlay.js?v=20260924-0725"></script><script src="driver-mobile-nav-fix.js?v=20261020-map1"></script><script src="driver-chat-live.js?v=20261015-session2"></script><script src="driver-navigation-native.js?v=20261020-map1"></script><script src="driver-voice-live.js?v=20260925-0745"></script><script src="driver-alerts-auto-live.js?v=20260925-0800"></script><script src="driver-route-pins-native.js?v=20261020-map1"></script><script src="driver-ios-map-fallback.js?v=20261020-map1"></script><script src="driver-priority-route-live.js?v=20261015-session2"></script><script src="driver-pod-live.js?v=20261020-map1"></script><script src="nwtb-system-lock-live.js?v=20260929-1200"></script><div style="position:fixed;right:7px;bottom:5px;font-size:8px;color:#98a2b3;pointer-events:none;z-index:99999">NWTB GPS NATIVE</div></body>
 </html>

@@ -1,0 +1,10 @@
+{
+  "private": true,
+  "scripts": {
+    "test": "cd .. && node tests/driver-map-lifecycle.test.cjs && node tests/native-office-route-map.test.cjs && node tests/release-gate.test.cjs && node tests/sales-route-safety.test.cjs"
+  },
+  "devDependencies": {
+    "leaflet": "1.9.4",
+    "linkedom": "0.18.13"
+  }
+}

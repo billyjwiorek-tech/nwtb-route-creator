@@ -39,7 +39,7 @@ function injectStyles(){
  document.head.appendChild(s);
 }
 
-let map=null,resizeObserver=null,lastW=0,lastH=0,resizeTimer=null,panelObserver=null;
+let map=null,resizeObserver=null,mapElement=null,panelElement=null,lastW=0,lastH=0,resizeTimer=null,panelObserver=null;
 function panel(){return document.getElementById('nwtbNavPanel')}
 function shown(){return !!panel()?.classList.contains('show')}
 function safeInvalidate(){
@@ -60,7 +60,8 @@ function scheduleResize(){
 }
 function watchMapElement(){
  const el=document.getElementById('nwtbNavMap');
- if(!el||resizeObserver)return;
+ if(!el||el===mapElement)return;
+ resizeObserver?.disconnect();mapElement=el;lastW=0;lastH=0;
  if('ResizeObserver'in window){
    resizeObserver=new ResizeObserver(entries=>{
      const cr=entries[0]?.contentRect;if(!cr)return;
@@ -83,7 +84,8 @@ function syncState(){
  }
 }
 function watchPanel(){
- const p=panel();if(!p||panelObserver)return;
+ const p=panel();if(!p||p===panelElement)return;
+ panelObserver?.disconnect();panelElement=p;
  panelObserver=new MutationObserver(syncState);
  panelObserver.observe(p,{attributes:true,attributeFilter:['class']});
  syncState();
