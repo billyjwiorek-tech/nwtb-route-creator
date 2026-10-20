@@ -38,3 +38,15 @@ jobs:
           psql "$FIXTURE_DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/route-return-fixture-schema.sql
           psql "$FIXTURE_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$route_migration_path"
           psql "$FIXTURE_DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/route-return-db.test.sql
+  production-bytes:
+    if: github.ref == 'refs/heads/main'
+    needs: lifecycle
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify public Pages assets match this commit
+        run: node tests/verify-nwtb-return-production.cjs
