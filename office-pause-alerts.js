@@ -7,6 +7,9 @@ const TRACK='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-delivery
 const KEY='sb_publishable_EqF-iooqhmngSG5BbzOxfQ_Vnf9Altc';
 const CURSOR='nwtb_office_route_alert_cursor_v2',PENDING='nwtb_office_route_alert_pending_v2',MUTED='nwtb_office_route_alert_muted_v2';
 const TYPES=new Set(['ROUTE_PAUSED','ROUTE_RESUMED','ROUTE_COMPLETED']);
+const RETURN_TITLE='DRIVER IS ON THEIR WAY BACK TO NWTB';
+const desktopNotices=new Map();
+let desktopError='';
 const token=()=>localStorage.getItem('nwtb_delivery_token')||'';
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 function readPending(){try{const a=JSON.parse(localStorage.getItem(PENDING)||'[]');return Array.isArray(a)?a.filter(e=>Number(e?.id)>0&&TYPES.has(e.event_type)).slice(-100):[]}catch{return []}}
@@ -28,20 +31,54 @@ function playSound(){
  osc.start(start);osc.stop(end);soundState();return true
 }
 async function enableSound(){try{muted=false;localStorage.setItem(MUTED,'0');const AC=window.AudioContext||window.webkitAudioContext;if(!AC)throw Error('Sound is not supported by this browser.');if(!audio||audio.state==='closed'){audio=new AC();audio.onstatechange=soundState}if(audio.state!=='running')await audio.resume();stopSound();playSound();soundState()}catch(e){const el=document.getElementById('officeRouteSoundStatus');if(el)el.textContent=e.message||'Click ENABLE SOUND again.'}}
-function title(e){if(e.event_type==='ROUTE_COMPLETED')return 'RETURN TO NWTB';return e.event_type==='ROUTE_PAUSED'?'ROUTE PAUSED':'ROUTE RESUMED'}
-function description(e){if(e.event_type==='ROUTE_COMPLETED')return 'Final stop marked complete. Assigned return leg: '+(e.return_depot_name||'NWTB')+'.';return e.event_type==='ROUTE_PAUSED'?e.note||'Driver paused the route.':'Driver resumed the route.'}
+function desktopState(){
+ const button=document.getElementById('officeRouteDesktopEnable'),status=document.getElementById('officeRouteDesktopStatus');if(!button||!status)return;
+ const supported=typeof window.Notification==='function',permission=supported?window.Notification.permission:'unsupported';
+ button.disabled=!supported;button.textContent=permission==='granted'?'TEST DESKTOP POP-UP':permission==='denied'?'DESKTOP ALERTS BLOCKED':'ENABLE DESKTOP ALERTS';
+ status.textContent=desktopError||(permission==='granted'?'DESKTOP ALERTS READY':permission==='denied'?'ALLOW NOTIFICATIONS IN BROWSER SITE SETTINGS':supported?'CLICK ENABLE DESKTOP ALERTS':'DESKTOP ALERTS NOT SUPPORTED');
+ status.className=permission==='granted'&&!desktopError?'ready':'needs';
+ button.title=status.title='Keep Office open in a background tab or minimized window. If blocked, allow Notifications for this website in your browser site settings. Computer notification settings can also silence or hide pop-ups.';
+}
+function openAlertPanel(){const panel=document.getElementById('officeRouteAlertPanel');if(panel&&pending.length){panel.hidden=false;panel.scrollIntoView?.({block:'nearest'})}}
+function desktopNotice(event,isTest=false){
+ if(typeof window.Notification!=='function'||window.Notification.permission!=='granted')return false;
+ const tag=isTest?'nwtb-office-desktop-test':'nwtb-office-return-'+event.id;
+ if(!isTest&&desktopNotices.has(tag))return false;
+ try{
+  if(isTest)desktopNotices.get(tag)?.close();
+  const notice=new window.Notification(isTest?'TEST — NWTB DESKTOP ALERT':RETURN_TITLE,{
+   body:isTest?'THIS IS ONLY A TEST. LIVE RETURN ALERTS WILL SAY: '+RETURN_TITLE+'.':String(event.driver_name||event.employee_number||'DRIVER').toUpperCase()+' — '+description(event),
+   tag,requireInteraction:true,renotify:false,silent:true
+  });
+  desktopNotices.set(tag,notice);
+  notice.onclick=()=>{window.focus();openAlertPanel();notice.close()};
+  notice.onclose=()=>{if(desktopNotices.get(tag)===notice)desktopNotices.delete(tag)};
+  desktopError='';desktopState();return true
+ }catch{desktopError='DESKTOP POP-UP FAILED — CHECK BROWSER SETTINGS';desktopState();return false}
+}
+async function enableDesktop(){
+ desktopError='';
+ if(typeof window.Notification!=='function'){desktopState();return}
+ try{
+  // Permission must be requested directly from this user-clicked control, never on page load.
+  if(window.Notification.permission==='default')await window.Notification.requestPermission();
+  desktopState();if(window.Notification.permission==='granted')desktopNotice(null,true)
+ }catch{desktopError='COULD NOT ENABLE DESKTOP ALERTS — CHECK BROWSER SETTINGS';desktopState()}
+}
+function title(e){if(e.event_type==='ROUTE_COMPLETED')return RETURN_TITLE;return e.event_type==='ROUTE_PAUSED'?'ROUTE PAUSED':'ROUTE RESUMED'}
+function description(e){if(e.event_type==='ROUTE_COMPLETED')return ('FINAL STOP MARKED COMPLETE. ASSIGNED RETURN LEG: '+(e.return_depot_name||'NWTB')+'.').toUpperCase();return e.event_type==='ROUTE_PAUSED'?e.note||'Driver paused the route.':'Driver resumed the route.'}
 function time(value){try{return new Date(value).toLocaleString('en-US',{timeZone:'America/Chicago',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})+' CT'}catch{return String(value||'')}}
-function render(){const panel=document.getElementById('officeRouteAlertPanel'),rows=document.getElementById('officeRouteAlertRows'),badge=document.getElementById('officeRouteAlertBadge');if(!panel||!rows)return;rows.innerHTML=pending.slice().reverse().map(e=>'<article class="officeRouteAlert '+(e.event_type==='ROUTE_COMPLETED'?'returning':'')+'"><strong>'+esc(title(e))+' — '+esc(e.driver_name||e.employee_number||'Driver')+'</strong><p>'+esc(description(e))+'</p><small>'+esc(time(e.created_at))+'</small></article>').join('');badge.textContent='ROUTE ALERTS'+(pending.length?' ('+pending.length+')':'');badge.classList.toggle('unread',pending.length>0);panel.hidden=pending.length===0;soundState()}
-function acknowledge(){pending=[];waitingForSound=false;persist();stopSound();render()}
+function render(){const panel=document.getElementById('officeRouteAlertPanel'),rows=document.getElementById('officeRouteAlertRows'),badge=document.getElementById('officeRouteAlertBadge');if(!panel||!rows)return;rows.innerHTML=pending.slice().reverse().map(e=>'<article class="officeRouteAlert '+(e.event_type==='ROUTE_COMPLETED'?'returning':'')+'"><strong>'+esc(title(e))+' — '+esc(e.event_type==='ROUTE_COMPLETED'?String(e.driver_name||e.employee_number||'Driver').toUpperCase():e.driver_name||e.employee_number||'Driver')+'</strong><p>'+esc(description(e))+'</p><small>'+esc(time(e.created_at))+'</small></article>').join('');badge.textContent='ROUTE ALERTS'+(pending.length?' ('+pending.length+')':'');badge.classList.toggle('unread',pending.length>0);panel.hidden=pending.length===0;soundState();desktopState()}
+function acknowledge(){pending=[];waitingForSound=false;persist();for(const notice of desktopNotices.values()){try{notice.close()}catch{}}desktopNotices.clear();stopSound();render()}
 function ensure(){if(document.getElementById('officeRouteAlertToolbar'))return;
  const s=document.createElement('style');s.id='officeRouteAlertStyle';s.textContent=`
- #officeRouteAlertToolbar{display:flex;flex-wrap:wrap;gap:5px;align-items:center;position:fixed;right:12px;top:8px;z-index:11000;font-family:Arial,sans-serif}#officeRouteAlertToolbar.inHeader{position:static;max-width:460px}#officeRouteAlertToolbar button{border:1px solid #d0d5dd;border-radius:8px;background:#fff;color:#182230;padding:7px 9px;font-size:10px;font-weight:900;cursor:pointer}#officeRouteAlertToolbar #officeRouteSoundEnable{background:#175cd3;color:#fff;border-color:#175cd3}#officeRouteAlertBadge.unread{background:#fff4e5!important;color:#93370d!important;border-color:#f79009!important}#officeRouteAlertConnection{font-size:9px;font-weight:850}#officeRouteAlertConnection.ready{color:#067647}#officeRouteAlertConnection.needs{color:#b54708}#officeRouteSoundStatus{font-size:9px;font-weight:850;width:100%;text-align:right}#officeRouteSoundStatus.ready{color:#067647}#officeRouteSoundStatus.needs{color:#b54708}
+ #officeRouteAlertToolbar{display:flex;flex-wrap:wrap;gap:5px;align-items:center;position:fixed;right:12px;top:8px;z-index:11000;font-family:Arial,sans-serif}#officeRouteAlertToolbar.inHeader{position:static;max-width:470px}#officeRouteAlertToolbar button{border:1px solid #d0d5dd;border-radius:8px;background:#fff;color:#182230;padding:7px 9px;font-size:10px;font-weight:900;cursor:pointer}#officeRouteAlertToolbar button:disabled{cursor:default;opacity:.65}#officeRouteAlertToolbar #officeRouteSoundEnable,#officeRouteAlertToolbar #officeRouteDesktopEnable{background:#175cd3;color:#fff;border-color:#175cd3}#officeRouteAlertBadge.unread{background:#fff4e5!important;color:#93370d!important;border-color:#f79009!important}#officeRouteAlertStatuses{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px 10px;width:100%;font-size:9px;font-weight:850}#officeRouteAlertStatuses .ready{color:#067647}#officeRouteAlertStatuses .needs{color:#b54708}#officeRouteDesktopHelp{width:100%;text-align:right;font-size:9px;color:#475467}
  #officeRouteAlertPanel{position:fixed;right:16px;top:88px;z-index:21000;width:min(470px,calc(100vw - 32px));max-height:75vh;overflow:auto;background:#fff;border:2px solid #15803d;border-radius:14px;box-shadow:0 18px 50px #10182855;padding:15px;color:#182230;font-family:Arial,sans-serif}#officeRouteAlertPanel[hidden]{display:none}#officeRouteAlertPanel h2{font-size:17px;margin:0 0 5px}#officeRouteAlertPanel .hint{font-size:11px;line-height:1.4;color:#475467;margin:0 0 10px}.officeRouteAlert{padding:12px;border:1px solid #f79009;border-left:5px solid #f79009;border-radius:9px;background:#fffaeb;margin:10px 0}.officeRouteAlert.returning{border-color:#12b76a;background:#ecfdf3}.officeRouteAlert strong{font-size:14px;display:block}.officeRouteAlert p{font-size:12px;line-height:1.5;margin:6px 0}.officeRouteAlert small{font-size:10px;color:#667085}#officeRouteAlertAck{width:100%;padding:12px;border:0;border-radius:9px;background:#15803d;color:#fff;font-weight:900;cursor:pointer}
- @media(max-width:720px){#officeRouteAlertToolbar.inHeader{max-width:250px;gap:3px}#officeRouteAlertToolbar button{padding:6px;font-size:8px}#officeRouteAlertConnection{font-size:9px;font-weight:850}#officeRouteAlertConnection.ready{color:#067647}#officeRouteAlertConnection.needs{color:#b54708}#officeRouteSoundStatus{font-size:8px}#officeRouteAlertPanel{top:78px;right:8px;width:calc(100vw - 16px)}}
+ @media(max-width:720px){.topbar.hasOfficeRouteAlerts{height:auto;min-height:96px;padding-top:8px;padding-bottom:8px}#officeRouteAlertToolbar.inHeader{max-width:250px;gap:3px}#officeRouteAlertToolbar button{padding:6px;font-size:8px}#officeRouteAlertStatuses,#officeRouteDesktopHelp{font-size:8px}#officeRouteAlertPanel{top:112px;right:8px;width:calc(100vw - 16px)}}
  `;document.head.appendChild(s);
- const toolbar=document.createElement('div');toolbar.id='officeRouteAlertToolbar';toolbar.innerHTML='<button id="officeRouteSoundEnable" type="button">ENABLE 7-SECOND SOUND</button><button id="officeRouteSoundMute" type="button">MUTE</button><button id="officeRouteAlertBadge" type="button">ROUTE ALERTS</button><span id="officeRouteSoundStatus" role="status"></span><span id="officeRouteAlertConnection" role="status">WAITING FOR OFFICE</span>';const header=document.querySelector('.topright');if(header){toolbar.className='inHeader';header.prepend(toolbar)}else document.body.appendChild(toolbar);
- const panel=document.createElement('section');panel.id='officeRouteAlertPanel';panel.hidden=true;panel.setAttribute('aria-label','Office route alerts');panel.setAttribute('aria-live','assertive');panel.innerHTML='<h2>NWTB DRIVER ROUTE ALERT</h2><p class="hint">Return notices sound for 7 seconds when sound is enabled. Alerts stay here until acknowledged.</p><div id="officeRouteAlertRows"></div><button id="officeRouteAlertAck" type="button">ACKNOWLEDGE ALERTS</button>';document.body.appendChild(panel);
- document.getElementById('officeRouteSoundEnable').onclick=enableSound;document.getElementById('officeRouteAlertAck').onclick=acknowledge;document.getElementById('officeRouteAlertBadge').onclick=()=>{if(pending.length){panel.hidden=false;panel.scrollIntoView?.({block:'nearest'})}};
+ const toolbar=document.createElement('div');toolbar.id='officeRouteAlertToolbar';toolbar.innerHTML='<button id="officeRouteSoundEnable" type="button">ENABLE 7-SECOND SOUND</button><button id="officeRouteSoundMute" type="button">MUTE</button><button id="officeRouteDesktopEnable" type="button">ENABLE DESKTOP ALERTS</button><button id="officeRouteAlertBadge" type="button">ROUTE ALERTS</button><div id="officeRouteAlertStatuses"><span id="officeRouteSoundStatus" role="status"></span><span id="officeRouteDesktopStatus" role="status"></span><span id="officeRouteAlertConnection" role="status">WAITING FOR OFFICE</span></div><span id="officeRouteDesktopHelp">KEEP OFFICE OPEN • BACKGROUND OR MINIMIZED IS OK</span>';const header=document.querySelector('.topright');if(header){toolbar.className='inHeader';header.prepend(toolbar);document.querySelector('.topbar')?.classList.add('hasOfficeRouteAlerts')}else document.body.appendChild(toolbar);
+ const panel=document.createElement('section');panel.id='officeRouteAlertPanel';panel.hidden=true;panel.setAttribute('aria-label','Office route alerts');panel.setAttribute('aria-live','assertive');panel.innerHTML='<h2>NWTB DRIVER ROUTE ALERT</h2><p class="hint">Return notices sound for 7 seconds when sound is enabled. Enable desktop alerts for a pop-up while Office is in the background. Keep Office open. Alerts stay here until acknowledged.</p><div id="officeRouteAlertRows"></div><button id="officeRouteAlertAck" type="button">ACKNOWLEDGE ALERTS</button>';document.body.appendChild(panel);
+ document.getElementById('officeRouteSoundEnable').onclick=enableSound;document.getElementById('officeRouteDesktopEnable').onclick=enableDesktop;document.getElementById('officeRouteAlertAck').onclick=acknowledge;document.getElementById('officeRouteAlertBadge').onclick=openAlertPanel;
  document.getElementById('officeRouteSoundMute').onclick=()=>{muted=!muted;try{localStorage.setItem(MUTED,muted?'1':'0')}catch{}if(muted)stopSound();else if(waitingForSound)enableSound();soundState()};render()
 }
 async function poll(){
@@ -50,12 +87,12 @@ async function poll(){
   const session=token(),bootstrap=!primed&&last===0;
   const r=await fetch(TRACK,{method:'POST',cache:'no-store',headers:{'content-type':'application/json','apikey':KEY,'x-nwtb-session':session},body:JSON.stringify({action:'office_route_alerts',after_id:last,include_returns:true,bootstrap})});
   const j=await r.json().catch(()=>({error:'Invalid alert response.'}));if(!r.ok)throw Error(j.error||'Could not check route alerts.');if(session!==token())return;
-  const events=Array.isArray(j.events)?j.events:[];let sound=false;
-  for(const ev of events){const id=Number(ev?.id);if(!Number.isFinite(id)||id<=last||!TYPES.has(ev.event_type)||pending.some(x=>Number(x.id)===id))continue;if(ev.event_type==='ROUTE_COMPLETED'&&!ev.return_depot)continue;pending.push(ev);if(ev.event_type==='ROUTE_COMPLETED')sound=true}
-  pending=pending.slice(-100);last=Math.max(last,Number(j.last_id)||0,...events.map(e=>Number(e.id)||0));primed=true;persist();render();connection('ALERTS LIVE');if(sound)playSound();if(!j.has_more)break
+  const events=Array.isArray(j.events)?j.events:[],returns=[];
+  for(const ev of events){const id=Number(ev?.id);if(!Number.isFinite(id)||id<=last||!TYPES.has(ev.event_type)||pending.some(x=>Number(x.id)===id))continue;if(ev.event_type==='ROUTE_COMPLETED'&&!ev.return_depot)continue;pending.push(ev);if(ev.event_type==='ROUTE_COMPLETED')returns.push(ev)}
+  pending=pending.slice(-100);last=Math.max(last,Number(j.last_id)||0,...events.map(e=>Number(e.id)||0));primed=true;persist();render();connection('ALERTS LIVE');for(const ev of returns)desktopNotice(ev);if(returns.length)playSound();if(!j.has_more)break
  }}catch(e){connection('ALERT CHECK DELAYED');console.warn('Office route alert poll failed',e)}finally{busy=false}
 }
-window.NWTBOfficeRouteAlerts={poll,enableSound,acknowledge,stopSound};
-function boot(){ensure();poll();setInterval(poll,5000);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){soundState();poll()}})}
+window.NWTBOfficeRouteAlerts={poll,enableSound,enableDesktop,acknowledge,stopSound};
+function boot(){ensure();poll();setInterval(poll,5000);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){soundState();desktopState();poll()}})}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
