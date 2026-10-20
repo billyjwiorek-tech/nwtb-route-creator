@@ -17,7 +17,7 @@ jobs:
           POSTGRES_PASSWORD: fixture
         ports: ['5432:5432']
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
@@ -30,8 +30,16 @@ jobs:
           node-version: '24'
       - run: npm ci --prefix tests
       - run: npm --prefix tests test
-      - name: Check migration CLI
+      - name: Generate and validate return migration in disposable database
         run: |
-          npx --yes supabase@2.121.0 --help
-          npx --yes supabase@2.121.0 migration --help
-          npx --yes supabase@2.121.0 migration new --help
+          if [ -f supabase/changes/preserve_return_leg_until_confirmation.sql ]; then
+            npx --yes supabase@2.121.0 migration new preserve_return_leg_until_confirmation
+            route_migration_path=$(rg --files supabase/migrations | rg '_preserve_return_leg_until_confirmation.sql$')
+            cp supabase/changes/preserve_return_leg_until_confirmation.sql "$route_migration_path"
+          else
+            route_migration_path=$(rg --files supabase/migrations | rg '_preserve_return_leg_until_confirmation.sql$')
+          fi
+          printf 'RETURN_MIGRATION_PATH=%s\n' "$route_migration_path"
+          psql "$FIXTURE_DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/route-return-fixture-schema.sql
+          psql "$FIXTURE_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$route_migration_path"
+          psql "$FIXTURE_DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/route-return-db.test.sql
