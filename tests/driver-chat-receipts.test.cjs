@@ -104,7 +104,7 @@ function surface({office=false,messages=[message(1)],hidden=false,audioReady=tru
   const dangerous='<img src=x onerror=alert(1)>';const f=surface({messages:[message(1,'1234',dangerous)]});await settle();eq(f.get('nwtbDriverChatNoticeBody').textContent,dangerous,'Popup treats message body as text');eq(f.get('nwtbDriverChatNoticeBody').querySelector('img'),null,'Message markup cannot execute');await f.show();eq(f.get('nwtbDriverChatMsgs').querySelector('img'),null,'Drawer escapes message markup too');
  }
  {
-  const shared=[message(1)],office=surface({office:true,messages:shared});await settle();await office.refresh();ok(office.get('dclMsgs').textContent.includes('SENT — AWAITING DRIVER'),'Dispatch initially shows awaiting receipt');
+  const shared=[message(1)],office=surface({office:true,messages:shared});await office.tick(1);await office.refresh();ok(office.get('dclMsgs').textContent.includes('SENT — AWAITING DRIVER'),'Dispatch initially shows awaiting receipt');
   const driver=surface({messages:shared});await settle();await driver.click('nwtbDriverChatSeen');await office.tick(4000);ok(office.get('dclMsgs').textContent.includes('SEEN BY DRIVER'),'Dispatch poll refreshes receipt after Driver acknowledgment');ok(office.get('dclMsgs').querySelector('.dclReceipt.seen'),'Seen receipt has distinct visual state');ok(office.requests.every(r=>r.token==='office-fixture'),'Dispatch chat continues using only Office token');
  }
  {
