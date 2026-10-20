@@ -30,15 +30,10 @@ jobs:
           node-version: '24'
       - run: npm ci --prefix tests
       - run: npm --prefix tests test
-      - name: Generate and validate return migration in disposable database
+      - name: Validate return migration in disposable database
         run: |
-          if [ -f supabase/changes/preserve_return_leg_until_confirmation.sql ]; then
-            npx --yes supabase@2.121.0 migration new preserve_return_leg_until_confirmation
-            route_migration_path=$(rg --files supabase/migrations | rg '_preserve_return_leg_until_confirmation.sql$')
-            cp supabase/changes/preserve_return_leg_until_confirmation.sql "$route_migration_path"
-          else
-            route_migration_path=$(rg --files supabase/migrations | rg '_preserve_return_leg_until_confirmation.sql$')
-          fi
+          route_migration_path=$(find supabase/migrations -maxdepth 1 -type f -name '*_preserve_return_leg_until_confirmation.sql' -print -quit)
+          test -n "$route_migration_path"
           printf 'RETURN_MIGRATION_PATH=%s\n' "$route_migration_path"
           psql "$FIXTURE_DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/route-return-fixture-schema.sql
           psql "$FIXTURE_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$route_migration_path"
