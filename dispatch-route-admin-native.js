@@ -37,8 +37,10 @@ async function openOfficeRoute(request){
   clearBanner('routeMsg');
   const r=j.route,stops=(j.stops||[]).slice().sort((a,b)=>Number(a.stop_sequence)-Number(b.stop_sequence)),mapModel=window.NWTBOfficeRouteMap.model(r,stops);
   window.__lastOfficeRouteId=r.id;
+  const returning=r.status==='ACTIVE'&&!!r.returning_started_at&&!r.returned_at;
+  const phase=returning?(r.end_mode==='RETURN_DEPOT'||!r.end_mode||/NWTB|NORTHWEST TRUCKS/i.test(r.end_name||'')?'RETURNING TO NWTB':'RETURN LEG IN PROGRESS'):r.status;
   const releaseState=r.status==='ACTIVE'
-    ?'<div class="releaseGate active"><b>ACTIVE ROUTE</b><span>This route is already active in the driver app.</span></div>'
+    ?'<div class="releaseGate active"><b>'+(returning?esc(phase):'ACTIVE ROUTE')+'</b><span>'+(returning?'Stops are finished. The return leg remains active until the driver confirms arrival.':'This route is already active in the driver app.')+'</span></div>'
     :r.status==='PLANNED'&&r.released_to_driver
       ?'<div class="releaseGate released"><b>RELEASED TO DRIVER</b><span>The driver can see this planned route now.</span><button class="btn ghost" onclick="holdOfficeRoute(\''+r.id+'\')">HOLD FROM DRIVER</button></div>'
       :r.status==='PLANNED'
@@ -46,7 +48,7 @@ async function openOfficeRoute(request){
         :'<div class="releaseGate"><b>'+esc(r.status||'ROUTE')+'</b><span>No driver-release action is available for this route status.</span></div>';
   const drive=r.drive_minutes!=null?Number(r.drive_minutes):null,svc=r.service_minutes!=null?Number(r.service_minutes):null,total=r.estimated_minutes!=null?Number(r.estimated_minutes):null,retMi=r.return_miles!=null?Number(r.return_miles):null,retMin=r.return_minutes!=null?Number(r.return_minutes):null;
   document.getElementById('routeModalTitle').textContent='OFFICE ROUTE SCREEN • '+r.route_date;
-  document.getElementById('routeModalSub').textContent='READ ONLY • '+r.status+' • '+r.wave+' • '+r.driver_name+' • '+(r.depot||'BOLINGBROOK')+(mapModel.end?' • START / RETURN':' • ENDS AT LAST STOP');
+  document.getElementById('routeModalSub').textContent='READ ONLY • '+phase+' • '+r.wave+' • '+r.driver_name+' • '+(r.depot||'BOLINGBROOK')+(mapModel.end?' • START / RETURN':' • ENDS AT LAST STOP');
   document.getElementById('routeModalBody').dataset.officeRouteMode='preview';
   document.getElementById('routeModalBody').innerHTML=
    '<div class="banner show ok" style="margin-top:12px"><b>READ-ONLY OFFICE PREVIEW</b> — opening this screen does not start the route, create a driver session, change route status, or affect the driver’s 4-digit login.</div>'+releaseState+

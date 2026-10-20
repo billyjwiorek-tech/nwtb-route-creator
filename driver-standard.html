@@ -137,10 +137,10 @@ async function loadRoutes(){
   $('routes').innerHTML=routes.map(r=>{
    const status=String(r.status||'PLANNED').toUpperCase(),date=String(r.route_date||''),depot=String(r.depot||'BOLINGBROOK').toUpperCase(),drive=r.drive_minutes!=null?' • '+Math.round(Number(r.drive_minutes))+' drive min':'',svc=r.service_minutes!=null?' • '+Math.round(Number(r.service_minutes))+' service min':'';
    let label='PLANNED ROUTE',labelClass='planned';
-   if(status==='ACTIVE'){label='ACTIVE ROUTE';labelClass='active'}
+   if(status==='ACTIVE'){label=r.returning_started_at&&!r.returned_at?returnRouteLabel(r):'ACTIVE ROUTE';labelClass='active'}
    else if(date===today){todayPlanned++;label=todayPlanned===1?'NEXT ROUTE TODAY':'PLANNED ROUTE '+todayPlanned+' TODAY'}
    else if(date>today)label='FUTURE PRE-ROUTE';
-   const button=status==='ACTIVE'?'CONTINUE ACTIVE ROUTE':'OPEN ROUTE';
+   const button=status==='ACTIVE'?(r.returning_started_at&&!r.returned_at?'CONTINUE RETURN ROUTE':'CONTINUE ACTIVE ROUTE'):'OPEN ROUTE';
    return '<div class="panel"><div style="font-size:11px;font-weight:950;color:'+(status==='ACTIVE'?'#067647':'#175cd3')+';margin-bottom:5px">'+esc(label)+'</div><b>'+esc(date)+' • '+esc(depot)+' START / RETURN • '+esc(r.wave||'ROUTE')+'</b><br><span class="status '+labelClass+'">'+esc(status)+'</span>'+(r.estimated_miles!=null?' <span class="small">• '+Number(r.estimated_miles).toFixed(1)+' mi'+drive+svc+'</span>':'')+'<br><button class="btn '+(status==='ACTIVE'?'green':'blue')+'" onclick="openRoute(\''+r.id+'\')">'+button+'</button></div>'
   }).join('')||'<div class="panel">No planned or active route is assigned to your employee number.</div>'
  }catch(e){$('routes').innerHTML='<div class="panel warn">'+esc(e.message)+'</div>'}
@@ -152,17 +152,26 @@ async function openRoute(id,fromChange=false){
   const stops=j.stops||[],r=j.route||{},state=stateResp.route||r||{};currentRouteState=state;currentPaused=!!state.paused;
   const links=routeLinks(r,stops),pts=stops.map(s=>s.delivery_orders||{}),ep=routeEndpoints(r,pts.map(o=>({name:o.customer_name||'Stop',address:o.address||''})));
   const status=String(state.status||r.status||'PLANNED').toUpperCase();
+  const returning=status==='ACTIVE'&&!!(state.returning_started_at||r.returning_started_at)&&!(state.returned_at||r.returned_at)&&stops.length>0&&stops.every(s=>['DELIVERED','NOT_DELIVERED','SKIPPED'].includes(s.status));
   let controls='<button class="btn ghost" onclick="loadRoutes()">← BACK</button>';
   if(status==='PLANNED')controls+=' <button class="btn green" onclick="startRoute(\''+id+'\')">START ROUTE</button>';
   if(status==='ACTIVE'&&!currentPaused)controls+=' <button class="btn amber" onclick="openPauseModal()">PAUSE ROUTE</button>';
   if(currentPaused)controls+=' <button class="btn green" onclick="resumePausedRoute()">RESUME ROUTE</button>';
-  const routeStatus=currentPaused?'PAUSED':status;
+  if(returning&&!currentPaused)controls+=' <button id="nwtbFinishReturn" class="btn green" onclick="confirmReturn()">I AM BACK — FINISH ROUTE</button>';
+  const routeStatus=currentPaused?'PAUSED':returning?returnRouteLabel(r):status;
   const metrics=(r.estimated_miles!=null?Number(r.estimated_miles).toFixed(1)+' total mi':'')+(r.drive_minutes!=null?' • '+r.drive_minutes+' drive min':'')+(r.service_minutes!=null?' • '+r.service_minutes+' service min':'')+(r.return_miles!=null?' • return '+Number(r.return_miles).toFixed(1)+' mi / '+Math.round(Number(r.return_minutes||0))+' min':'');
-  let top='<div class="panel">'+controls+'<div class="routeMeta"><b>'+esc(ep.label)+':</b> '+esc(ep.startText)+'<br><span class="small">'+esc(ep.startAddress||'')+'</span><br><b>DEPOT:</b> '+esc(ep.depot)+(metrics?'<br><span class="small">'+esc(metrics)+'</span>':'')+'<br><span class="status '+routeStatus.toLowerCase()+'">'+esc(routeStatus)+'</span></div><div style="margin-top:10px">'+links.map(x=>'<a class="btn return" target="_blank" rel="noopener" href="'+x.url+'" style="margin:4px 4px 4px 0">'+esc(x.label)+'</a>').join('')+'</div>'+(currentPaused?'<div class="pauseBox paused"><b>ROUTE PAUSED</b><div class="pauseReason">'+esc(state.pause_reason||'Reason sent to Dispatch.')+'</div><div class="small" style="margin-top:5px">Stop completion is disabled until the route is resumed.</div></div>':'')+'</div>';
+  let top='<div class="panel">'+controls+'<div class="routeMeta"><b>'+esc(ep.label)+':</b> '+esc(ep.startText)+'<br><span class="small">'+esc(ep.startAddress||'')+'</span><br><b>DEPOT:</b> '+esc(ep.depot)+(metrics?'<br><span class="small">'+esc(metrics)+'</span>':'')+'<br><span class="status '+(currentPaused?'paused':status.toLowerCase())+'">'+esc(routeStatus)+'</span></div><div style="margin-top:10px">'+links.map(x=>'<a class="btn return" target="_blank" rel="noopener" href="'+x.url+'" style="margin:4px 4px 4px 0">'+esc(x.label)+'</a>').join('')+'</div>'+(currentPaused?'<div class="pauseBox paused"><b>ROUTE PAUSED</b><div class="pauseReason">'+esc(state.pause_reason||'Reason sent to Dispatch.')+'</div><div class="small" style="margin-top:5px">Stop completion is disabled until the route is resumed.</div></div>':'')+'</div>';
   const stopHtml=stops.map(s=>{const o=s.delivery_orders||{},nav='https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent((o.customer_name||'')+', '+(o.address||''))+'&travelmode=driving&dir_action=navigate',pending=s.status==='PENDING';let completion='';if(pending&&currentPaused)completion='<div class="disabledNote">Route is paused. Resume before completing this stop.</div>';else if(pending)completion='<div class="actions"><button class="btn green" onclick="finish(\''+s.id+'\',\'DELIVERED\')">COMPLETE</button><button class="btn red" onclick="finish(\''+s.id+'\',\'NOT_DELIVERED\')">NOT COMPLETED</button></div>';else completion='<div style="margin-top:9px"><b>'+esc(s.status)+'</b></div>';return '<div class="stop"><div class="stopHead"><div><div class="stopName">STOP '+esc(s.stop_sequence)+': '+esc(o.customer_name||'Stop')+'</div><span class="pill">'+esc(o.stop_type||'STOP')+'</span></div></div><div class="address">'+esc(o.address||'')+'</div>'+(o.notes?'<div class="notes small">'+esc(o.notes)+'</div>':'')+'<div class="actions"><a class="btn blue" target="_blank" rel="noopener" href="'+nav+'">NAVIGATE</a></div>'+completion+'</div>'}).join('');
-  $('routes').innerHTML=top+stopHtml;
+  const returnNotice=returning?'<div class="panel" style="border:2px solid #12b76a;background:#ecfdf3"><b>'+esc(returnRouteLabel(r))+'</b><p>Your stops are finished. The route and return leg remain active until you are back at '+esc(r.end_name||'NWTB '+(r.depot||'BOLINGBROOK'))+'.</p><p>Only after arriving, click <b>I AM BACK — FINISH ROUTE</b>.</p></div>':'';
+  $('routes').innerHTML=top+returnNotice+stopHtml;
   startChangePolling(id);
  }catch(e){alert(e.message)}
+}
+function returnRouteLabel(r){return r.end_mode==='RETURN_DEPOT'||!r.end_mode||/NWTB|NORTHWEST TRUCKS/i.test(r.end_name||'')?'RETURNING TO NWTB':'RETURN LEG IN PROGRESS'}
+async function confirmReturn(){
+ const id=route;if(!id||currentRouteState?.status!=='ACTIVE')return;
+ if(!confirm('Are you back at the assigned return location?\n\nOnly finish the route after you have arrived back.'))return;
+ try{await post(ROUTE_API,{action:'route_return_driver',route_id:id,returned:true});if(route!==id)return;window.nwtbStopNavigation?.();window.nwtbStopBuiltInTracking?.();await loadRoutes()}catch(e){alert(e.message||'Could not finish the return leg.')}
 }
 async function startRoute(id){await enableAlerts(false);try{await post(ROUTE_API,{action:'route_start_driver',route_id:id,driver_employee_number:driver});route=id;await openRoute(id)}catch(e){alert(e.message)}}
 async function finish(id,status){if(currentPaused){alert('This route is paused. Resume the route before completing stops.');return}let note='';if(status==='NOT_DELIVERED')note=prompt('Reason / note:')||'';try{await post(ROUTE_API,{action:'stop_status_driver',stop_id:id,status,note});openRoute(route)}catch(e){alert(e.message)}}

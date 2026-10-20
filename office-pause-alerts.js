@@ -1,12 +1,13 @@
 (function(){
 'use strict';
 // One Office alert host across all views; embedded Dispatch must not sound a second alarm.
-try{if(window.parent!==window&&window.parent.NWTBOfficeAlertsHost)return}catch{}
+try{let host=window.parent;while(host&&host!==window){if(host.NWTBOfficeAlertsHost)return;const next=host.parent;if(next===host)break;host=next}}catch{}
 if(window.NWTBOfficeRouteAlerts)return;
 const TRACK='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-delivery-tracking';
 const KEY='sb_publishable_EqF-iooqhmngSG5BbzOxfQ_Vnf9Altc';
 const CURSOR='nwtb_office_route_alert_cursor_v2',PENDING='nwtb_office_route_alert_pending_v2',MUTED='nwtb_office_route_alert_muted_v2';
-const TYPES=new Set(['ROUTE_PAUSED','ROUTE_RESUMED','ROUTE_COMPLETED']);
+const TYPES=new Set(['ROUTE_PAUSED','ROUTE_RESUMED','ROUTE_RETURNING','ROUTE_COMPLETED']);
+const isReturn=e=>e?.event_type==='ROUTE_RETURNING'||e?.event_type==='ROUTE_COMPLETED';
 const RETURN_TITLE='DRIVER IS ON THEIR WAY BACK TO NWTB';
 const desktopNotices=new Map();
 let desktopError='';
@@ -65,10 +66,10 @@ async function enableDesktop(){
   desktopState();if(window.Notification.permission==='granted')desktopNotice(null,true)
  }catch{desktopError='COULD NOT ENABLE DESKTOP ALERTS — CHECK BROWSER SETTINGS';desktopState()}
 }
-function title(e){if(e.event_type==='ROUTE_COMPLETED')return RETURN_TITLE;return e.event_type==='ROUTE_PAUSED'?'ROUTE PAUSED':'ROUTE RESUMED'}
-function description(e){if(e.event_type==='ROUTE_COMPLETED')return ('FINAL STOP MARKED COMPLETE. ASSIGNED RETURN LEG: '+(e.return_depot_name||'NWTB')+'.').toUpperCase();return e.event_type==='ROUTE_PAUSED'?e.note||'Driver paused the route.':'Driver resumed the route.'}
+function title(e){if(isReturn(e))return RETURN_TITLE;return e.event_type==='ROUTE_PAUSED'?'ROUTE PAUSED':'ROUTE RESUMED'}
+function description(e){if(isReturn(e))return ('FINAL STOP MARKED COMPLETE. ASSIGNED RETURN LEG: '+(e.return_depot_name||'NWTB')+'.').toUpperCase();return e.event_type==='ROUTE_PAUSED'?e.note||'Driver paused the route.':'Driver resumed the route.'}
 function time(value){try{return new Date(value).toLocaleString('en-US',{timeZone:'America/Chicago',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})+' CT'}catch{return String(value||'')}}
-function render(){const panel=document.getElementById('officeRouteAlertPanel'),rows=document.getElementById('officeRouteAlertRows'),badge=document.getElementById('officeRouteAlertBadge');if(!panel||!rows)return;rows.innerHTML=pending.slice().reverse().map(e=>'<article class="officeRouteAlert '+(e.event_type==='ROUTE_COMPLETED'?'returning':'')+'"><strong>'+esc(title(e))+' — '+esc(e.event_type==='ROUTE_COMPLETED'?String(e.driver_name||e.employee_number||'Driver').toUpperCase():e.driver_name||e.employee_number||'Driver')+'</strong><p>'+esc(description(e))+'</p><small>'+esc(time(e.created_at))+'</small></article>').join('');badge.textContent='ROUTE ALERTS'+(pending.length?' ('+pending.length+')':'');badge.classList.toggle('unread',pending.length>0);panel.hidden=pending.length===0;soundState();desktopState()}
+function render(){const panel=document.getElementById('officeRouteAlertPanel'),rows=document.getElementById('officeRouteAlertRows'),badge=document.getElementById('officeRouteAlertBadge');if(!panel||!rows)return;rows.innerHTML=pending.slice().reverse().map(e=>'<article class="officeRouteAlert '+(isReturn(e)?'returning':'')+'"><strong>'+esc(title(e))+' — '+esc(isReturn(e)?String(e.driver_name||e.employee_number||'Driver').toUpperCase():e.driver_name||e.employee_number||'Driver')+'</strong><p>'+esc(description(e))+'</p><small>'+esc(time(e.created_at))+'</small></article>').join('');badge.textContent='ROUTE ALERTS'+(pending.length?' ('+pending.length+')':'');badge.classList.toggle('unread',pending.length>0);panel.hidden=pending.length===0;soundState();desktopState()}
 function acknowledge(){pending=[];waitingForSound=false;persist();for(const notice of desktopNotices.values()){try{notice.close()}catch{}}desktopNotices.clear();stopSound();render()}
 function ensure(){if(document.getElementById('officeRouteAlertToolbar'))return;
  const s=document.createElement('style');s.id='officeRouteAlertStyle';s.textContent=`
@@ -88,7 +89,7 @@ async function poll(){
   const r=await fetch(TRACK,{method:'POST',cache:'no-store',headers:{'content-type':'application/json','apikey':KEY,'x-nwtb-session':session},body:JSON.stringify({action:'office_route_alerts',after_id:last,include_returns:true,bootstrap})});
   const j=await r.json().catch(()=>({error:'Invalid alert response.'}));if(!r.ok)throw Error(j.error||'Could not check route alerts.');if(session!==token())return;
   const events=Array.isArray(j.events)?j.events:[],returns=[];
-  for(const ev of events){const id=Number(ev?.id);if(!Number.isFinite(id)||id<=last||!TYPES.has(ev.event_type)||pending.some(x=>Number(x.id)===id))continue;if(ev.event_type==='ROUTE_COMPLETED'&&!ev.return_depot)continue;pending.push(ev);if(ev.event_type==='ROUTE_COMPLETED')returns.push(ev)}
+  for(const ev of events){const id=Number(ev?.id);if(!Number.isFinite(id)||id<=last||!TYPES.has(ev.event_type)||pending.some(x=>Number(x.id)===id))continue;if(isReturn(ev)&&!ev.return_depot)continue;pending.push(ev);if(isReturn(ev))returns.push(ev)}
   pending=pending.slice(-100);last=Math.max(last,Number(j.last_id)||0,...events.map(e=>Number(e.id)||0));primed=true;persist();render();connection('ALERTS LIVE');for(const ev of returns)desktopNotice(ev);if(returns.length)playSound();if(!j.has_more)break
  }}catch(e){connection('ALERT CHECK DELAYED');console.warn('Office route alert poll failed',e)}finally{busy=false}
 }
