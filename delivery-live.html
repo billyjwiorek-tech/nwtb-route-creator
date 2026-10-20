@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>NWTB Delivery Operations — Optimized GPS</title>
+<script>window.NWTBOfficeAlertsHost=true;</script>
 <style>
 :root{--nav:#0f172a;--nav2:#0b1220;--ink:#182230;--muted:#667085;--line:#e4e7ec;--page:#f4f6f8;--card:#fff;--blue:#2563eb;--shadow:0 12px 34px rgba(16,24,40,.08);--soft:0 4px 16px rgba(16,24,40,.06)}
 *{box-sizing:border-box}html,body{height:100%;margin:0;font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;color:var(--ink);background:var(--page)}
@@ -59,7 +60,7 @@ button{font:inherit}.app{min-height:100vh;display:grid;grid-template-columns:230
     </div>
    </div>
   </section>
-  <section id="dispatch" class="view"><div class="pageIntro"><div><h2>Dispatch</h2><p>Create stops, optimize routes and assign drivers.</p></div><span class="chip">AUTO MULTI-DRIVER • PER-DRIVER DEPOT</span></div><div class="frameWrap"><iframe id="fDispatch" src="dispatch-native.html?v=20261015-officemap2" title="Dispatch"></iframe></div></section>
+  <section id="dispatch" class="view"><div class="pageIntro"><div><h2>Dispatch</h2><p>Create stops, optimize routes and assign drivers.</p></div><span class="chip">AUTO MULTI-DRIVER • PER-DRIVER DEPOT</span></div><div class="frameWrap"><iframe id="fDispatch" src="dispatch-native.html?v=20261020-return1" title="Dispatch"></iframe></div></section>
   <section id="drivers" class="view"><div class="pageIntro"><div><h2>Live Drivers</h2><p>View active driver locations from the NWTB built-in GPS engine.</p></div><span class="chip">REAL-TIME GPS</span></div><div class="frameWrap"><iframe id="fTracker" src="tracker-live.html?v=20260925-1135" title="Live Drivers"></iframe></div></section><section id="driver" class="view"><div class="pageIntro"><div><h2>Driver View</h2><p>Preview the mobile route experience used in the field.</p></div><span class="chip">4-DIGIT DRIVER • LIVE GPS</span></div><div class="frameWrap"><iframe id="fDriver" src="driver-live.html?v=20261020-map1" title="Driver View"></iframe></div></section>
   <section id="chat" class="view"><div class="pageIntro"><div><h2>Delivery / Pickup Chat</h2><p>Operations-only messaging.</p></div><span class="chip">SEPARATE FROM SALES</span></div><div class="frameWrap"><iframe id="fChat" src="dispatch.html?v=20261015-releasegate2#chat" title="Delivery Pickup Chat"></iframe></div></section>
   <section id="admin" class="view"><div class="pageIntro"><div><h2>Administration</h2><p>Manage Delivery customer and vendor master data.</p></div><span class="chip">MASTER DATA</span></div><div class="frameWrap"><iframe id="fAdmin" src="dispatch.html?v=20261015-releasegate2#data" title="Master Data"></iframe></div></section>
@@ -92,6 +93,7 @@ function syncKpis(){const d=getDispatchDoc();if(!d)return;const map={kUn:'stUn',
 setInterval(syncKpis,5000);
 const initial=location.hash.replace('#','');if(titles[initial])openView(initial);else openView('dashboard');
 </script>
+<script src="office-pause-alerts.js?v=20261020-return1"></script>
 <script src="nwtb-system-lock-live.js?v=20260929-1200" data-control="1"></script>
 <div style="position:fixed;right:8px;bottom:5px;font:8px Arial;color:#98a2b3;z-index:99999;pointer-events:none">NWTB OPTIMIZED GPS NATIVE</div></body>
 </html>
