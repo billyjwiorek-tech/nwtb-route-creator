@@ -34,11 +34,26 @@ async function currentBatch(kind:'CUSTOMER'|'VENDOR'){
  const {data}=await db.from('delivery_master_versions').select('current_batch').eq('kind',kind).maybeSingle()
  return data?.current_batch||null
 }
-async function geocode(address:string){
- try{const q=address.trim();if(!q)return null
-  const r=await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=us&q='+encodeURIComponent(q),{headers:{'User-Agent':'NWTB-Delivery-Manager/1.0','Accept':'application/json'}})
-  if(!r.ok)return null;const a=await r.json();const h=Array.isArray(a)?a[0]:null;if(!h)return null
-  const lat=Number(h.lat),lon=Number(h.lon);return Number.isFinite(lat)&&Number.isFinite(lon)?{lat,lon,display_name:h.display_name||q}:null
+function resolvedGeocode(hit:any,address:string,source:string){
+ if(hit?.lat===null||hit?.lat===undefined||hit?.lat===''||hit?.lon===null||hit?.lon===undefined||hit?.lon==='')return null
+ const lat=Number(hit.lat),lon=Number(hit.lon)
+ if(!Number.isFinite(lat)||!Number.isFinite(lon)||lat<20||lat>60||lon<-135||lon>-55)return null
+ return {lat,lon,display_name:txt(hit.matched_address||hit.display_name||address,320),source:txt(hit.source,80)||source}
+}
+async function geocode(address:string,sessionToken:string){
+ const q=address.trim();if(!q||!sessionToken)return null
+ // Share the authenticated multi-source resolver with the Custom Route Builder.
+ // ADD STOP, frequent locations and legacy creation paths all enter here.
+ try{
+  const r=await fetch(url+'/functions/v1/nwtb-custom-geocoder-v2',{method:'POST',headers:{'content-type':'application/json','x-nwtb-session':sessionToken},body:JSON.stringify({address:q}),signal:AbortSignal.timeout(12000)})
+  if(r.ok){const hit=await r.json();const match=hit?.ok===true?resolvedGeocode(hit,q,'NWTB_CUSTOM_GEOCODER_V2'):null;if(match)return match}
+  else if(r.status===404)return null
+ }catch{}
+ // Retain the old provider as a bounded fallback for resolver outages.
+ // Public geocoders receive only the address, never the employee session.
+ try{
+  const r=await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=us&q='+encodeURIComponent(q),{headers:{'User-Agent':'NWTB-Delivery-Manager/1.0','Accept':'application/json'},signal:AbortSignal.timeout(5000)})
+  if(!r.ok)return null;const a=await r.json();return resolvedGeocode(Array.isArray(a)?a[0]:null,q,'NOMINATIM')
  }catch{return null}
 }
 function searchTokens(raw:string){return [...new Set(raw.toUpperCase().match(/[A-Z0-9]+/g)||[])].filter(x=>x.length>=2).slice(0,6)}
@@ -109,12 +124,12 @@ Deno.serve(async(req:Request)=>{
  if(action==='saved_location_create'){
   const source_type=txt(input?.source_type,20),name=txt(input?.name,180),address=txt(input?.address,240)
   if(!['CUSTOMER','VENDOR','OTHER'].includes(source_type)||!name||!address)return reply(req,{error:'Name, address and source type are required.'},400)
-  let lat=Number(input?.lat),lon=Number(input?.lon);if(!Number.isFinite(lat)||!Number.isFinite(lon)){const g=await geocode(address);lat=g?.lat??NaN;lon=g?.lon??NaN}
+  let lat=Number(input?.lat),lon=Number(input?.lon);if(!Number.isFinite(lat)||!Number.isFinite(lon)){const g=await geocode(address,session.token);lat=g?.lat??NaN;lon=g?.lon??NaN}
   const row={source_type,source_ref:txt(input?.source_ref,60)||null,location_code:txt(input?.location_code,80)||null,name,address,phone:txt(input?.phone,60)||null,lat:Number.isFinite(lat)?lat:null,lon:Number.isFinite(lon)?lon:null,instructions:txt(input?.instructions,1000)||null,hours:txt(input?.hours,200)||null,frequent:input?.frequent!==false,verified:!!input?.verified,created_by:session.employee_number,updated_at:now()}
   const {data,error}=await db.from('delivery_saved_locations').insert(row).select('*').single();if(error)return reply(req,{error:'Could not save location.'},500);return reply(req,{ok:true,location:data})
  }
  if(action==='geocode'){
-  const address=txt(input?.address,240);if(!address)return reply(req,{error:'Address required.'},400);const g=await geocode(address);if(!g)return reply(req,{error:'Address could not be geocoded.'},404);return reply(req,{ok:true,...g})
+  const address=txt(input?.address,240);if(!address)return reply(req,{error:'Address required.'},400);const g=await geocode(address,session.token);if(!g)return reply(req,{error:'Address could not be geocoded.'},404);return reply(req,{ok:true,...g})
  }
  if(action==='orders_list'){
   const statuses=Array.isArray(input?.statuses)?input.statuses.map((x:any)=>String(x)).slice(0,10):[];let q=db.from('delivery_orders').select('*').order('priority',{ascending:false}).order('promised_by',{ascending:true,nullsFirst:false}).order('created_at',{ascending:true}).limit(500);if(statuses.length)q=q.in('status',statuses)
@@ -124,7 +139,7 @@ Deno.serve(async(req:Request)=>{
   const customer_name=txt(input?.customer_name,180),address=txt(input?.address,240),stop_type=txt(input?.stop_type||'CUSTOMER_DELIVERY',40),source_type=txt(input?.source_type||'CUSTOMER',20)
   if(!customer_name||!address)return reply(req,{error:'Stop name and address are required.'},400);if(!['CUSTOMER_DELIVERY','CUSTOMER_PICKUP','VENDOR_PICKUP','CORE_RETURN_PICKUP','OTHER'].includes(stop_type))return reply(req,{error:'Invalid stop type.'},400);if(!['CUSTOMER','VENDOR','OTHER'].includes(source_type))return reply(req,{error:'Invalid source type.'},400)
   const priority=txt(input?.priority||'NORMAL',20);if(!['NORMAL','PRIORITY','HOT_SHOT'].includes(priority))return reply(req,{error:'Invalid priority.'},400)
-  let lat=Number(input?.lat),lon=Number(input?.lon);if(!Number.isFinite(lat)||!Number.isFinite(lon)){const g=await geocode(address);lat=g?.lat??NaN;lon=g?.lon??NaN}
+  let lat=Number(input?.lat),lon=Number(input?.lon);if(!Number.isFinite(lat)||!Number.isFinite(lon)){const g=await geocode(address,session.token);lat=g?.lat??NaN;lon=g?.lon??NaN}
   const pieces=Math.max(0,Math.min(9999,Number(input?.pieces)||0)),row={sales_order_no:txt(input?.sales_order_no,60)||null,reference_no:txt(input?.reference_no,80)||null,customer_number:txt(input?.customer_number,60)||null,customer_name,address,lat:Number.isFinite(lat)?lat:null,lon:Number.isFinite(lon)?lon:null,phone:txt(input?.phone,60)||null,pieces,priority,promised_by:input?.promised_by||null,notes:txt(input?.notes,1500)||null,created_by:session.employee_number,stop_type,source_type,source_ref:txt(input?.source_ref,60)||null,saved_location_id:txt(input?.saved_location_id,60)||null}
   const {data,error}=await db.from('delivery_orders').insert(row).select('*').single();if(error)return reply(req,{error:'Could not create stop.'},500);await db.from('delivery_events').insert({order_id:data.id,employee_number:session.employee_number,event_type:'STOP_CREATED',note:stop_type});return reply(req,{ok:true,order:data})
  }
