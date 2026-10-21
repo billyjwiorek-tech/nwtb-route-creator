@@ -10,7 +10,7 @@ function show(ev){
  const bar=document.getElementById('routeAlert');if(bar){bar.className='alertbar show';bar.style.background='#7c3aed';bar.innerHTML='ROUTE RE-OPTIMIZED BY DISPATCH<div class="sub">'+String(ev.note||'Your remaining stop order changed.').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))+'</div>';setTimeout(()=>{bar.className='alertbar';bar.style.background=''},10000)}
  try{if(typeof playAlertTone==='function')playAlertTone(true)}catch{}
  try{if(navigator.vibrate)navigator.vibrate([350,120,350,120,650])}catch{}
- if('Notification'in window&&Notification.permission==='granted'){try{new Notification('NWTB — ROUTE UPDATED',{body:ev.note||'Dispatch re-optimized your remaining stops.',tag:'nwtb-priority-'+String(typeof route!=='undefined'?route:''),renotify:true})}catch{}}
+ window.NWTBNotifications?.show('NWTB — ROUTE UPDATED',{body:ev.note||'Dispatch re-optimized your remaining stops.',tag:'nwtb-priority-'+String(typeof route!=='undefined'?route:''),renotify:true});
 }
 async function check(){
  if(busy)return;

@@ -7,7 +7,7 @@ let navTrafficAware=false,navRouteSource='',navEtaAnchorS=0,navEtaAnchorAt=0,nav
 let navVoiceCues=[];
 
 const hav=(a,b)=>{const R=6371008.8,p=Math.PI/180,dLat=(b.lat-a.lat)*p,dLon=(b.lon-a.lon)*p,x=Math.sin(dLat/2)**2+Math.cos(a.lat*p)*Math.cos(b.lat*p)*Math.sin(dLon/2)**2;return 2*R*Math.asin(Math.sqrt(x))};
-const feet=m=>m<160.934?`${Math.max(10,Math.round(m/10)*10)} ft`:`${(m/1609.344).toFixed(1)} mi`;
+const feet=m=>m<160.934?`${Math.max(10,Math.round(m/0.3048/10)*10)} ft`:`${(m/1609.344).toFixed(1)} mi`;
 const eta=s=>{const min=Math.max(1,Math.round(Number(s||0)/60));return min<60?`${min} min`:`${Math.floor(min/60)} hr ${min%60?min%60+' min':''}`.trim()};
 const validCoord=(lat,lon)=>Number.isFinite(Number(lat))&&Number.isFinite(Number(lon))&&Math.abs(Number(lat))>1&&Math.abs(Number(lon))>1;
 
@@ -67,7 +67,7 @@ function showArrival(){
  if(!navTarget?.stop_id||arrivalFor===navTarget.stop_id)return;
  arrivalFor=navTarget.stop_id;const x=ensureArrival();document.getElementById('nwtbArrivalName').textContent=`${navTarget.name||'Current stop'} — tap complete to start directions to the next stop.`;x.classList.add('show');
  speak(`You have arrived at ${navTarget.name||'the stop'}. Complete the stop to start directions to the next stop.`);if(navigator.vibrate)navigator.vibrate([300,120,300,120,500]);
- if('Notification'in window&&Notification.permission==='granted'){try{new Notification('NWTB — ARRIVED AT STOP',{body:`${navTarget.name||'Stop'} — complete stop and go to the next stop.`,tag:'nwtb-arrival-'+navTarget.stop_id,renotify:true})}catch{}}
+ window.NWTBNotifications?.show('NWTB — ARRIVED AT STOP',{body:`${navTarget.name||'Stop'} — complete stop and go to the next stop.`,tag:'nwtb-arrival-'+navTarget.stop_id,renotify:true});
 }
 function hideArrival(){const x=document.getElementById('nwtbArrival');if(x)x.classList.remove('show')}
 function clearNearGlow(){if(navGlow&&navMap){try{navMap.removeLayer(navGlow)}catch{}}navGlow=null}

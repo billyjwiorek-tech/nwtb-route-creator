@@ -55,7 +55,18 @@ function desktopNotice(event,isTest=false){
   notice.onclick=()=>{window.focus();openAlertPanel();notice.close()};
   notice.onclose=()=>{if(desktopNotices.get(tag)===notice)desktopNotices.delete(tag)};
   desktopError='';desktopState();return true
- }catch{desktopError='DESKTOP POP-UP FAILED — CHECK BROWSER SETTINGS';desktopState();return false}
+ }catch{
+  // Mobile Chrome requires service-worker notifications; preserve the desktop click behavior above.
+  if(window.NWTBNotifications){
+   desktopNotices.set(tag,{close:()=>window.NWTBNotifications.close(tag)});
+   window.NWTBNotifications.show(isTest?'TEST — NWTB DESKTOP ALERT':RETURN_TITLE,{
+    body:isTest?'THIS IS ONLY A TEST. LIVE RETURN ALERTS WILL SAY: '+RETURN_TITLE+'.':String(event.driver_name||event.employee_number||'DRIVER').toUpperCase()+' — '+description(event),
+    tag,requireInteraction:true,renotify:false,silent:true
+   }).then(sent=>{desktopError=sent?'':'DESKTOP POP-UP FAILED — CHECK BROWSER SETTINGS';if(!sent)desktopNotices.delete(tag);desktopState()});
+   return true;
+  }
+  desktopError='DESKTOP POP-UP FAILED — CHECK BROWSER SETTINGS';desktopState();return false
+ }
 }
 async function enableDesktop(){
  desktopError='';
@@ -94,6 +105,6 @@ async function poll(){
  }}catch(e){connection('ALERT CHECK DELAYED');console.warn('Office route alert poll failed',e)}finally{busy=false}
 }
 window.NWTBOfficeRouteAlerts={poll,enableSound,enableDesktop,acknowledge,stopSound};
-function boot(){ensure();poll();setInterval(poll,5000);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){soundState();desktopState();poll()}})}
+function boot(){ensure();poll();setInterval(poll,5000);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){soundState();desktopState();poll()}});window.navigator?.serviceWorker?.addEventListener?.('message',event=>{if(event.data?.type==='NWTB_OPEN_OFFICE_ALERTS')openAlertPanel()})}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();

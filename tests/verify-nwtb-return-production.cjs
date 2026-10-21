@@ -5,8 +5,17 @@ const files = [
  'delivery-live.html','delivery-standard.html','office-driver-preview.html','office-driver-qr.js','driver-gps-qr.svg','driver-live.html','driver-standard.html',
  'dispatch-native.html','dispatch-live.html','dispatch.html','dispatch-route-admin-native.js',
  'tracker-live.html','tracker-live-core.html','tracker-gps-status.js','tracker-driver-status.js','office-map-live.mjs','supabase/functions/nwtb-office-map/policy.mjs','unified-search.js','custom-master-search.js','custom-stop.js',
+ 'nwtb-notifications.js','driver-priority-route-live.js','driver-alerts-auto-live.js','driver-pod-live.js','driver-exceptions-live.js','driver-offline-live.js','driver-custom-navigation-native.js','driver-mobile-nav-fix.js','driver-route-pins-native.js','driver-ios-map-fallback.js','driver-depot-support-live.js','driver-profiles-live.js',
  'office-pause-alerts.js','nwtb-driver-sw.js','driver-chat-live.js','dispatch-chat-live.js','tracker-driver-presence.js','tracker-live-van.js','tracker-route-filter.js','tracker-active-route-guard.js','driver-tracking-engine-native.js','driver-navigation-native.js','driver-voice-live.js','driver-phone-push.js','dispatch-driver-tools.js','dispatch-tools-hub-live.js','driver-gps.webmanifest','driver-standard.webmanifest'
 ];
+// Cover the production entry pages and their local modules, including modules loaded dynamically.
+for(let pass=0;pass<6;pass++)for(const file of [...files]){
+ if(!/\.(?:html|js|mjs)$/.test(file)||file.startsWith('supabase/'))continue;
+ for(const match of fs.readFileSync(file,'utf8').matchAll(/["']([a-zA-Z0-9_-]+\.(?:js|mjs|html))(?:\?[^"']*)?["']/g)){
+  if(fs.existsSync(match[1])&&!files.includes(match[1]))files.push(match[1]);
+ }
+}
+if(!files.includes('nwt-logo.svg'))files.push('nwt-logo.svg');
 async function main(){
  const expected = new Map(files.map(path => [path, fs.readFileSync(path,'utf8')]));
  let pending = [...files];

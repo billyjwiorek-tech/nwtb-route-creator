@@ -27,9 +27,6 @@ async function arm(){
 }
 function userArm(){
  arm();
- if('Notification'in window&&Notification.permission==='default'){
-  try{Notification.requestPermission()}catch{}
- }
  document.removeEventListener('pointerup',userArm,true);
  document.removeEventListener('touchend',userArm,true);
 }
