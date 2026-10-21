@@ -7,7 +7,7 @@ const PNG='data:image/png;base64,fixture';let checks=0;
 function ok(value,message){assert.ok(value,message);checks++}
 function eq(a,b,message){assert.deepEqual(a,b,message);checks++}
 const settle=async()=>{for(let i=0;i<35;i++)await Promise.resolve()};
-function fixture({ios=false,android=false,original=false}={}){
+function fixture({ios=false,android=false,original=false,navigationSource=null}={}){
  const html=read('driver-live.html'),{window:dom}=parseHTML(html),document=dom.document;
  const timers=new Map(),watches=new Map(),cleared=[],requests=[],alerts=[],resizeObservers=[];
  let now=1800000000000,timerId=0,watchId=0,fixes=0,holdFix=false,fixCallbacks=[],holdNavigation=null,podFailure=false;
@@ -52,8 +52,8 @@ function fixture({ios=false,android=false,original=false}={}){
  vm.runInContext(inline.replace(/\bboot\(\);\s*$/, ''),ctx);
  for(const name of ['openRoute','loadRoutes','finish','startRoute','enableAlerts'])Object.defineProperty(window,name,{get:()=>ctx[name],set:value=>ctx[name]=value,configurable:true});
  vm.runInContext("token='fixture-driver-token';driver='1234';route='fixture-r1';currentRouteState={status:'ACTIVE'};",ctx);
- let source=original?require('node:child_process').execFileSync('git',['show','aa8c608d3b1af922958621aba35256a4206cb0ae:driver-navigation-native.js'],{cwd:root,encoding:'utf8'}):read('driver-navigation-native.js');
- const last=source.lastIndexOf('})();');source=source.slice(0,last)+"window.__navTest={beginNavigation,navigateNext,initMap,decorateRoute,reroute,feet,get map(){return navMap},get target(){return navTarget},get coords(){return navRouteCoords}};"+source.slice(last);
+ let source=navigationSource||(original?require('node:child_process').execFileSync('git',['show','aa8c608d3b1af922958621aba35256a4206cb0ae:driver-navigation-native.js'],{cwd:root,encoding:'utf8'}):read('driver-navigation-native.js'));
+ const last=source.lastIndexOf('})();');source=source.slice(0,last)+"window.__navTest={beginNavigation,navigateNext,initMap,decorateRoute,reroute,feet,...(typeof buildProgress==='function'?{buildProgress,projectRoute,remainingProgress,applyRoute,receiveNavFix}:{}),get map(){return navMap},get target(){return navTarget},get coords(){return navRouteCoords}};"+source.slice(last);
  vm.runInContext(source,ctx);
  function load(name){vm.runInContext(read(name),ctx,{filename:name})}
  return {window,document,ctx,data,requests,alerts,tick,load,cleared,watches,resizeObservers,local,private:window.__navTest,fixes:()=>fixes,holdFix:()=>holdFix=true,releaseFix(){holdFix=false;for(const cb of fixCallbacks.splice(0))cb(currentPosition())},holdNextNav(fn){holdNavigation=fn},failSave:v=>podFailure=v,response,async open(){await window.openRoute(data.route.id);await tick(150)},async begin(){await window.__navTest.navigateNext(data.route.id);await settle();await tick(100)}};

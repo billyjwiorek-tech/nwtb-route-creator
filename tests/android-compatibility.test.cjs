@@ -82,7 +82,7 @@ async function mapCameraAndTouch(){
  const map=f.private.map,container=map.getContainer();ok(container.isConnected,'Android has an attached real Leaflet map');ok(container.querySelectorAll('.leaflet-tile').length>0,'Android receives street tile elements');ok(container.querySelector('svg path'),'Android route geometry is drawn');eq(f.document.getElementById('nwtbIosStableMap'),null,'iPhone fallback does not cover Android Leaflet map');
  eq(f.private.feet(30.48),'100 ft','30.48 meters is displayed as 100 feet');eq(f.private.feet(15.24),'50 ft');eq(f.private.feet(1609.344),'1.0 mi');
  const arrivals=[];f.window.Notification=class{static permission='granted';constructor(){throw TypeError('Android requires worker notifications')}};f.window.navigator.serviceWorker={getRegistration:async()=>({active:{},showNotification:async(title,options)=>arrivals.push({title,options})})};f.load('nwtb-notifications.js');
- for(let i=0;i<3;i++){for(const callback of f.watches.values())callback({timestamp:Date.now(),coords:{latitude:41.7,longitude:-88.04,accuracy:3,speed:0}});await settle()}
+ for(let i=0;i<3;i++){for(const callback of f.watches.values())callback({timestamp:f.ctx.Date.now(),coords:{latitude:41.7,longitude:-88.04,accuracy:3,speed:0}});await f.tick(1000)}
  eq(arrivals.length,1,'Android arrival uses worker notification once');eq(arrivals[0].title,'NWTB — ARRIVED AT STOP');
  f.document.dispatchEvent(new f.document.defaultView.Event('orientationchange'));await f.tick(800);eq(f.private.map,map,'Orientation handling preserves route map');
  // Android camera images are decoded and resized before upload. GPS denial must not block POD.
