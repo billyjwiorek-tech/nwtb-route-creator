@@ -1,0 +1,250 @@
+{
+  "captured_at": "2026-10-21",
+  "source_project": "ufnjyidhxuytrmbjzgtu",
+  "production_frontend_commit": "8d46a3b8a042c3cf41d88fa8bc902d13dab520d2",
+  "note": "Read-only snapshots. Not deployed. No production data or secret values copied.",
+  "functions": [
+    {
+      "name": "nwtb-chat",
+      "version": 8,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "sha256": "023fa1471faa1c300ceb55b6b4ce4967f8ab676b1b071f0ff2f2507ca3b81d6e",
+      "files": [
+        "nwtb-chat/index.ts",
+        "_shared/sales-route-server.ts",
+        "_shared/sales-route-policy.js"
+      ]
+    },
+    {
+      "name": "nwtb-delivery",
+      "version": 10,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "sha256": "388a1bb0e97769a371dceb347604a8451e56509978760ea25bdabedfc540e9b2",
+      "files": [
+        "nwtb-delivery/index.ts"
+      ]
+    },
+    {
+      "name": "nwtb-delivery-chat",
+      "version": 6,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "sha256": "5e533825a2ed8a4856be1b3bd553b6c6c81460d9110a37f209ba7b64fef74e93",
+      "files": [
+        "nwtb-delivery-chat/index.ts"
+      ]
+    },
+    {
+      "name": "nwtb-delivery-tracking",
+      "version": 14,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "sha256": "047242e8adf440b2635fb380084091a3397a1a5fddb7f47dc100cb1d4c7fee33",
+      "files": [
+        "nwtb-delivery-tracking/index.ts"
+      ]
+    },
+    {
+      "name": "nwtb-route-matrix",
+      "version": 2,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "sha256": "fe869a98a9ae4d11c8562d603285756405cec99211aa3f7976e0618dca777120",
+      "files": [
+        "nwtb-route-matrix/index.ts"
+      ]
+    },
+    {
+      "name": "nwtb-delivery-route-admin",
+      "version": 12,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "sha256": "d3b42ef63b91bbf598af0e31175443b72bd014fe71524b214b9a68c0c37d471a",
+      "files": [
+        "nwtb-delivery-route-admin/index.ts"
+      ]
+    },
+    {
+      "name": "nwtb-location-resolver",
+      "version": 7,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "sha256": "cc96d0df0b73909820fa04dfc997175bfa786528047e03c701c3aa5a118e0102",
+      "files": [
+        "nwtb-location-resolver/index.ts"
+      ]
+    },
+    {
+      "name": "nwtb-master-geocoder",
+      "version": 4,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "sha256": "59544b51b7af76b331db8ceffa171f63da28eafdacf18945f7d216b291e47aca",
+      "files": [
+        "nwtb-master-geocoder/index.ts"
+      ]
+    },
+    {
+      "name": "nwtb-delivery-board-admin",
+      "version": 3,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "sha256": "79246b9a12907c6b6c6228f71f7b3041ebe9467b9d017fe2636dba4704820a9b",
+      "files": [
+        "nwtb-delivery-board-admin/index.ts"
+      ]
+    },
+    {
+      "name": "nwtb-custom-route",
+      "version": 4,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "sha256": "0b7366117471b0261ecdb96d9f4848f0fc44daaad36ba1e46f8b77f898e60e9c",
+      "files": [
+        "nwtb-custom-route/index.ts"
+      ]
+    },
+    {
+      "name": "nwtb-delivery-route-ops",
+      "version": 4,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "sha256": "9a213305a209648027dce637ea7101222a289b61636d877bd9a45926bd5f629a",
+      "files": [
+        "nwtb-delivery-route-ops/index.ts"
+      ]
+    },
+    {
+      "name": "nwtb-driver-navigation",
+      "version": 4,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "sha256": "eeb8327a8ea56120f5f5763852291da1db056d6c2188e776be7b1b62670ec9c3",
+      "files": [
+        "nwtb-driver-navigation/index.ts"
+      ]
+    },
+    {
+      "name": "nwtb-live-tracking-v2",
+      "version": 7,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "sha256": "df5532b3d700f8a27bc76c1415be31588f5c0ca20bcc7164e997aff960644f93",
+      "files": [
+        "nwtb-live-tracking-v2/index.ts"
+      ]
+    },
+    {
+      "name": "nwtb-custom-geocoder-v2",
+      "version": 1,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "sha256": "422edcc28202bff91bea9eaf7a552fbdcf95619fdf99985439018e3c6e81ee94",
+      "files": [
+        "nwtb-custom-geocoder-v2/index.ts"
+      ]
+    },
+    {
+      "name": "nwtb-route-priority",
+      "version": 3,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "sha256": "0fb537f9a2a1300fe61b2704838a5f53498504ca677b3af8c5fb6b3b5795afa7",
+      "files": [
+        "nwtb-route-priority/index.ts"
+      ]
+    },
+    {
+      "name": "nwtb-system-control",
+      "version": 2,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "sha256": "ccf139a7487598ee454b703331eebc3a151a39741062ab747c27c346bc5e96f3",
+      "files": [
+        "nwtb-system-control/index.ts"
+      ]
+    },
+    {
+      "name": "nwtb-admin-roles",
+      "version": 3,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "sha256": "acb1dd8600432cd5d91ec83dc89b7594fb2a4626d772474e57477d62d7c3a3b2",
+      "files": [
+        "nwtb-admin-roles/index.ts"
+      ]
+    },
+    {
+      "name": "nwtb-delivery-audit",
+      "version": 1,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "sha256": "feff913b2c368ccb40f72971e46780ef072cc55170fce5aff9071e37b43ed042",
+      "files": [
+        "nwtb-delivery-audit/index.ts"
+      ]
+    },
+    {
+      "name": "nwtb-pod",
+      "version": 2,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "sha256": "0943474a339374706e28ea020b1bd3abfcbd1c9ee2b63003d183ae071156e1cf",
+      "files": [
+        "nwtb-pod/index.ts"
+      ]
+    },
+    {
+      "name": "nwtb-delivery-exceptions",
+      "version": 1,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "sha256": "fac0e3ba53802803eb19d5174b1cadae07727b6dda4a8d91791e80f7b8894cea",
+      "files": [
+        "nwtb-delivery-exceptions/index.ts"
+      ]
+    },
+    {
+      "name": "nwtb-dispatch-health",
+      "version": 1,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "sha256": "79c1be44298dcacd4adb4200d678ccaa289bc174b2f270a5ba22618446dbec3b",
+      "files": [
+        "nwtb-dispatch-health/index.ts"
+      ]
+    },
+    {
+      "name": "nwtb-smart-route",
+      "version": 1,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "sha256": "a2516b2d62cdcaa35f162e65f14e96f84ebf40c4bcc61aede1c8673ffa4d2c84",
+      "files": [
+        "nwtb-smart-route/index.ts"
+      ]
+    },
+    {
+      "name": "nwtb-delivery-profiles",
+      "version": 1,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "sha256": "f00e6b1145b7ea66cecf44888e09deb466e36f114e7110a1cc10d8b12509ee88",
+      "files": [
+        "nwtb-delivery-profiles/index.ts"
+      ]
+    },
+    {
+      "name": "nwtb-multi-route",
+      "version": 2,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "sha256": "5c6e5882cfea3dc602f36bae221db76e53a45b8f89a68f39e352226a654e634d",
+      "files": [
+        "nwtb-multi-route/index.ts"
+      ]
+    }
+  ]
+}

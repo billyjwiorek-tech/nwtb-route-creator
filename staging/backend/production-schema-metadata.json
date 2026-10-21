@@ -1,0 +1,4312 @@
+{
+  "types": [],
+  "views": [
+    {
+      "name": "nwtb_dispatch_health_view",
+      "definition": " SELECT r.id AS route_id,\n    r.route_date,\n    r.wave,\n    r.status,\n    r.driver_employee_number,\n    e.display_name AS driver_display_name,\n    r.estimated_miles,\n    r.estimated_minutes,\n    r.paused_at,\n    r.resumed_at,\n    r.pause_reason,\n    rs.started_at,\n    COALESCE(ss.total_stops, 0::bigint)::integer AS total_stops,\n    COALESCE(ss.delivered_stops, 0::bigint)::integer AS delivered_stops,\n    COALESCE(ss.failed_stops, 0::bigint)::integer AS failed_stops,\n    COALESCE(ss.pending_stops, 0::bigint)::integer AS pending_stops,\n    COALESCE(ss.pending_priority, 0::bigint)::integer AS pending_priority,\n    COALESCE(ss.pending_hot_shot, 0::bigint)::integer AS pending_hot_shot,\n    COALESCE(ss.overdue_promises, 0::bigint)::integer AS overdue_promises,\n    COALESCE(ss.due_soon_promises, 0::bigint)::integer AS due_soon_promises,\n    COALESCE(ex.open_exceptions, 0::bigint)::integer AS open_exceptions,\n    ns.stop_id AS next_stop_id,\n    ns.stop_sequence AS next_stop_sequence,\n    ns.customer_name AS next_customer_name,\n    ns.address AS next_address,\n    ns.priority AS next_priority,\n    ns.promised_by AS next_promised_by,\n    ns.sales_order_no AS next_sales_order_no,\n    ns.lat AS next_lat,\n    ns.lon AS next_lon,\n    lg.captured_at AS gps_captured_at,\n    lg.lat AS gps_lat,\n    lg.lon AS gps_lon,\n    lg.accuracy_m AS gps_accuracy_m,\n    lg.speed_mps AS gps_speed_mps\n   FROM delivery_routes r\n     LEFT JOIN employees e ON e.employee_number = r.driver_employee_number\n     LEFT JOIN LATERAL ( SELECT min(delivery_events.created_at) AS started_at\n           FROM delivery_events\n          WHERE delivery_events.route_id = r.id AND delivery_events.event_type = 'ROUTE_STARTED'::text) rs ON true\n     LEFT JOIN LATERAL ( SELECT count(*) AS total_stops,\n            count(*) FILTER (WHERE s.status = 'DELIVERED'::text) AS delivered_stops,\n            count(*) FILTER (WHERE s.status = ANY (ARRAY['NOT_DELIVERED'::text, 'SKIPPED'::text])) AS failed_stops,\n            count(*) FILTER (WHERE s.status = 'PENDING'::text) AS pending_stops,\n            count(*) FILTER (WHERE s.status = 'PENDING'::text AND (upper(COALESCE(o.priority, 'NORMAL'::text)) = ANY (ARRAY['PRIORITY'::text, 'HOT_SHOT'::text]))) AS pending_priority,\n            count(*) FILTER (WHERE s.status = 'PENDING'::text AND upper(COALESCE(o.priority, 'NORMAL'::text)) = 'HOT_SHOT'::text) AS pending_hot_shot,\n            count(*) FILTER (WHERE s.status = 'PENDING'::text AND o.promised_by IS NOT NULL AND o.promised_by < now()) AS overdue_promises,\n            count(*) FILTER (WHERE s.status = 'PENDING'::text AND o.promised_by IS NOT NULL AND o.promised_by >= now() AND o.promised_by <= (now() + '00:30:00'::interval)) AS due_soon_promises\n           FROM delivery_route_stops s\n             JOIN delivery_orders o ON o.id = s.order_id\n          WHERE s.route_id = r.id) ss ON true\n     LEFT JOIN LATERAL ( SELECT s.id AS stop_id,\n            s.stop_sequence,\n            o.customer_name,\n            o.address,\n            o.priority,\n            o.promised_by,\n            o.sales_order_no,\n            o.lat,\n            o.lon\n           FROM delivery_route_stops s\n             JOIN delivery_orders o ON o.id = s.order_id\n          WHERE s.route_id = r.id AND s.status = 'PENDING'::text\n          ORDER BY s.stop_sequence\n         LIMIT 1) ns ON true\n     LEFT JOIN LATERAL ( SELECT delivery_driver_locations.captured_at,\n            delivery_driver_locations.lat,\n            delivery_driver_locations.lon,\n            delivery_driver_locations.accuracy_m,\n            delivery_driver_locations.speed_mps\n           FROM delivery_driver_locations\n          WHERE delivery_driver_locations.route_id = r.id\n          ORDER BY delivery_driver_locations.captured_at DESC\n         LIMIT 1) lg ON true\n     LEFT JOIN LATERAL ( SELECT count(*) AS open_exceptions\n           FROM delivery_exceptions x\n          WHERE x.route_id = r.id AND x.status = 'OPEN'::text) ex ON true\n  WHERE r.status = ANY (ARRAY['ACTIVE'::text, 'PLANNED'::text]);"
+    }
+  ],
+  "tables": [
+    {
+      "rls": true,
+      "name": "chat_messages",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "default": null,
+          "identity": "d",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "employee_number",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "display_name",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "message_type",
+          "type": "text",
+          "default": "'text'::text",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "body",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "route_payload",
+          "type": "jsonb",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "channel",
+          "type": "text",
+          "default": "'SALES'::text",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "name": "chat_sessions",
+      "columns": [
+        {
+          "name": "token",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "employee_number",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "last_seen_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "default": "(now() + '30 days'::interval)",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "name": "delivery_chat_messages",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "default": null,
+          "identity": "d",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "employee_number",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "display_name",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "body",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "sender_role",
+          "type": "text",
+          "default": "'DISPATCH'::text",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "conversation_driver_employee_number",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "conversation_driver_name",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "route_id",
+          "type": "uuid",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "read_by_dispatch_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "read_by_driver_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "name": "delivery_customer_master",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "default": null,
+          "identity": "d",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "customer_number",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "addr1",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "addr2",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "city",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "state",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "phone_home",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "phone_work",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "terms",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "source_file",
+          "type": "text",
+          "default": "'UPDATES CUSTOMER MASTER LIST 09-22-2026.xlsx'::text",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "imported_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "import_batch",
+          "type": "uuid",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "lat",
+          "type": "double precision",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "lon",
+          "type": "double precision",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "geocoded_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "geocode_source",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "geocode_status",
+          "type": "text",
+          "default": "'PENDING'::text",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "geocode_error",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "geocode_attempted_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "name": "delivery_driver_locations",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "default": null,
+          "identity": "d",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "driver_employee_number",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "route_id",
+          "type": "uuid",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "lat",
+          "type": "double precision",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "lon",
+          "type": "double precision",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "accuracy_m",
+          "type": "double precision",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "heading_deg",
+          "type": "double precision",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "speed_mps",
+          "type": "double precision",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "captured_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "received_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "location_source",
+          "type": "text",
+          "default": "'WEB_DRIVER'::text",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "name": "delivery_events",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "default": null,
+          "identity": "d",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "route_id",
+          "type": "uuid",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "stop_id",
+          "type": "uuid",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "order_id",
+          "type": "uuid",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "employee_number",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "event_type",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "note",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "name": "delivery_exceptions",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "exception_number",
+          "type": "bigint",
+          "default": null,
+          "identity": "a",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "route_id",
+          "type": "uuid",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "stop_id",
+          "type": "uuid",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "order_id",
+          "type": "uuid",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "driver_employee_number",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "driver_display_name",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "customer_name",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "address",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "sales_order_no",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "customer_number",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "reason_code",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "reason_label",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "lat",
+          "type": "double precision",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "lon",
+          "type": "double precision",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "accuracy_m",
+          "type": "double precision",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "occurred_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "default": "'OPEN'::text",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "resolution_action",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "resolution_note",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "resolved_by_employee_number",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "resolved_by_display_name",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "resolved_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "name": "delivery_location_profiles",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "saved_location_id",
+          "type": "uuid",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "source_type",
+          "type": "text",
+          "default": "'OTHER'::text",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "source_ref",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "address",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "address_key",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "instructions",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "receiving_hours",
+          "type": "jsonb",
+          "default": "'{}'::jsonb",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "hours_note",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "service_minutes",
+          "type": "integer",
+          "default": "10",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "contact_name",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "contact_phone",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "call_before_delivery",
+          "type": "boolean",
+          "default": "false",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "gate_code",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "entrance_notes",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "dock_notes",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "parking_notes",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "forklift_required",
+          "type": "boolean",
+          "default": "false",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "leave_with",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "vehicle_access_notes",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "active",
+          "type": "boolean",
+          "default": "true",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "created_by",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "updated_by",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "verified_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "verified_by",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "name": "delivery_master_versions",
+      "columns": [
+        {
+          "name": "kind",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "current_batch",
+          "type": "uuid",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "source_file",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "row_count",
+          "type": "integer",
+          "default": "0",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "imported_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "imported_by",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "name": "delivery_navigation_usage",
+      "columns": [
+        {
+          "name": "month_key",
+          "type": "date",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "mapbox_requests",
+          "type": "bigint",
+          "default": "0",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "name": "delivery_orders",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "sales_order_no",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "customer_number",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "customer_name",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "address",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "lat",
+          "type": "double precision",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "lon",
+          "type": "double precision",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "phone",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "pieces",
+          "type": "integer",
+          "default": "1",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "priority",
+          "type": "text",
+          "default": "'NORMAL'::text",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "promised_by",
+          "type": "timestamp with time zone",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "default": "'UNASSIGNED'::text",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "created_by",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "last_status_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "stop_type",
+          "type": "text",
+          "default": "'CUSTOMER_DELIVERY'::text",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "source_type",
+          "type": "text",
+          "default": "'CUSTOMER'::text",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "source_ref",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "saved_location_id",
+          "type": "uuid",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "reference_no",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "name": "delivery_pods",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "pod_number",
+          "type": "bigint",
+          "default": null,
+          "identity": "a",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "route_id",
+          "type": "uuid",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "stop_id",
+          "type": "uuid",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "order_id",
+          "type": "uuid",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "driver_employee_number",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "driver_display_name",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "recipient_name",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "delivery_result",
+          "type": "text",
+          "default": "'DELIVERED'::text",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "lat",
+          "type": "double precision",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "lon",
+          "type": "double precision",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "accuracy_m",
+          "type": "double precision",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "captured_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "signature_path",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "signature_sha256",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "photo_path",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "photo_sha256",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "name": "delivery_route_stops",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "route_id",
+          "type": "uuid",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "order_id",
+          "type": "uuid",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "stop_sequence",
+          "type": "integer",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "default": "'PENDING'::text",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "arrived_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "driver_note",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "name": "delivery_routes",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "route_date",
+          "type": "date",
+          "default": "CURRENT_DATE",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "depot",
+          "type": "text",
+          "default": "'BOLINGBROOK'::text",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "driver_employee_number",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "wave",
+          "type": "text",
+          "default": "'MORNING'::text",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "default": "'PLANNED'::text",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "estimated_miles",
+          "type": "numeric(10,2)",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "estimated_minutes",
+          "type": "integer",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "created_by",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "route_note",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "route_mode",
+          "type": "text",
+          "default": "'STANDARD'::text",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "start_name",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "start_address",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "start_lat",
+          "type": "double precision",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "start_lon",
+          "type": "double precision",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "end_mode",
+          "type": "text",
+          "default": "'RETURN_DEPOT'::text",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "end_name",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "end_address",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "end_lat",
+          "type": "double precision",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "end_lon",
+          "type": "double precision",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "paused_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "paused_by_employee_number",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "pause_reason",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "resumed_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "drive_minutes",
+          "type": "integer",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "service_minutes",
+          "type": "integer",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "return_miles",
+          "type": "numeric",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "return_minutes",
+          "type": "integer",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "traffic_aware",
+          "type": "boolean",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "matrix_source",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "released_to_driver",
+          "type": "boolean",
+          "default": "true",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "released_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "released_by_employee_number",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "returning_started_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "returned_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "name": "delivery_saved_locations",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "source_type",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "source_ref",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "location_code",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "address",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "phone",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "lat",
+          "type": "double precision",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "lon",
+          "type": "double precision",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "instructions",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "hours",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "frequent",
+          "type": "boolean",
+          "default": "false",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "verified",
+          "type": "boolean",
+          "default": "false",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "active",
+          "type": "boolean",
+          "default": "true",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "created_by",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "name": "delivery_tracking_devices",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "driver_employee_number",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "device_hash",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "device_hint",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "label",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "active",
+          "type": "boolean",
+          "default": "true",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "last_seen_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "name": "delivery_vendor_master",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "default": null,
+          "identity": "d",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "vendor_id",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "addr1",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "addr2",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "city",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "state",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "phone",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "contact",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "email",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "terms",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "inactive",
+          "type": "boolean",
+          "default": "false",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "source_file",
+          "type": "text",
+          "default": "'VENDOR LIST.xlsx'::text",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "imported_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "import_batch",
+          "type": "uuid",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "lat",
+          "type": "double precision",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "lon",
+          "type": "double precision",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "geocoded_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "geocode_source",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "geocode_status",
+          "type": "text",
+          "default": "'PENDING'::text",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "geocode_error",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "geocode_attempted_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "name": "employees",
+      "columns": [
+        {
+          "name": "employee_number",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "display_name",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "active",
+          "type": "boolean",
+          "default": "true",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "name": "nwtb_admin_security",
+      "columns": [
+        {
+          "name": "key",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "value_hash",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "name": "nwtb_delivery_role_permissions",
+      "columns": [
+        {
+          "name": "role",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "permission",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "name": "nwtb_delivery_roles",
+      "columns": [
+        {
+          "name": "employee_number",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "role",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "active",
+          "type": "boolean",
+          "default": "true",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "updated_by",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "name": "nwtb_driver_push_keys",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "public_key",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "private_key",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "name": "nwtb_driver_push_subscriptions",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "driver_employee_number",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "session_token",
+          "type": "uuid",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "endpoint",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "p256dh",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "auth",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "page_path",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "last_success_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "last_error",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "name": "nwtb_restore_point_rows",
+      "columns": [
+        {
+          "name": "restore_point_id",
+          "type": "uuid",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "table_name",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "row_key",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "row_data",
+          "type": "jsonb",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "name": "nwtb_restore_points",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "label",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "reason",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "kind",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "default": "'CREATING'::text",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "created_by",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "row_counts",
+          "type": "jsonb",
+          "default": "'{}'::jsonb",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "name": "nwtb_system_control",
+      "columns": [
+        {
+          "name": "id",
+          "type": "smallint",
+          "default": "1",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "state",
+          "type": "text",
+          "default": "'ACTIVE'::text",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "message",
+          "type": "text",
+          "default": "'NWTB DELIVERY SYSTEM KILLED!!! FUCK YOU PAY ME🖕🖕🖕🖕🖕'::text",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "changed_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "changed_by_employee_number",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "changed_by_display_name",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "name": "nwtb_system_control_audit",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "default": null,
+          "identity": "a",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "action",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "previous_state",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "new_state",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "actor_employee_number",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "actor_display_name",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "name": "nwtb_v2_route_plan_drivers",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "plan_id",
+          "type": "uuid",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "route_index",
+          "type": "integer",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "driver_employee_number",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "driver_display_name",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "stop_count",
+          "type": "integer",
+          "default": "0",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "estimated_miles",
+          "type": "numeric",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "estimated_minutes",
+          "type": "integer",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "default": "'DRAFT'::text",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "routed_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "drive_minutes",
+          "type": "integer",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "service_minutes",
+          "type": "integer",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "return_miles",
+          "type": "numeric",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "return_minutes",
+          "type": "integer",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "outbound_and_between_miles",
+          "type": "numeric",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "outbound_and_between_minutes",
+          "type": "integer",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "depot",
+          "type": "text",
+          "default": "'BOLINGBROOK'::text",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "name": "nwtb_v2_route_plan_stops",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "plan_id",
+          "type": "uuid",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "plan_driver_id",
+          "type": "uuid",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "driver_employee_number",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "order_id",
+          "type": "uuid",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "stop_sequence",
+          "type": "integer",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "customer_name",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "address",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "lat",
+          "type": "double precision",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "lon",
+          "type": "double precision",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "priority",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "promised_by",
+          "type": "timestamp with time zone",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "stop_type",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "source_type",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "source_ref",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "saved_location_id",
+          "type": "uuid",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "service_minutes",
+          "type": "integer",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "leg_miles",
+          "type": "numeric",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "leg_minutes",
+          "type": "integer",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "name": "nwtb_v2_route_plans",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "created_by",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "default": "'DRAFT'::text",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "depot",
+          "type": "text",
+          "default": "'BOLINGBROOK'::text",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "driver_count",
+          "type": "integer",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "stop_count",
+          "type": "integer",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "estimated_total_miles",
+          "type": "numeric",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "estimated_total_minutes",
+          "type": "integer",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "max_route_minutes",
+          "type": "integer",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "matrix_source",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "traffic_aware",
+          "type": "boolean",
+          "default": "false",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "objective",
+          "type": "jsonb",
+          "default": "'{}'::jsonb",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "note",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "routed_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "routed_by",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "name": "prospect_visit_status",
+      "columns": [
+        {
+          "name": "account_key",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "address",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "default": "'NOT_VISITED'::text",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "note",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "updated_by",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "updated_by_name",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        }
+      ]
+    },
+    {
+      "rls": true,
+      "name": "sales_accounts",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "default": null,
+          "identity": "d",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "source_index",
+          "type": "integer",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "payload",
+          "type": "jsonb",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "active",
+          "type": "boolean",
+          "default": "true",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "imported_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        }
+      ]
+    }
+  ],
+  "indexes": [
+    "CREATE INDEX chat_messages_channel_created_idx ON public.chat_messages USING btree (channel, created_at DESC)",
+    "CREATE INDEX chat_messages_created_at_idx ON public.chat_messages USING btree (created_at DESC)",
+    "CREATE INDEX chat_sessions_employee_idx ON public.chat_sessions USING btree (employee_number)",
+    "CREATE INDEX delivery_chat_dispatch_unread_idx ON public.delivery_chat_messages USING btree (created_at DESC) WHERE ((sender_role = 'DRIVER'::text) AND (read_by_dispatch_at IS NULL))",
+    "CREATE INDEX delivery_chat_driver_unread_idx ON public.delivery_chat_messages USING btree (conversation_driver_employee_number, created_at DESC) WHERE ((sender_role = 'DISPATCH'::text) AND (read_by_driver_at IS NULL))",
+    "CREATE INDEX delivery_chat_messages_created_at_idx ON public.delivery_chat_messages USING btree (created_at DESC)",
+    "CREATE INDEX delivery_chat_messages_created_idx ON public.delivery_chat_messages USING btree (created_at DESC)",
+    "CREATE INDEX delivery_chat_thread_created_idx ON public.delivery_chat_messages USING btree (conversation_driver_employee_number, created_at DESC)",
+    "CREATE INDEX delivery_customer_master_batch_idx ON public.delivery_customer_master USING btree (import_batch)",
+    "CREATE INDEX delivery_customer_master_coords_idx ON public.delivery_customer_master USING btree (customer_number) WHERE ((lat IS NOT NULL) AND (lon IS NOT NULL))",
+    "CREATE INDEX delivery_customer_master_geocode_status_idx ON public.delivery_customer_master USING btree (import_batch, geocode_status)",
+    "CREATE INDEX delivery_customer_master_name_idx ON public.delivery_customer_master USING gin (to_tsvector('simple'::regconfig, COALESCE(name, ''::text)))",
+    "CREATE INDEX delivery_customer_master_number_idx ON public.delivery_customer_master USING btree (customer_number)",
+    "CREATE INDEX delivery_driver_locations_driver_time_idx ON public.delivery_driver_locations USING btree (driver_employee_number, captured_at DESC)",
+    "CREATE INDEX delivery_driver_locations_route_time_idx ON public.delivery_driver_locations USING btree (route_id, captured_at DESC)",
+    "CREATE INDEX delivery_events_created_at_idx ON public.delivery_events USING btree (created_at DESC)",
+    "CREATE INDEX delivery_events_event_type_idx ON public.delivery_events USING btree (event_type)",
+    "CREATE INDEX delivery_events_route_idx ON public.delivery_events USING btree (route_id, created_at)",
+    "CREATE INDEX delivery_exceptions_driver_idx ON public.delivery_exceptions USING btree (driver_employee_number, created_at DESC)",
+    "CREATE UNIQUE INDEX delivery_exceptions_open_stop_idx ON public.delivery_exceptions USING btree (stop_id) WHERE (status = 'OPEN'::text)",
+    "CREATE INDEX delivery_exceptions_order_idx ON public.delivery_exceptions USING btree (order_id)",
+    "CREATE INDEX delivery_exceptions_status_created_idx ON public.delivery_exceptions USING btree (status, created_at DESC)",
+    "CREATE UNIQUE INDEX delivery_location_profiles_addr_active_uq ON public.delivery_location_profiles USING btree (address_key) WHERE (active = true)",
+    "CREATE INDEX delivery_location_profiles_address_idx ON public.delivery_location_profiles USING btree (address_key)",
+    "CREATE INDEX delivery_location_profiles_name_idx ON public.delivery_location_profiles USING btree (lower(name))",
+    "CREATE UNIQUE INDEX delivery_location_profiles_ref_active_uq ON public.delivery_location_profiles USING btree (source_type, source_ref) WHERE ((source_ref IS NOT NULL) AND (source_ref <> ''::text) AND (active = true))",
+    "CREATE UNIQUE INDEX delivery_location_profiles_saved_active_uq ON public.delivery_location_profiles USING btree (saved_location_id) WHERE ((saved_location_id IS NOT NULL) AND (active = true))",
+    "CREATE INDEX delivery_location_profiles_source_idx ON public.delivery_location_profiles USING btree (source_type, source_ref)",
+    "CREATE INDEX delivery_orders_priority_idx ON public.delivery_orders USING btree (priority)",
+    "CREATE INDEX delivery_orders_promised_by_idx ON public.delivery_orders USING btree (promised_by)",
+    "CREATE INDEX delivery_orders_status_idx ON public.delivery_orders USING btree (status)",
+    "CREATE INDEX delivery_pods_created_at_idx ON public.delivery_pods USING btree (created_at DESC)",
+    "CREATE INDEX delivery_pods_order_idx ON public.delivery_pods USING btree (order_id)",
+    "CREATE INDEX delivery_pods_route_idx ON public.delivery_pods USING btree (route_id)",
+    "CREATE UNIQUE INDEX delivery_pods_stop_unique_idx ON public.delivery_pods USING btree (stop_id) WHERE (stop_id IS NOT NULL)",
+    "CREATE INDEX delivery_routes_driver_date_idx ON public.delivery_routes USING btree (driver_employee_number, route_date)",
+    "CREATE INDEX delivery_routes_status_idx ON public.delivery_routes USING btree (status)",
+    "CREATE INDEX delivery_saved_locations_frequent_idx ON public.delivery_saved_locations USING btree (frequent) WHERE (active = true)",
+    "CREATE INDEX delivery_saved_locations_source_idx ON public.delivery_saved_locations USING btree (source_type, source_ref)",
+    "CREATE INDEX delivery_stops_route_sequence_idx ON public.delivery_route_stops USING btree (route_id, stop_sequence)",
+    "CREATE INDEX delivery_tracking_devices_driver_idx ON public.delivery_tracking_devices USING btree (driver_employee_number, active)",
+    "CREATE INDEX delivery_vendor_master_batch_idx ON public.delivery_vendor_master USING btree (import_batch)",
+    "CREATE INDEX delivery_vendor_master_coords_idx ON public.delivery_vendor_master USING btree (vendor_id) WHERE ((lat IS NOT NULL) AND (lon IS NOT NULL))",
+    "CREATE INDEX delivery_vendor_master_geocode_status_idx ON public.delivery_vendor_master USING btree (import_batch, geocode_status)",
+    "CREATE INDEX delivery_vendor_master_name_idx ON public.delivery_vendor_master USING gin (to_tsvector('simple'::regconfig, COALESCE(name, ''::text)))",
+    "CREATE INDEX delivery_vendor_master_vendor_idx ON public.delivery_vendor_master USING btree (vendor_id)",
+    "CREATE INDEX idx_delivery_driver_locations_driver_source_captured ON public.delivery_driver_locations USING btree (driver_employee_number, location_source, captured_at DESC)",
+    "CREATE INDEX nwtb_driver_push_driver_idx ON public.nwtb_driver_push_subscriptions USING btree (driver_employee_number)",
+    "CREATE INDEX nwtb_driver_push_session_idx ON public.nwtb_driver_push_subscriptions USING btree (session_token)",
+    "CREATE UNIQUE INDEX nwtb_one_active_delivery_route_per_driver_idx ON public.delivery_routes USING btree (driver_employee_number) WHERE (status = 'ACTIVE'::text)",
+    "CREATE INDEX nwtb_restore_point_rows_table_idx ON public.nwtb_restore_point_rows USING btree (table_name, restore_point_id)",
+    "CREATE INDEX nwtb_restore_points_created_at_idx ON public.nwtb_restore_points USING btree (created_at DESC)",
+    "CREATE INDEX nwtb_system_control_audit_created_at_idx ON public.nwtb_system_control_audit USING btree (created_at DESC)",
+    "CREATE INDEX nwtb_v2_driver_current_route_idx ON public.nwtb_v2_route_plan_drivers USING btree (driver_employee_number, status, routed_at DESC)",
+    "CREATE INDEX nwtb_v2_route_plan_drivers_plan_idx ON public.nwtb_v2_route_plan_drivers USING btree (plan_id, route_index)",
+    "CREATE INDEX nwtb_v2_route_plan_stops_plan_idx ON public.nwtb_v2_route_plan_stops USING btree (plan_id, driver_employee_number, stop_sequence)",
+    "CREATE INDEX nwtb_v2_route_plans_created_at_idx ON public.nwtb_v2_route_plans USING btree (created_at DESC)",
+    "CREATE INDEX prospect_visit_status_status_idx ON public.prospect_visit_status USING btree (status)",
+    "CREATE INDEX prospect_visit_status_updated_at_idx ON public.prospect_visit_status USING btree (updated_at DESC)"
+  ],
+  "triggers": [
+    {
+      "table": "delivery_route_stops",
+      "definition": "CREATE TRIGGER nwtb_pending_stop_reopens_return BEFORE INSERT OR UPDATE OF status, route_id ON public.delivery_route_stops FOR EACH ROW EXECUTE FUNCTION nwtb_pending_stop_reopens_return()"
+    },
+    {
+      "table": "delivery_route_stops",
+      "definition": "CREATE TRIGGER nwtb_stop_update_route_phase AFTER UPDATE OF status ON public.delivery_route_stops FOR EACH ROW WHEN ((old.status IS DISTINCT FROM new.status)) EXECUTE FUNCTION nwtb_stop_update_route_phase()"
+    },
+    {
+      "table": "delivery_routes",
+      "definition": "CREATE TRIGGER nwtb_delivery_route_driver_role_guard BEFORE INSERT OR UPDATE OF driver_employee_number ON public.delivery_routes FOR EACH ROW EXECUTE FUNCTION nwtb_enforce_delivery_route_driver_role()"
+    },
+    {
+      "table": "delivery_routes",
+      "definition": "CREATE TRIGGER nwtb_keep_return_leg_active BEFORE UPDATE OF status ON public.delivery_routes FOR EACH ROW EXECUTE FUNCTION nwtb_keep_return_leg_active()"
+    },
+    {
+      "table": "delivery_routes",
+      "definition": "CREATE TRIGGER nwtb_stage_office_route_until_release_trg BEFORE INSERT OR UPDATE OF driver_employee_number, status ON public.delivery_routes FOR EACH ROW EXECUTE FUNCTION nwtb_stage_office_route_until_release()"
+    },
+    {
+      "table": "nwtb_restore_points",
+      "definition": "CREATE TRIGGER nwtb_restore_point_include_delivery_exceptions AFTER UPDATE OF status ON public.nwtb_restore_points FOR EACH ROW WHEN (((new.status = 'COMPLETE'::text) AND (old.status IS DISTINCT FROM new.status))) EXECUTE FUNCTION nwtb_snapshot_delivery_exceptions_on_restore_complete()"
+    },
+    {
+      "table": "nwtb_restore_points",
+      "definition": "CREATE TRIGGER nwtb_restore_point_include_delivery_profiles AFTER UPDATE OF status ON public.nwtb_restore_points FOR EACH ROW WHEN (((new.status = 'COMPLETE'::text) AND (old.status IS DISTINCT FROM new.status))) EXECUTE FUNCTION nwtb_snapshot_delivery_profiles_on_restore_complete()"
+    }
+  ],
+  "functions": [
+    {
+      "args": "p_employee_number text, p_display_name text, p_created_by text",
+      "name": "nwtb_add_delivery_driver",
+      "definition": "CREATE OR REPLACE FUNCTION public.nwtb_add_delivery_driver(p_employee_number text, p_display_name text, p_created_by text)\n RETURNS jsonb\n LANGUAGE plpgsql\n SET search_path TO 'public', 'pg_temp'\nAS $function$\nDECLARE v_name text:=btrim(coalesce(p_display_name,''));v_driver text:=btrim(coalesce(p_employee_number,''));v_existing public.employees%ROWTYPE;\nBEGIN\n IF v_driver !~ '^[0-9]{4}$' OR v_driver='9998' OR length(v_name)<2 OR length(v_name)>120 THEN RAISE EXCEPTION 'A name and a valid 4-digit employee number are required.' USING ERRCODE='22023'; END IF;\n IF NOT EXISTS(SELECT 1 FROM public.employees WHERE employee_number=p_created_by AND active) THEN RAISE EXCEPTION 'Office employee is not active.' USING ERRCODE='42501'; END IF;\n PERFORM 1 FROM public.nwtb_system_control WHERE id=1 AND state<>'KILLED' FOR SHARE;\n IF NOT FOUND THEN RAISE EXCEPTION 'NWTB Delivery System is locked.' USING ERRCODE='P0001'; END IF;\n SELECT * INTO v_existing FROM public.employees WHERE employee_number=v_driver FOR UPDATE;\n IF FOUND THEN\n  IF v_existing.active AND v_existing.display_name=v_name AND EXISTS(SELECT 1 FROM public.nwtb_delivery_roles WHERE employee_number=v_driver AND role='DRIVER' AND active) THEN\n   RETURN jsonb_build_object('employee_number',v_driver,'display_name',v_name,'role','DRIVER','active',true,'already_exists',true);\n  END IF;\n  RAISE EXCEPTION 'Employee number already exists. Use USER ROLES to manage the existing employee.' USING ERRCODE='23505';\n END IF;\n INSERT INTO public.employees(employee_number,display_name,active) VALUES(v_driver,v_name,true);\n INSERT INTO public.nwtb_delivery_roles(employee_number,role,active,updated_at,updated_by) VALUES(v_driver,'DRIVER',true,now(),p_created_by)\n ON CONFLICT(employee_number) DO UPDATE SET role='DRIVER',active=true,updated_at=excluded.updated_at,updated_by=excluded.updated_by;\n INSERT INTO public.delivery_events(employee_number,event_type,note) VALUES(p_created_by,'DELIVERY_DRIVER_ADDED',format('Driver added: %s (%s)',v_name,v_driver));\n RETURN jsonb_build_object('employee_number',v_driver,'display_name',v_name,'role','DRIVER','active',true,'already_exists',false);\nEND;$function$\n"
+    },
+    {
+      "args": "p_limit bigint",
+      "name": "nwtb_claim_mapbox_request",
+      "definition": "CREATE OR REPLACE FUNCTION public.nwtb_claim_mapbox_request(p_limit bigint DEFAULT 90000)\n RETURNS boolean\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\ndeclare\n  v_month date := date_trunc('month', now())::date;\n  v_count bigint;\nbegin\n  insert into public.delivery_navigation_usage(month_key, mapbox_requests, updated_at)\n  values (v_month, 0, now())\n  on conflict (month_key) do nothing;\n\n  update public.delivery_navigation_usage\n     set mapbox_requests = mapbox_requests + 1,\n         updated_at = now()\n   where month_key = v_month\n     and mapbox_requests < greatest(0, p_limit)\n  returning mapbox_requests into v_count;\n\n  return found;\nend;\n$function$\n"
+    },
+    {
+      "args": "p_created_by text, p_route_date date, p_routes jsonb",
+      "name": "nwtb_commit_multi_routes",
+      "definition": "CREATE OR REPLACE FUNCTION public.nwtb_commit_multi_routes(p_created_by text, p_route_date date, p_routes jsonb)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\ndeclare\n  r jsonb;\n  s jsonb;\n  v_driver text;\n  v_depot text;\n  v_order uuid;\n  v_route uuid;\n  v_seq integer;\n  v_seen uuid[] := array[]::uuid[];\n  v_result jsonb := '[]'::jsonb;\n  v_start_name text;\n  v_start_address text;\n  v_start_lat double precision;\n  v_start_lon double precision;\nbegin\n  if p_routes is null or jsonb_typeof(p_routes) <> 'array' or jsonb_array_length(p_routes)=0 then\n    raise exception 'At least one driver route is required.';\n  end if;\n\n  -- Validate the entire route set before writing anything.\n  -- IMPORTANT: a driver may already have ACTIVE or PLANNED routes.\n  -- Office pre-routing is allowed. Only route start enforces one ACTIVE route at a time.\n  for r in select value from jsonb_array_elements(p_routes)\n  loop\n    v_driver := trim(coalesce(r->>'driver_employee_number',''));\n    v_depot := upper(trim(coalesce(r->>'depot','')));\n\n    if v_driver !~ '^\\d{4}$' then\n      raise exception 'Every route requires a valid 4-digit driver employee number.';\n    end if;\n\n    if v_depot not in ('BOLINGBROOK','PALATINE') then\n      raise exception 'Every driver requires a valid depot.';\n    end if;\n\n    if not exists (\n      select 1\n      from public.employees e\n      join public.nwtb_delivery_roles dr on dr.employee_number=e.employee_number\n      where e.employee_number=v_driver\n        and e.active=true\n        and dr.active=true\n        and dr.role='DRIVER'\n    ) then\n      raise exception 'Driver % is not an active NWTB driver.', v_driver;\n    end if;\n\n    if jsonb_typeof(r->'stops') <> 'array' or jsonb_array_length(r->'stops')=0 then\n      raise exception 'Every selected driver must receive at least one stop.';\n    end if;\n\n    for s in select value from jsonb_array_elements(r->'stops')\n    loop\n      begin\n        v_order := (s->>'order_id')::uuid;\n      exception when others then\n        raise exception 'A route contains an invalid stop identifier.';\n      end;\n\n      if v_order = any(v_seen) then\n        raise exception 'The same delivery stop was assigned more than once.';\n      end if;\n\n      if not exists (\n        select 1 from public.delivery_orders\n        where id=v_order and status='UNASSIGNED'\n      ) then\n        raise exception 'One or more selected stops are no longer AVAILABLE.';\n      end if;\n\n      v_seen := array_append(v_seen,v_order);\n    end loop;\n  end loop;\n\n  -- Every validation passed. Create all routes in one transaction.\n  for r in select value from jsonb_array_elements(p_routes)\n  loop\n    v_driver := trim(r->>'driver_employee_number');\n    v_depot := upper(trim(r->>'depot'));\n\n    if v_depot='PALATINE' then\n      v_start_name := 'Northwest Trucks - Palatine';\n      v_start_address := '2120 N Rand Rd, Palatine, IL 60074';\n      v_start_lat := 42.148326;\n      v_start_lon := -88.033080;\n    else\n      v_start_name := 'Northwest Trucks - Bolingbrook';\n      v_start_address := '201 S W Frontage Rd, Bolingbrook, IL 60440';\n      v_start_lat := 41.682487;\n      v_start_lon := -88.072262;\n    end if;\n\n    insert into public.delivery_routes(\n      route_date,depot,driver_employee_number,wave,status,\n      estimated_miles,estimated_minutes,created_by,route_note,route_mode,\n      start_name,start_address,start_lat,start_lon,\n      end_mode,end_name,end_address,end_lat,end_lon,\n      drive_minutes,service_minutes,return_miles,return_minutes,\n      traffic_aware,matrix_source\n    ) values (\n      coalesce(p_route_date,current_date),\n      v_depot,\n      v_driver,\n      'CUSTOM',\n      'PLANNED',\n      nullif(r->>'estimated_miles','')::numeric,\n      nullif(r->>'estimated_minutes','')::integer,\n      p_created_by,\n      'Automatic multi-driver pre-route; starts and returns to '||v_depot||'.',\n      'MULTI_DRIVER_OPTIMIZED',\n      v_start_name,v_start_address,v_start_lat,v_start_lon,\n      'RETURN_DEPOT',v_start_name,v_start_address,v_start_lat,v_start_lon,\n      nullif(r->>'drive_minutes','')::integer,\n      nullif(r->>'service_minutes','')::integer,\n      nullif(r->>'return_miles','')::numeric,\n      nullif(r->>'return_minutes','')::integer,\n      coalesce((r->>'traffic_aware')::boolean,false),\n      nullif(r->>'matrix_source','')\n    )\n    returning id into v_route;\n\n    v_seq := 0;\n    for s in\n      select value\n      from jsonb_array_elements(r->'stops')\n      order by (value->>'stop_sequence')::integer\n    loop\n      v_seq := v_seq + 1;\n      v_order := (s->>'order_id')::uuid;\n\n      insert into public.delivery_route_stops(\n        route_id,order_id,stop_sequence,status\n      ) values (\n        v_route,v_order,v_seq,'PENDING'\n      );\n\n      update public.delivery_orders\n      set status='ROUTED',last_status_at=now(),updated_at=now()\n      where id=v_order and status='UNASSIGNED';\n\n      if not found then\n        raise exception 'A selected stop changed while routes were being created.';\n      end if;\n    end loop;\n\n    insert into public.delivery_events(\n      route_id,employee_number,event_type,note\n    ) values (\n      v_route,p_created_by,'ROUTE_CREATED',\n      'Office pre-route created: '||v_seq||' stop(s), depot '||v_depot\n    );\n\n    v_result := v_result || jsonb_build_array(\n      jsonb_build_object(\n        'route_id',v_route,\n        'driver_employee_number',v_driver,\n        'depot',v_depot,\n        'stop_count',v_seq,\n        'estimated_miles',nullif(r->>'estimated_miles','')::numeric,\n        'estimated_minutes',nullif(r->>'estimated_minutes','')::integer,\n        'drive_minutes',nullif(r->>'drive_minutes','')::integer,\n        'service_minutes',nullif(r->>'service_minutes','')::integer,\n        'return_miles',nullif(r->>'return_miles','')::numeric,\n        'return_minutes',nullif(r->>'return_minutes','')::integer\n      )\n    );\n  end loop;\n\n  return jsonb_build_object('ok',true,'routes',v_result);\nend;\n$function$\n"
+    },
+    {
+      "args": "p_route_id uuid, p_driver_employee_number text",
+      "name": "nwtb_confirm_route_return",
+      "definition": "CREATE OR REPLACE FUNCTION public.nwtb_confirm_route_return(p_route_id uuid, p_driver_employee_number text)\n RETURNS jsonb\n LANGUAGE plpgsql\n SET search_path TO 'public', 'pg_catalog'\nAS $function$\nDECLARE r public.delivery_routes; n bigint; all_done boolean; t timestamptz:=now();\nBEGIN\n IF EXISTS(SELECT 1 FROM public.nwtb_system_control WHERE id=1 AND state='KILLED') THEN RAISE EXCEPTION 'NWTB_SYSTEM_KILLED'; END IF;\n SELECT * INTO r FROM public.delivery_routes WHERE id=p_route_id FOR UPDATE;\n IF r.id IS NULL THEN RAISE EXCEPTION 'Route not found.'; END IF;\n IF r.driver_employee_number IS DISTINCT FROM p_driver_employee_number THEN RAISE EXCEPTION 'Route is assigned to another driver.'; END IF;\n IF r.status='COMPLETED' AND r.returned_at IS NOT NULL THEN\n  RETURN jsonb_build_object('route_id',r.id,'route_status','COMPLETED','returned_at',r.returned_at,'already_confirmed',true);\n END IF;\n IF r.status<>'ACTIVE' OR r.released_to_driver IS DISTINCT FROM true THEN RAISE EXCEPTION 'Only a released ACTIVE route can confirm its return.'; END IF;\n IF NOT public.nwtb_route_needs_return(to_jsonb(r)) THEN RAISE EXCEPTION 'This route ends at its last stop.'; END IF;\n IF r.paused_at IS NOT NULL AND (r.resumed_at IS NULL OR r.paused_at>r.resumed_at) THEN RAISE EXCEPTION 'Resume the route before confirming arrival.'; END IF;\n SELECT count(*),coalesce(bool_and(coalesce(status IN ('DELIVERED','NOT_DELIVERED','SKIPPED'),false)),false)\n INTO n,all_done FROM public.delivery_route_stops WHERE route_id=r.id;\n IF n=0 OR NOT all_done THEN RAISE EXCEPTION 'Finish all assigned stops before confirming the return.'; END IF;\n IF r.returning_started_at IS NULL THEN PERFORM public.nwtb_finish_route_stops(r.id,p_driver_employee_number); END IF;\n UPDATE public.delivery_routes SET status='COMPLETED',returned_at=t,updated_at=t WHERE id=r.id;\n INSERT INTO public.delivery_events(route_id,employee_number,event_type,note)\n VALUES(r.id,p_driver_employee_number,'ROUTE_RETURNED','Driver explicitly confirmed arrival at the assigned return location.'),\n       (r.id,p_driver_employee_number,'ROUTE_COMPLETED','Route completed after driver confirmed the return leg.');\n RETURN jsonb_build_object('route_id',r.id,'route_status','COMPLETED','returned_at',t,'already_confirmed',false);\nEND $function$\n"
+    },
+    {
+      "args": "p_label text, p_reason text, p_kind text, p_created_by text",
+      "name": "nwtb_create_restore_point",
+      "definition": "CREATE OR REPLACE FUNCTION public.nwtb_create_restore_point(p_label text, p_reason text DEFAULT NULL::text, p_kind text DEFAULT 'MANUAL'::text, p_created_by text DEFAULT 'SYSTEM'::text)\n RETURNS uuid\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'pg_catalog'\nAS $function$\ndeclare\n  v_id uuid;\n  v_count bigint;\n  v_counts jsonb := '{}'::jsonb;\n  v_kind text := upper(coalesce(p_kind,'MANUAL'));\nbegin\n  if v_kind not in ('DAILY','MANUAL','PRE_DEPLOY','INITIAL') then raise exception 'Invalid restore point kind'; end if;\n  insert into public.nwtb_restore_points(label,reason,kind,status,created_by)\n  values(left(coalesce(nullif(trim(p_label),''),'NWTB Restore Point'),200),left(nullif(trim(p_reason),''),1000),v_kind,'CREATING',left(coalesce(nullif(trim(p_created_by),''),'SYSTEM'),120))\n  returning id into v_id;\n  insert into public.nwtb_restore_point_rows select v_id,'delivery_routes',t.id::text,to_jsonb(t) from public.delivery_routes t; get diagnostics v_count=row_count; v_counts:=v_counts||jsonb_build_object('delivery_routes',v_count);\n  insert into public.nwtb_restore_point_rows select v_id,'delivery_route_stops',t.id::text,to_jsonb(t) from public.delivery_route_stops t; get diagnostics v_count=row_count; v_counts:=v_counts||jsonb_build_object('delivery_route_stops',v_count);\n  insert into public.nwtb_restore_point_rows select v_id,'delivery_orders',t.id::text,to_jsonb(t) from public.delivery_orders t; get diagnostics v_count=row_count; v_counts:=v_counts||jsonb_build_object('delivery_orders',v_count);\n  insert into public.nwtb_restore_point_rows select v_id,'delivery_saved_locations',t.id::text,to_jsonb(t) from public.delivery_saved_locations t; get diagnostics v_count=row_count; v_counts:=v_counts||jsonb_build_object('delivery_saved_locations',v_count);\n  insert into public.nwtb_restore_point_rows select v_id,'delivery_master_versions',t.kind::text,to_jsonb(t) from public.delivery_master_versions t; get diagnostics v_count=row_count; v_counts:=v_counts||jsonb_build_object('delivery_master_versions',v_count);\n  insert into public.nwtb_restore_point_rows select v_id,'employees',t.employee_number::text,to_jsonb(t) from public.employees t; get diagnostics v_count=row_count; v_counts:=v_counts||jsonb_build_object('employees',v_count);\n  insert into public.nwtb_restore_point_rows select v_id,'delivery_tracking_devices',t.id::text,to_jsonb(t) from public.delivery_tracking_devices t; get diagnostics v_count=row_count; v_counts:=v_counts||jsonb_build_object('delivery_tracking_devices',v_count);\n  insert into public.nwtb_restore_point_rows select v_id,'delivery_pods',t.id::text,to_jsonb(t) from public.delivery_pods t; get diagnostics v_count=row_count; v_counts:=v_counts||jsonb_build_object('delivery_pods',v_count);\n  if v_kind in ('MANUAL','PRE_DEPLOY','INITIAL') then\n    insert into public.nwtb_restore_point_rows select v_id,'delivery_chat_messages',t.id::text,to_jsonb(t) from public.delivery_chat_messages t; get diagnostics v_count=row_count; v_counts:=v_counts||jsonb_build_object('delivery_chat_messages',v_count);\n    insert into public.nwtb_restore_point_rows select v_id,'delivery_events',t.id::text,to_jsonb(t) from public.delivery_events t; get diagnostics v_count=row_count; v_counts:=v_counts||jsonb_build_object('delivery_events',v_count);\n  end if;\n  update public.nwtb_restore_points set status='COMPLETE',completed_at=now(),row_counts=v_counts where id=v_id;\n  return v_id;\nexception when others then\n  if v_id is not null then update public.nwtb_restore_points set status='FAILED',completed_at=now(),reason=left(coalesce(reason,'')||case when reason is null or reason='' then '' else ' | ' end||'Checkpoint error: '||sqlerrm,1000) where id=v_id; end if;\n  raise;\nend;\n$function$\n"
+    },
+    {
+      "args": "p_employee_number text, p_permission text",
+      "name": "nwtb_delivery_has_permission",
+      "definition": "CREATE OR REPLACE FUNCTION public.nwtb_delivery_has_permission(p_employee_number text, p_permission text)\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO 'public', 'pg_catalog'\nAS $function$\n  select exists(\n    select 1\n    from public.nwtb_delivery_roles r\n    join public.nwtb_delivery_role_permissions p on p.role=r.role\n    where r.employee_number=p_employee_number\n      and r.active=true\n      and p.permission=upper(p_permission)\n  )\n$function$\n"
+    },
+    {
+      "args": "p_employee_number text",
+      "name": "nwtb_delivery_role_for",
+      "definition": "CREATE OR REPLACE FUNCTION public.nwtb_delivery_role_for(p_employee_number text)\n RETURNS text\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO 'public', 'pg_catalog'\nAS $function$\n  select case\n    when r.active is true then r.role\n    else null\n  end\n  from public.nwtb_delivery_roles r\n  where r.employee_number=p_employee_number\n  limit 1\n$function$\n"
+    },
+    {
+      "args": "",
+      "name": "nwtb_enforce_delivery_route_driver_role",
+      "definition": "CREATE OR REPLACE FUNCTION public.nwtb_enforce_delivery_route_driver_role()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'pg_catalog'\nAS $function$\ndeclare\n  v_role text;\n  v_active boolean;\nbegin\n  select role,active into v_role,v_active\n  from public.nwtb_delivery_roles\n  where employee_number=new.driver_employee_number;\n\n  if v_role is distinct from 'DRIVER' or v_active is distinct from true then\n    raise exception 'Assigned employee is not an active NWTB Delivery DRIVER';\n  end if;\n  return new;\nend;\n$function$\n"
+    },
+    {
+      "args": "p_pod_id uuid, p_stop_id uuid, p_driver_employee_number text, p_driver_display_name text, p_recipient_name text, p_notes text, p_lat double precision, p_lon double precision, p_accuracy_m double precision, p_captured_at timestamp with time zone, p_signature_path text, p_signature_sha256 text, p_photo_path text, p_photo_sha256 text",
+      "name": "nwtb_finalize_pod",
+      "definition": "CREATE OR REPLACE FUNCTION public.nwtb_finalize_pod(p_pod_id uuid, p_stop_id uuid, p_driver_employee_number text, p_driver_display_name text, p_recipient_name text, p_notes text, p_lat double precision, p_lon double precision, p_accuracy_m double precision, p_captured_at timestamp with time zone, p_signature_path text, p_signature_sha256 text, p_photo_path text, p_photo_sha256 text)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'pg_catalog'\nAS $function$\ndeclare\n  v_route_id uuid;\n  v_order_id uuid;\n  v_stop_status text;\n  v_route_driver text;\n  v_driver_role text;\n  v_driver_role_active boolean;\n  v_customer_name text;\n  v_pod_number bigint;\n  v_remaining bigint;\n  v_route_completed boolean := false;\n  v_route_status text;\n  v_released boolean;\n  v_paused_at timestamptz;\n  v_resumed_at timestamptz;\n  v_finish jsonb;\n  v_state text;\nbegin\n  select state into v_state from public.nwtb_system_control where id=1;\n  if v_state='KILLED' then raise exception 'NWTB_SYSTEM_KILLED'; end if;\n\n  select role,active into v_driver_role,v_driver_role_active\n  from public.nwtb_delivery_roles\n  where employee_number=p_driver_employee_number;\n  if v_driver_role is distinct from 'DRIVER' or v_driver_role_active is distinct from true then\n    raise exception 'Driver is not an active NWTB Delivery DRIVER';\n  end if;\n\n  -- Serialize stop completion and return confirmation on the route row first.\n  select route_id into v_route_id from public.delivery_route_stops where id=p_stop_id;\n  perform 1 from public.delivery_routes where id=v_route_id for update;\n  select s.route_id,s.order_id,s.status,r.driver_employee_number,o.customer_name,r.status,r.released_to_driver,r.paused_at,r.resumed_at\n    into v_route_id,v_order_id,v_stop_status,v_route_driver,v_customer_name,v_route_status,v_released,v_paused_at,v_resumed_at\n  from public.delivery_route_stops s\n  join public.delivery_routes r on r.id=s.route_id\n  join public.delivery_orders o on o.id=s.order_id\n  where s.id=p_stop_id\n  for update of s;\n\n  if v_route_id is null then raise exception 'Stop not found'; end if;\n  if v_route_driver is distinct from p_driver_employee_number then raise exception 'Stop is assigned to another driver'; end if;\n  if v_route_status is distinct from 'ACTIVE' or v_released is distinct from true then raise exception 'Start a released route before completing a stop'; end if;\n  if v_paused_at is not null and (v_resumed_at is null or v_paused_at>v_resumed_at) then raise exception 'Resume the route before completing a stop'; end if;\n  if v_stop_status is distinct from 'PENDING' then raise exception 'Stop is no longer pending'; end if;\n  if nullif(trim(p_recipient_name),'') is null then raise exception 'Recipient name is required'; end if;\n  if p_signature_path is null and p_photo_path is null then raise exception 'Signature or photo is required'; end if;\n\n  insert into public.delivery_pods(\n    id,route_id,stop_id,order_id,driver_employee_number,driver_display_name,\n    recipient_name,delivery_result,notes,lat,lon,accuracy_m,captured_at,\n    signature_path,signature_sha256,photo_path,photo_sha256\n  ) values (\n    p_pod_id,v_route_id,p_stop_id,v_order_id,p_driver_employee_number,left(p_driver_display_name,180),\n    left(trim(p_recipient_name),180),'DELIVERED',left(nullif(trim(p_notes),''),1500),\n    p_lat,p_lon,p_accuracy_m,coalesce(p_captured_at,now()),\n    p_signature_path,p_signature_sha256,p_photo_path,p_photo_sha256\n  ) returning pod_number into v_pod_number;\n\n  update public.delivery_route_stops\n     set status='DELIVERED',completed_at=coalesce(p_captured_at,now()),driver_note=left(nullif(trim(p_notes),''),1000),updated_at=now()\n   where id=p_stop_id;\n\n  update public.delivery_orders\n     set status='DELIVERED',last_status_at=coalesce(p_captured_at,now()),updated_at=now()\n   where id=v_order_id;\n\n  insert into public.delivery_events(route_id,stop_id,order_id,employee_number,event_type,note)\n  values(v_route_id,p_stop_id,v_order_id,p_driver_employee_number,'POD_CAPTURED',\n         'POD #'||v_pod_number||' captured for '||coalesce(v_customer_name,'delivery')||'; received by '||left(trim(p_recipient_name),180));\n\n  insert into public.delivery_events(route_id,stop_id,order_id,employee_number,event_type,note)\n  values(v_route_id,p_stop_id,v_order_id,p_driver_employee_number,'STOP_DELIVERED','Delivered with POD #'||v_pod_number);\n\n  select count(*) into v_remaining\n  from public.delivery_route_stops\n  where route_id=v_route_id and status='PENDING';\n\n  if v_remaining=0 then\n    v_finish:=public.nwtb_finish_route_stops(v_route_id,p_driver_employee_number);\n    v_route_completed:=coalesce((v_finish->>'route_completed')::boolean,false);\n  end if;\n\n  return jsonb_build_object(\n    'pod_id',p_pod_id,\n    'pod_number',v_pod_number,\n    'route_id',v_route_id,\n    'stop_id',p_stop_id,\n    'order_id',v_order_id,\n    'route_completed',v_route_completed,\n    'return_pending',coalesce((v_finish->>'return_pending')::boolean,false)\n  );\nend;\n$function$\n"
+    },
+    {
+      "args": "p_route_id uuid, p_driver_employee_number text",
+      "name": "nwtb_finish_route_stops",
+      "definition": "CREATE OR REPLACE FUNCTION public.nwtb_finish_route_stops(p_route_id uuid, p_driver_employee_number text)\n RETURNS jsonb\n LANGUAGE plpgsql\n SET search_path TO 'public', 'pg_catalog'\nAS $function$\nDECLARE r public.delivery_routes; n bigint; all_done boolean; started timestamptz; t timestamptz:=now();\nBEGIN\n IF EXISTS(SELECT 1 FROM public.nwtb_system_control WHERE id=1 AND state='KILLED') THEN RAISE EXCEPTION 'NWTB_SYSTEM_KILLED'; END IF;\n SELECT * INTO r FROM public.delivery_routes WHERE id=p_route_id FOR UPDATE;\n IF r.id IS NULL THEN RAISE EXCEPTION 'Route not found.'; END IF;\n IF r.driver_employee_number IS DISTINCT FROM p_driver_employee_number THEN RAISE EXCEPTION 'Route is assigned to another driver.'; END IF;\n IF r.status='COMPLETED' AND (r.returned_at IS NOT NULL OR NOT public.nwtb_route_needs_return(to_jsonb(r))) THEN\n  RETURN jsonb_build_object('route_id',r.id,'route_status','COMPLETED','route_completed',true,'return_pending',false);\n END IF;\n IF r.status <> 'ACTIVE' OR r.released_to_driver IS DISTINCT FROM true THEN RAISE EXCEPTION 'Only a released ACTIVE route can finish stops.'; END IF;\n IF r.paused_at IS NOT NULL AND (r.resumed_at IS NULL OR r.paused_at>r.resumed_at) THEN RAISE EXCEPTION 'Resume the route before finishing stops.'; END IF;\n SELECT count(*),coalesce(bool_and(coalesce(status IN ('DELIVERED','NOT_DELIVERED','SKIPPED'),false)),false)\n INTO n,all_done FROM public.delivery_route_stops WHERE route_id=r.id;\n IF n=0 OR NOT all_done THEN\n  RETURN jsonb_build_object('route_id',r.id,'route_status','ACTIVE','route_completed',false,'return_pending',false);\n END IF;\n IF public.nwtb_route_needs_return(to_jsonb(r)) THEN\n  started:=coalesce(r.returning_started_at,t);\n  IF r.returning_started_at IS NULL THEN\n   UPDATE public.delivery_routes SET returning_started_at=started,returned_at=NULL,updated_at=t WHERE id=r.id;\n   INSERT INTO public.delivery_events(route_id,employee_number,event_type,note)\n   VALUES(r.id,p_driver_employee_number,'ROUTE_RETURNING','All stops finished. Assigned return leg is in progress; driver arrival is not yet confirmed.');\n  END IF;\n  RETURN jsonb_build_object('route_id',r.id,'route_status','ACTIVE','route_completed',false,'return_pending',true,'returning_started_at',started);\n END IF;\n UPDATE public.delivery_routes SET status='COMPLETED',updated_at=t WHERE id=r.id;\n INSERT INTO public.delivery_events(route_id,employee_number,event_type,note)\n VALUES(r.id,p_driver_employee_number,'ROUTE_COMPLETED','All stops finished. This route ends at its last stop.');\n RETURN jsonb_build_object('route_id',r.id,'route_status','COMPLETED','route_completed',true,'return_pending',false);\nEND $function$\n"
+    },
+    {
+      "args": "",
+      "name": "nwtb_keep_return_leg_active",
+      "definition": "CREATE OR REPLACE FUNCTION public.nwtb_keep_return_leg_active()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'public', 'pg_catalog'\nAS $function$\nDECLARE n bigint; all_done boolean;\nBEGIN\n IF OLD.status='ACTIVE' AND NEW.status='COMPLETED' AND NEW.returned_at IS NULL\n    AND public.nwtb_route_needs_return(to_jsonb(NEW)) THEN\n  SELECT count(*),coalesce(bool_and(coalesce(status IN ('DELIVERED','NOT_DELIVERED','SKIPPED'),false)),false)\n   INTO n,all_done FROM public.delivery_route_stops WHERE route_id=NEW.id;\n  IF n=0 OR NOT all_done THEN RAISE EXCEPTION 'Cannot complete a route with unfinished stops.'; END IF;\n  NEW.status:='ACTIVE';NEW.returning_started_at:=coalesce(NEW.returning_started_at,now());\n  IF OLD.returning_started_at IS NULL THEN\n   INSERT INTO public.delivery_events(route_id,employee_number,event_type,note)\n   VALUES(NEW.id,NEW.driver_employee_number,'ROUTE_RETURNING','All stops finished. Return leg remains ACTIVE until driver confirms arrival.');\n  END IF;\n END IF;\n RETURN NEW;\nEND $function$\n"
+    },
+    {
+      "args": "",
+      "name": "nwtb_pending_stop_reopens_return",
+      "definition": "CREATE OR REPLACE FUNCTION public.nwtb_pending_stop_reopens_return()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'public', 'pg_catalog'\nAS $function$\nDECLARE r public.delivery_routes;\nBEGIN\n IF NEW.status='PENDING' THEN\n  SELECT * INTO r FROM public.delivery_routes WHERE id=NEW.route_id FOR UPDATE;\n  IF r.id IS NULL OR r.status NOT IN ('PLANNED','ACTIVE') THEN RAISE EXCEPTION 'Only a planned or active route can receive a pending stop.'; END IF;\n  IF r.returning_started_at IS NOT NULL OR r.returned_at IS NOT NULL THEN\n   UPDATE public.delivery_routes SET returning_started_at=NULL,returned_at=NULL,updated_at=now() WHERE id=r.id;\n  END IF;\n END IF;\n RETURN NEW;\nEND $function$\n"
+    },
+    {
+      "args": "p_exception_id uuid, p_action text, p_employee_number text, p_resolution_note text",
+      "name": "nwtb_resolve_delivery_exception",
+      "definition": "CREATE OR REPLACE FUNCTION public.nwtb_resolve_delivery_exception(p_exception_id uuid, p_action text, p_employee_number text, p_resolution_note text DEFAULT NULL::text)\n RETURNS delivery_exceptions\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'pg_temp'\nAS $function$\ndeclare\n  v_ex public.delivery_exceptions;\n  v_name text;\n  v_t timestamptz := now();\nbegin\n  select * into v_ex from public.delivery_exceptions where id=p_exception_id for update;\n  if v_ex.id is null then raise exception 'Exception not found.'; end if;\n  if v_ex.status <> 'OPEN' then raise exception 'This exception is already resolved.'; end if;\n  if p_action not in ('RETRY_AVAILABLE','CLOSE_NO_RETRY') then raise exception 'Invalid exception resolution.'; end if;\n  select display_name into v_name from public.employees where employee_number=p_employee_number;\n\n  if p_action='RETRY_AVAILABLE' then\n    insert into public.delivery_events(route_id,order_id,employee_number,event_type,note)\n      values(v_ex.route_id,v_ex.order_id,p_employee_number,'EXCEPTION_RETURNED_AVAILABLE',concat('Exception #',v_ex.exception_number,' returned to AVAILABLE for retry.',case when nullif(trim(coalesce(p_resolution_note,'')),'') is not null then ' '||trim(p_resolution_note) else '' end));\n    delete from public.delivery_route_stops where id=v_ex.stop_id and status='NOT_DELIVERED';\n    update public.delivery_orders set status='UNASSIGNED',last_status_at=v_t,updated_at=v_t where id=v_ex.order_id;\n  else\n    insert into public.delivery_events(route_id,order_id,employee_number,event_type,note)\n      values(v_ex.route_id,v_ex.order_id,p_employee_number,'EXCEPTION_CLOSED_NO_RETRY',concat('Exception #',v_ex.exception_number,' closed with no retry.',case when nullif(trim(coalesce(p_resolution_note,'')),'') is not null then ' '||trim(p_resolution_note) else '' end));\n  end if;\n\n  update public.delivery_exceptions\n    set status='RESOLVED',resolution_action=p_action,resolution_note=nullif(trim(coalesce(p_resolution_note,'')),''),resolved_by_employee_number=p_employee_number,resolved_by_display_name=v_name,resolved_at=v_t,updated_at=v_t\n    where id=p_exception_id\n    returning * into v_ex;\n  return v_ex;\nend;\n$function$\n"
+    },
+    {
+      "args": "p_route jsonb",
+      "name": "nwtb_route_needs_return",
+      "definition": "CREATE OR REPLACE FUNCTION public.nwtb_route_needs_return(p_route jsonb)\n RETURNS boolean\n LANGUAGE sql\n IMMUTABLE\n SET search_path TO 'pg_catalog'\nAS $function$\n SELECT coalesce(nullif(p_route->>'end_mode',''),'RETURN_DEPOT') <> 'LAST_STOP'\n$function$\n"
+    },
+    {
+      "args": "",
+      "name": "nwtb_snapshot_delivery_exceptions_on_restore_complete",
+      "definition": "CREATE OR REPLACE FUNCTION public.nwtb_snapshot_delivery_exceptions_on_restore_complete()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'pg_temp'\nAS $function$\ndeclare\n  v_count integer;\nbegin\n  if new.status='COMPLETE' and old.status is distinct from new.status then\n    insert into public.nwtb_restore_point_rows(restore_point_id,table_name,row_key,row_data)\n    select new.id,'delivery_exceptions',e.id::text,to_jsonb(e)\n    from public.delivery_exceptions e\n    on conflict (restore_point_id,table_name,row_key) do update set row_data=excluded.row_data;\n    select count(*) into v_count from public.delivery_exceptions;\n    update public.nwtb_restore_points\n      set row_counts=coalesce(row_counts,'{}'::jsonb)||jsonb_build_object('delivery_exceptions',v_count)\n      where id=new.id;\n  end if;\n  return new;\nend;\n$function$\n"
+    },
+    {
+      "args": "",
+      "name": "nwtb_snapshot_delivery_profiles_on_restore_complete",
+      "definition": "CREATE OR REPLACE FUNCTION public.nwtb_snapshot_delivery_profiles_on_restore_complete()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'pg_temp'\nAS $function$\ndeclare\n  v_count integer;\nbegin\n  if new.status='COMPLETE' and old.status is distinct from new.status then\n    insert into public.nwtb_restore_point_rows(restore_point_id,table_name,row_key,row_data)\n    select new.id,'delivery_location_profiles',p.id::text,to_jsonb(p)\n    from public.delivery_location_profiles p\n    on conflict (restore_point_id,table_name,row_key) do update set row_data=excluded.row_data;\n    select count(*) into v_count from public.delivery_location_profiles;\n    update public.nwtb_restore_points\n      set row_counts=coalesce(row_counts,'{}'::jsonb)||jsonb_build_object('delivery_location_profiles',v_count)\n      where id=new.id;\n  end if;\n  return new;\nend;\n$function$\n"
+    },
+    {
+      "args": "",
+      "name": "nwtb_stage_office_route_until_release",
+      "definition": "CREATE OR REPLACE FUNCTION public.nwtb_stage_office_route_until_release()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n  IF TG_OP = 'INSERT' THEN\n    IF NEW.status = 'PLANNED'\n       AND COALESCE(NEW.created_by,'') <> COALESCE(NEW.driver_employee_number,'') THEN\n      NEW.released_to_driver := false;\n      NEW.released_at := NULL;\n      NEW.released_by_employee_number := NULL;\n    END IF;\n  ELSIF TG_OP = 'UPDATE' THEN\n    IF NEW.status = 'PLANNED'\n       AND (OLD.driver_employee_number IS DISTINCT FROM NEW.driver_employee_number\n            OR OLD.status IS DISTINCT FROM NEW.status) THEN\n      NEW.released_to_driver := false;\n      NEW.released_at := NULL;\n      NEW.released_by_employee_number := NULL;\n    END IF;\n  END IF;\n  RETURN NEW;\nEND;\n$function$\n"
+    },
+    {
+      "args": "",
+      "name": "nwtb_stop_update_route_phase",
+      "definition": "CREATE OR REPLACE FUNCTION public.nwtb_stop_update_route_phase()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'public', 'pg_catalog'\nAS $function$\nBEGIN\n IF NEW.status IN ('DELIVERED','NOT_DELIVERED','SKIPPED')\n    AND EXISTS(SELECT 1 FROM public.delivery_routes WHERE id=NEW.route_id AND status='ACTIVE') THEN\n  PERFORM public.nwtb_finish_route_stops(NEW.route_id,(SELECT driver_employee_number FROM public.delivery_routes WHERE id=NEW.route_id));\n END IF;\n RETURN NEW;\nEND $function$\n"
+    },
+    {
+      "args": "p_stop_id uuid, p_driver_employee_number text, p_reason_code text, p_reason_label text, p_notes text, p_lat double precision, p_lon double precision, p_accuracy_m double precision, p_occurred_at timestamp with time zone",
+      "name": "nwtb_submit_delivery_exception",
+      "definition": "CREATE OR REPLACE FUNCTION public.nwtb_submit_delivery_exception(p_stop_id uuid, p_driver_employee_number text, p_reason_code text, p_reason_label text, p_notes text DEFAULT NULL::text, p_lat double precision DEFAULT NULL::double precision, p_lon double precision DEFAULT NULL::double precision, p_accuracy_m double precision DEFAULT NULL::double precision, p_occurred_at timestamp with time zone DEFAULT now())\n RETURNS delivery_exceptions\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'pg_temp'\nAS $function$\ndeclare\n  v_stop record;\n  v_order record;\n  v_driver_name text;\n  v_exception public.delivery_exceptions;\n  v_t timestamptz := coalesce(p_occurred_at, now());\n  v_remaining integer;\nbegin\n  -- Use the same route-first lock order as POD and return confirmation.\n  perform 1 from public.delivery_routes where id=(select route_id from public.delivery_route_stops where id=p_stop_id) for update;\n  select s.id,s.route_id,s.order_id,s.status,r.driver_employee_number,r.status as route_status,r.paused_at,r.resumed_at\n    into v_stop\n  from public.delivery_route_stops s\n  join public.delivery_routes r on r.id=s.route_id\n  where s.id=p_stop_id\n  for update of s;\n\n  if v_stop.id is null then raise exception 'Stop not found.'; end if;\n  if v_stop.driver_employee_number <> p_driver_employee_number then raise exception 'Stop is assigned to another driver.'; end if;\n  if v_stop.status <> 'PENDING' then raise exception 'Only a pending stop can be marked as an exception.'; end if;\n  if v_stop.route_status <> 'ACTIVE' then raise exception 'Start the route before reporting a delivery exception.'; end if;\n  if v_stop.paused_at is not null and (v_stop.resumed_at is null or v_stop.paused_at > v_stop.resumed_at) then raise exception 'Resume the route before reporting a delivery exception.'; end if;\n\n  select id,customer_name,address,sales_order_no,customer_number,status\n    into v_order\n  from public.delivery_orders\n  where id=v_stop.order_id\n  for update;\n  if v_order.id is null then raise exception 'Delivery order not found.'; end if;\n\n  select display_name into v_driver_name from public.employees where employee_number=p_driver_employee_number;\n\n  insert into public.delivery_exceptions(\n    route_id,stop_id,order_id,driver_employee_number,driver_display_name,customer_name,address,sales_order_no,customer_number,\n    reason_code,reason_label,notes,lat,lon,accuracy_m,occurred_at\n  ) values (\n    v_stop.route_id,v_stop.id,v_stop.order_id,p_driver_employee_number,v_driver_name,v_order.customer_name,v_order.address,v_order.sales_order_no,v_order.customer_number,\n    p_reason_code,p_reason_label,nullif(trim(coalesce(p_notes,'')),''),p_lat,p_lon,p_accuracy_m,v_t\n  ) returning * into v_exception;\n\n  update public.delivery_route_stops\n    set status='NOT_DELIVERED',completed_at=v_t,driver_note=concat(p_reason_label,case when nullif(trim(coalesce(p_notes,'')),'') is not null then ': '||trim(p_notes) else '' end),updated_at=now()\n    where id=v_stop.id;\n  update public.delivery_orders\n    set status='NOT_DELIVERED',last_status_at=v_t,updated_at=now()\n    where id=v_stop.order_id;\n\n  insert into public.delivery_events(route_id,stop_id,order_id,employee_number,event_type,note)\n    values(v_stop.route_id,v_stop.id,v_stop.order_id,p_driver_employee_number,'DELIVERY_EXCEPTION_REPORTED',concat('#',v_exception.exception_number,' ',p_reason_label,case when nullif(trim(coalesce(p_notes,'')),'') is not null then ' — '||trim(p_notes) else '' end));\n\n  select count(*) into v_remaining from public.delivery_route_stops where route_id=v_stop.route_id and status='PENDING';\n  if v_remaining=0 then\n    perform public.nwtb_finish_route_stops(v_stop.route_id,p_driver_employee_number);\n  end if;\n  return v_exception;\nend;\n$function$\n"
+    },
+    {
+      "args": "p_new_plan_id uuid, p_routed_by text",
+      "name": "nwtb_v2_release_plan",
+      "definition": "CREATE OR REPLACE FUNCTION public.nwtb_v2_release_plan(p_new_plan_id uuid, p_routed_by text)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\ndeclare\n  v_status text;\n  v_now timestamptz := now();\n  v_old_plan uuid;\n  v_replaced uuid[] := ARRAY[]::uuid[];\nbegin\n  select status into v_status\n  from public.nwtb_v2_route_plans\n  where id=p_new_plan_id\n  for update;\n\n  if v_status is null then\n    raise exception 'V2 plan not found.';\n  end if;\n\n  if v_status='ROUTED' then\n    return jsonb_build_object('ok',true,'already_routed',true,'plan_id',p_new_plan_id,'replaced_plan_ids','[]'::jsonb);\n  end if;\n\n  if v_status<>'DRAFT' then\n    raise exception 'Only a DRAFT V2 plan can be routed.';\n  end if;\n\n  for v_old_plan in\n    select distinct x.plan_id\n    from (\n      select d.plan_id\n      from public.nwtb_v2_route_plan_drivers d\n      join public.nwtb_v2_route_plan_stops s on s.plan_driver_id=d.id\n      where d.status='ROUTED'\n        and s.order_id in (\n          select order_id from public.nwtb_v2_route_plan_stops where plan_id=p_new_plan_id\n        )\n      union\n      select d.plan_id\n      from public.nwtb_v2_route_plan_drivers d\n      where d.status='ROUTED'\n        and d.driver_employee_number in (\n          select driver_employee_number\n          from public.nwtb_v2_route_plan_drivers\n          where plan_id=p_new_plan_id\n        )\n    ) x\n  loop\n    if exists (\n      select 1\n      from public.nwtb_v2_route_plan_drivers od\n      join public.nwtb_v2_route_plan_stops os on os.plan_driver_id=od.id\n      where od.plan_id=v_old_plan\n        and od.status='ROUTED'\n        and not exists (\n          select 1\n          from public.nwtb_v2_route_plan_stops ns\n          where ns.plan_id=p_new_plan_id\n            and ns.order_id=os.order_id\n        )\n    ) then\n      raise exception 'Cannot replace V2 plan % because not all of its routed stops are included in the new plan.', v_old_plan;\n    end if;\n\n    v_replaced := array_append(v_replaced,v_old_plan);\n  end loop;\n\n  if coalesce(array_length(v_replaced,1),0)>0 then\n    update public.nwtb_v2_route_plan_drivers\n      set status='ARCHIVED'\n    where plan_id=any(v_replaced)\n      and status='ROUTED';\n\n    update public.nwtb_v2_route_plans\n      set status='ARCHIVED',\n          note='Superseded by V2 plan '||p_new_plan_id::text\n    where id=any(v_replaced)\n      and status='ROUTED';\n  end if;\n\n  update public.nwtb_v2_route_plan_drivers\n    set status='ROUTED',\n        routed_at=v_now\n  where plan_id=p_new_plan_id;\n\n  update public.nwtb_v2_route_plans\n    set status='ROUTED',\n        routed_at=v_now,\n        routed_by=p_routed_by,\n        note='V2 ROUTED assignment released to drivers. Production routes remain untouched.'\n  where id=p_new_plan_id;\n\n  return jsonb_build_object(\n    'ok',true,\n    'already_routed',false,\n    'plan_id',p_new_plan_id,\n    'replaced_plan_ids',to_jsonb(v_replaced)\n  );\nend;\n$function$\n"
+    }
+  ],
+  "sequences": [
+    {
+      "max": 9223372036854776000,
+      "min": 1,
+      "name": "chat_messages_id_seq",
+      "type": "bigint",
+      "cache": 1,
+      "cycle": false,
+      "start": 1,
+      "increment": 1
+    },
+    {
+      "max": 9223372036854776000,
+      "min": 1,
+      "name": "delivery_chat_messages_id_seq",
+      "type": "bigint",
+      "cache": 1,
+      "cycle": false,
+      "start": 1,
+      "increment": 1
+    },
+    {
+      "max": 9223372036854776000,
+      "min": 1,
+      "name": "delivery_customer_master_id_seq",
+      "type": "bigint",
+      "cache": 1,
+      "cycle": false,
+      "start": 1,
+      "increment": 1
+    },
+    {
+      "max": 9223372036854776000,
+      "min": 1,
+      "name": "delivery_driver_locations_id_seq",
+      "type": "bigint",
+      "cache": 1,
+      "cycle": false,
+      "start": 1,
+      "increment": 1
+    },
+    {
+      "max": 9223372036854776000,
+      "min": 1,
+      "name": "delivery_events_id_seq",
+      "type": "bigint",
+      "cache": 1,
+      "cycle": false,
+      "start": 1,
+      "increment": 1
+    },
+    {
+      "max": 9223372036854776000,
+      "min": 1,
+      "name": "delivery_exceptions_exception_number_seq",
+      "type": "bigint",
+      "cache": 1,
+      "cycle": false,
+      "start": 1,
+      "increment": 1
+    },
+    {
+      "max": 9223372036854776000,
+      "min": 1,
+      "name": "delivery_pods_pod_number_seq",
+      "type": "bigint",
+      "cache": 1,
+      "cycle": false,
+      "start": 1,
+      "increment": 1
+    },
+    {
+      "max": 9223372036854776000,
+      "min": 1,
+      "name": "delivery_vendor_master_id_seq",
+      "type": "bigint",
+      "cache": 1,
+      "cycle": false,
+      "start": 1,
+      "increment": 1
+    },
+    {
+      "max": 9223372036854776000,
+      "min": 1,
+      "name": "nwtb_system_control_audit_id_seq",
+      "type": "bigint",
+      "cache": 1,
+      "cycle": false,
+      "start": 1,
+      "increment": 1
+    },
+    {
+      "max": 9223372036854776000,
+      "min": 1,
+      "name": "sales_accounts_id_seq",
+      "type": "bigint",
+      "cache": 1,
+      "cycle": false,
+      "start": 1,
+      "increment": 1
+    }
+  ],
+  "constraints": [
+    {
+      "name": "chat_messages_pkey",
+      "type": "p",
+      "table": "chat_messages",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "chat_sessions_pkey",
+      "type": "p",
+      "table": "chat_sessions",
+      "definition": "PRIMARY KEY (token)"
+    },
+    {
+      "name": "delivery_chat_messages_pkey",
+      "type": "p",
+      "table": "delivery_chat_messages",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "delivery_customer_master_pkey",
+      "type": "p",
+      "table": "delivery_customer_master",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "delivery_driver_locations_pkey",
+      "type": "p",
+      "table": "delivery_driver_locations",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "delivery_events_pkey",
+      "type": "p",
+      "table": "delivery_events",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "delivery_exceptions_pkey",
+      "type": "p",
+      "table": "delivery_exceptions",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "delivery_location_profiles_pkey",
+      "type": "p",
+      "table": "delivery_location_profiles",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "delivery_master_versions_pkey",
+      "type": "p",
+      "table": "delivery_master_versions",
+      "definition": "PRIMARY KEY (kind)"
+    },
+    {
+      "name": "delivery_navigation_usage_pkey",
+      "type": "p",
+      "table": "delivery_navigation_usage",
+      "definition": "PRIMARY KEY (month_key)"
+    },
+    {
+      "name": "delivery_orders_pkey",
+      "type": "p",
+      "table": "delivery_orders",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "delivery_pods_pkey",
+      "type": "p",
+      "table": "delivery_pods",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "delivery_route_stops_pkey",
+      "type": "p",
+      "table": "delivery_route_stops",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "delivery_routes_pkey",
+      "type": "p",
+      "table": "delivery_routes",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "delivery_saved_locations_pkey",
+      "type": "p",
+      "table": "delivery_saved_locations",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "delivery_tracking_devices_pkey",
+      "type": "p",
+      "table": "delivery_tracking_devices",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "delivery_vendor_master_pkey",
+      "type": "p",
+      "table": "delivery_vendor_master",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "employees_pkey",
+      "type": "p",
+      "table": "employees",
+      "definition": "PRIMARY KEY (employee_number)"
+    },
+    {
+      "name": "nwtb_admin_security_pkey",
+      "type": "p",
+      "table": "nwtb_admin_security",
+      "definition": "PRIMARY KEY (key)"
+    },
+    {
+      "name": "nwtb_delivery_role_permissions_pkey",
+      "type": "p",
+      "table": "nwtb_delivery_role_permissions",
+      "definition": "PRIMARY KEY (role, permission)"
+    },
+    {
+      "name": "nwtb_delivery_roles_pkey",
+      "type": "p",
+      "table": "nwtb_delivery_roles",
+      "definition": "PRIMARY KEY (employee_number)"
+    },
+    {
+      "name": "nwtb_driver_push_keys_pkey",
+      "type": "p",
+      "table": "nwtb_driver_push_keys",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "nwtb_driver_push_subscriptions_pkey",
+      "type": "p",
+      "table": "nwtb_driver_push_subscriptions",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "nwtb_restore_point_rows_pkey",
+      "type": "p",
+      "table": "nwtb_restore_point_rows",
+      "definition": "PRIMARY KEY (restore_point_id, table_name, row_key)"
+    },
+    {
+      "name": "nwtb_restore_points_pkey",
+      "type": "p",
+      "table": "nwtb_restore_points",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "nwtb_system_control_pkey",
+      "type": "p",
+      "table": "nwtb_system_control",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "nwtb_system_control_audit_pkey",
+      "type": "p",
+      "table": "nwtb_system_control_audit",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "nwtb_v2_route_plan_drivers_pkey",
+      "type": "p",
+      "table": "nwtb_v2_route_plan_drivers",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "nwtb_v2_route_plan_stops_pkey",
+      "type": "p",
+      "table": "nwtb_v2_route_plan_stops",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "nwtb_v2_route_plans_pkey",
+      "type": "p",
+      "table": "nwtb_v2_route_plans",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "prospect_visit_status_pkey",
+      "type": "p",
+      "table": "prospect_visit_status",
+      "definition": "PRIMARY KEY (account_key)"
+    },
+    {
+      "name": "sales_accounts_pkey",
+      "type": "p",
+      "table": "sales_accounts",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "delivery_exceptions_exception_number_key",
+      "type": "u",
+      "table": "delivery_exceptions",
+      "definition": "UNIQUE (exception_number)"
+    },
+    {
+      "name": "delivery_pods_pod_number_key",
+      "type": "u",
+      "table": "delivery_pods",
+      "definition": "UNIQUE (pod_number)"
+    },
+    {
+      "name": "delivery_route_stops_route_id_order_id_key",
+      "type": "u",
+      "table": "delivery_route_stops",
+      "definition": "UNIQUE (route_id, order_id)"
+    },
+    {
+      "name": "delivery_route_stops_route_id_stop_sequence_key",
+      "type": "u",
+      "table": "delivery_route_stops",
+      "definition": "UNIQUE (route_id, stop_sequence)"
+    },
+    {
+      "name": "delivery_tracking_devices_device_hash_key",
+      "type": "u",
+      "table": "delivery_tracking_devices",
+      "definition": "UNIQUE (device_hash)"
+    },
+    {
+      "name": "nwtb_driver_push_subscriptions_endpoint_key",
+      "type": "u",
+      "table": "nwtb_driver_push_subscriptions",
+      "definition": "UNIQUE (endpoint)"
+    },
+    {
+      "name": "nwtb_v2_route_plan_drivers_plan_id_driver_employee_number_key",
+      "type": "u",
+      "table": "nwtb_v2_route_plan_drivers",
+      "definition": "UNIQUE (plan_id, driver_employee_number)"
+    },
+    {
+      "name": "nwtb_v2_route_plan_drivers_plan_id_route_index_key",
+      "type": "u",
+      "table": "nwtb_v2_route_plan_drivers",
+      "definition": "UNIQUE (plan_id, route_index)"
+    },
+    {
+      "name": "nwtb_v2_route_plan_stops_plan_driver_id_stop_sequence_key",
+      "type": "u",
+      "table": "nwtb_v2_route_plan_stops",
+      "definition": "UNIQUE (plan_driver_id, stop_sequence)"
+    },
+    {
+      "name": "nwtb_v2_route_plan_stops_plan_id_order_id_key",
+      "type": "u",
+      "table": "nwtb_v2_route_plan_stops",
+      "definition": "UNIQUE (plan_id, order_id)"
+    },
+    {
+      "name": "sales_accounts_source_index_key",
+      "type": "u",
+      "table": "sales_accounts",
+      "definition": "UNIQUE (source_index)"
+    },
+    {
+      "name": "chat_messages_channel_check",
+      "type": "c",
+      "table": "chat_messages",
+      "definition": "CHECK ((channel = ANY (ARRAY['SALES'::text, 'DELIVERY_PICKUP'::text])))"
+    },
+    {
+      "name": "chat_messages_message_type_check",
+      "type": "c",
+      "table": "chat_messages",
+      "definition": "CHECK ((message_type = ANY (ARRAY['text'::text, 'route'::text])))"
+    },
+    {
+      "name": "delivery_chat_messages_body_check",
+      "type": "c",
+      "table": "delivery_chat_messages",
+      "definition": "CHECK (((char_length(body) >= 1) AND (char_length(body) <= 1000)))"
+    },
+    {
+      "name": "delivery_chat_messages_sender_role_check",
+      "type": "c",
+      "table": "delivery_chat_messages",
+      "definition": "CHECK ((sender_role = ANY (ARRAY['DISPATCH'::text, 'DRIVER'::text])))"
+    },
+    {
+      "name": "delivery_driver_locations_source_check",
+      "type": "c",
+      "table": "delivery_driver_locations",
+      "definition": "CHECK ((location_source = ANY (ARRAY['WEB_DRIVER'::text, 'GPS_ROUTING_APP'::text])))"
+    },
+    {
+      "name": "delivery_exceptions_reason_code_check",
+      "type": "c",
+      "table": "delivery_exceptions",
+      "definition": "CHECK ((reason_code = ANY (ARRAY['CUSTOMER_CLOSED'::text, 'NO_ONE_AVAILABLE'::text, 'WRONG_ADDRESS'::text, 'CUSTOMER_REFUSED'::text, 'DAMAGED_PARTS'::text, 'MISSING_PARTS'::text, 'ACCESS_BLOCKED'::text, 'CUSTOMER_REQUESTED_RESCHEDULE'::text, 'VEHICLE_ISSUE'::text, 'OTHER'::text])))"
+    },
+    {
+      "name": "delivery_exceptions_resolution_action_check",
+      "type": "c",
+      "table": "delivery_exceptions",
+      "definition": "CHECK (((resolution_action IS NULL) OR (resolution_action = ANY (ARRAY['RETRY_AVAILABLE'::text, 'CLOSE_NO_RETRY'::text]))))"
+    },
+    {
+      "name": "delivery_exceptions_status_check",
+      "type": "c",
+      "table": "delivery_exceptions",
+      "definition": "CHECK ((status = ANY (ARRAY['OPEN'::text, 'RESOLVED'::text])))"
+    },
+    {
+      "name": "delivery_location_profiles_hours_object",
+      "type": "c",
+      "table": "delivery_location_profiles",
+      "definition": "CHECK ((jsonb_typeof(receiving_hours) = 'object'::text))"
+    },
+    {
+      "name": "delivery_location_profiles_service_minutes_check",
+      "type": "c",
+      "table": "delivery_location_profiles",
+      "definition": "CHECK (((service_minutes >= 0) AND (service_minutes <= 180)))"
+    },
+    {
+      "name": "delivery_location_profiles_source_type_check",
+      "type": "c",
+      "table": "delivery_location_profiles",
+      "definition": "CHECK ((source_type = ANY (ARRAY['CUSTOMER'::text, 'VENDOR'::text, 'OTHER'::text])))"
+    },
+    {
+      "name": "delivery_master_versions_kind_check",
+      "type": "c",
+      "table": "delivery_master_versions",
+      "definition": "CHECK ((kind = ANY (ARRAY['CUSTOMER'::text, 'VENDOR'::text])))"
+    },
+    {
+      "name": "delivery_navigation_usage_mapbox_requests_check",
+      "type": "c",
+      "table": "delivery_navigation_usage",
+      "definition": "CHECK ((mapbox_requests >= 0))"
+    },
+    {
+      "name": "delivery_navigation_usage_month_key_check",
+      "type": "c",
+      "table": "delivery_navigation_usage",
+      "definition": "CHECK ((month_key = (date_trunc('month'::text, (month_key)::timestamp with time zone))::date))"
+    },
+    {
+      "name": "delivery_orders_pieces_check",
+      "type": "c",
+      "table": "delivery_orders",
+      "definition": "CHECK ((pieces >= 0))"
+    },
+    {
+      "name": "delivery_orders_priority_check",
+      "type": "c",
+      "table": "delivery_orders",
+      "definition": "CHECK ((priority = ANY (ARRAY['NORMAL'::text, 'PRIORITY'::text, 'HOT_SHOT'::text])))"
+    },
+    {
+      "name": "delivery_orders_source_type_check",
+      "type": "c",
+      "table": "delivery_orders",
+      "definition": "CHECK ((source_type = ANY (ARRAY['CUSTOMER'::text, 'VENDOR'::text, 'OTHER'::text])))"
+    },
+    {
+      "name": "delivery_orders_status_check",
+      "type": "c",
+      "table": "delivery_orders",
+      "definition": "CHECK ((status = ANY (ARRAY['UNASSIGNED'::text, 'ROUTED'::text, 'OUT_FOR_DELIVERY'::text, 'DELIVERED'::text, 'NOT_DELIVERED'::text, 'CANCELED'::text])))"
+    },
+    {
+      "name": "delivery_orders_stop_type_check",
+      "type": "c",
+      "table": "delivery_orders",
+      "definition": "CHECK ((stop_type = ANY (ARRAY['CUSTOMER_DELIVERY'::text, 'CUSTOMER_PICKUP'::text, 'VENDOR_PICKUP'::text, 'CORE_RETURN_PICKUP'::text, 'OTHER'::text])))"
+    },
+    {
+      "name": "delivery_pods_delivery_result_check",
+      "type": "c",
+      "table": "delivery_pods",
+      "definition": "CHECK ((delivery_result = 'DELIVERED'::text))"
+    },
+    {
+      "name": "delivery_route_stops_status_check",
+      "type": "c",
+      "table": "delivery_route_stops",
+      "definition": "CHECK ((status = ANY (ARRAY['PENDING'::text, 'DELIVERED'::text, 'NOT_DELIVERED'::text, 'SKIPPED'::text])))"
+    },
+    {
+      "name": "delivery_route_stops_stop_sequence_check",
+      "type": "c",
+      "table": "delivery_route_stops",
+      "definition": "CHECK ((stop_sequence > 0))"
+    },
+    {
+      "name": "delivery_routes_depot_check",
+      "type": "c",
+      "table": "delivery_routes",
+      "definition": "CHECK ((depot = ANY (ARRAY['BOLINGBROOK'::text, 'PALATINE'::text])))"
+    },
+    {
+      "name": "delivery_routes_status_check",
+      "type": "c",
+      "table": "delivery_routes",
+      "definition": "CHECK ((status = ANY (ARRAY['PLANNED'::text, 'ACTIVE'::text, 'COMPLETED'::text, 'CANCELED'::text])))"
+    },
+    {
+      "name": "delivery_routes_wave_check",
+      "type": "c",
+      "table": "delivery_routes",
+      "definition": "CHECK ((wave = ANY (ARRAY['MORNING'::text, 'AFTERNOON'::text, 'HOT_SHOT'::text, 'CUSTOM'::text])))"
+    },
+    {
+      "name": "delivery_saved_locations_source_type_check",
+      "type": "c",
+      "table": "delivery_saved_locations",
+      "definition": "CHECK ((source_type = ANY (ARRAY['CUSTOMER'::text, 'VENDOR'::text, 'OTHER'::text])))"
+    },
+    {
+      "name": "employees_employee_number_check",
+      "type": "c",
+      "table": "employees",
+      "definition": "CHECK ((employee_number ~ '^[0-9]{4}$'::text))"
+    },
+    {
+      "name": "nwtb_delivery_role_permissions_role_check",
+      "type": "c",
+      "table": "nwtb_delivery_role_permissions",
+      "definition": "CHECK ((role = ANY (ARRAY['ADMIN'::text, 'DISPATCH'::text, 'SUPERVISOR'::text, 'DRIVER'::text, 'VIEW_ONLY'::text])))"
+    },
+    {
+      "name": "nwtb_delivery_roles_role_check",
+      "type": "c",
+      "table": "nwtb_delivery_roles",
+      "definition": "CHECK ((role = ANY (ARRAY['ADMIN'::text, 'DISPATCH'::text, 'SUPERVISOR'::text, 'DRIVER'::text, 'VIEW_ONLY'::text])))"
+    },
+    {
+      "name": "nwtb_driver_push_keys_id_check",
+      "type": "c",
+      "table": "nwtb_driver_push_keys",
+      "definition": "CHECK ((id = 1))"
+    },
+    {
+      "name": "nwtb_driver_push_keys_private_key_check",
+      "type": "c",
+      "table": "nwtb_driver_push_keys",
+      "definition": "CHECK ((length(private_key) = 43))"
+    },
+    {
+      "name": "nwtb_driver_push_keys_public_key_check",
+      "type": "c",
+      "table": "nwtb_driver_push_keys",
+      "definition": "CHECK ((length(public_key) = 87))"
+    },
+    {
+      "name": "nwtb_driver_push_subscriptions_auth_check",
+      "type": "c",
+      "table": "nwtb_driver_push_subscriptions",
+      "definition": "CHECK ((length(auth) = 22))"
+    },
+    {
+      "name": "nwtb_driver_push_subscriptions_endpoint_check",
+      "type": "c",
+      "table": "nwtb_driver_push_subscriptions",
+      "definition": "CHECK ((length(endpoint) <= 2048))"
+    },
+    {
+      "name": "nwtb_driver_push_subscriptions_p256dh_check",
+      "type": "c",
+      "table": "nwtb_driver_push_subscriptions",
+      "definition": "CHECK ((length(p256dh) = 87))"
+    },
+    {
+      "name": "nwtb_driver_push_subscriptions_page_path_check",
+      "type": "c",
+      "table": "nwtb_driver_push_subscriptions",
+      "definition": "CHECK ((page_path = ANY (ARRAY['/nwtb-route-creator/driver-live.html'::text, '/nwtb-route-creator/driver-standard.html'::text])))"
+    },
+    {
+      "name": "nwtb_restore_points_kind_check",
+      "type": "c",
+      "table": "nwtb_restore_points",
+      "definition": "CHECK ((kind = ANY (ARRAY['DAILY'::text, 'MANUAL'::text, 'PRE_DEPLOY'::text, 'INITIAL'::text])))"
+    },
+    {
+      "name": "nwtb_restore_points_status_check",
+      "type": "c",
+      "table": "nwtb_restore_points",
+      "definition": "CHECK ((status = ANY (ARRAY['CREATING'::text, 'COMPLETE'::text, 'FAILED'::text])))"
+    },
+    {
+      "name": "nwtb_system_control_id_check",
+      "type": "c",
+      "table": "nwtb_system_control",
+      "definition": "CHECK ((id = 1))"
+    },
+    {
+      "name": "nwtb_system_control_state_check",
+      "type": "c",
+      "table": "nwtb_system_control",
+      "definition": "CHECK ((state = ANY (ARRAY['ACTIVE'::text, 'KILLED'::text])))"
+    },
+    {
+      "name": "nwtb_system_control_audit_action_check",
+      "type": "c",
+      "table": "nwtb_system_control_audit",
+      "definition": "CHECK ((action = ANY (ARRAY['KILL'::text, 'REACTIVATE'::text])))"
+    },
+    {
+      "name": "nwtb_v2_route_plan_drivers_depot_check",
+      "type": "c",
+      "table": "nwtb_v2_route_plan_drivers",
+      "definition": "CHECK ((depot = ANY (ARRAY['BOLINGBROOK'::text, 'PALATINE'::text])))"
+    },
+    {
+      "name": "nwtb_v2_route_plan_drivers_status_check",
+      "type": "c",
+      "table": "nwtb_v2_route_plan_drivers",
+      "definition": "CHECK ((status = ANY (ARRAY['DRAFT'::text, 'ROUTED'::text, 'ARCHIVED'::text])))"
+    },
+    {
+      "name": "nwtb_v2_route_plans_depot_check",
+      "type": "c",
+      "table": "nwtb_v2_route_plans",
+      "definition": "CHECK ((depot = ANY (ARRAY['BOLINGBROOK'::text, 'PALATINE'::text, 'MULTI'::text])))"
+    },
+    {
+      "name": "nwtb_v2_route_plans_driver_count_check",
+      "type": "c",
+      "table": "nwtb_v2_route_plans",
+      "definition": "CHECK ((driver_count > 0))"
+    },
+    {
+      "name": "nwtb_v2_route_plans_status_check",
+      "type": "c",
+      "table": "nwtb_v2_route_plans",
+      "definition": "CHECK ((status = ANY (ARRAY['DRAFT'::text, 'ROUTED'::text, 'ARCHIVED'::text])))"
+    },
+    {
+      "name": "nwtb_v2_route_plans_stop_count_check",
+      "type": "c",
+      "table": "nwtb_v2_route_plans",
+      "definition": "CHECK ((stop_count >= 0))"
+    },
+    {
+      "name": "prospect_visit_status_status_check",
+      "type": "c",
+      "table": "prospect_visit_status",
+      "definition": "CHECK ((status = ANY (ARRAY['NOT_VISITED'::text, 'FOLLOW_UP'::text, 'DO_NOT_ROUTE'::text, 'NOT_A_FIT'::text])))"
+    },
+    {
+      "name": "chat_messages_employee_number_fkey",
+      "type": "f",
+      "table": "chat_messages",
+      "definition": "FOREIGN KEY (employee_number) REFERENCES employees(employee_number)"
+    },
+    {
+      "name": "chat_sessions_employee_number_fkey",
+      "type": "f",
+      "table": "chat_sessions",
+      "definition": "FOREIGN KEY (employee_number) REFERENCES employees(employee_number) ON DELETE CASCADE"
+    },
+    {
+      "name": "delivery_chat_messages_conversation_driver_employee_number_fkey",
+      "type": "f",
+      "table": "delivery_chat_messages",
+      "definition": "FOREIGN KEY (conversation_driver_employee_number) REFERENCES employees(employee_number)"
+    },
+    {
+      "name": "delivery_chat_messages_employee_number_fkey",
+      "type": "f",
+      "table": "delivery_chat_messages",
+      "definition": "FOREIGN KEY (employee_number) REFERENCES employees(employee_number)"
+    },
+    {
+      "name": "delivery_chat_messages_route_id_fkey",
+      "type": "f",
+      "table": "delivery_chat_messages",
+      "definition": "FOREIGN KEY (route_id) REFERENCES delivery_routes(id) ON DELETE SET NULL"
+    },
+    {
+      "name": "delivery_driver_locations_driver_employee_number_fkey",
+      "type": "f",
+      "table": "delivery_driver_locations",
+      "definition": "FOREIGN KEY (driver_employee_number) REFERENCES employees(employee_number)"
+    },
+    {
+      "name": "delivery_driver_locations_route_id_fkey",
+      "type": "f",
+      "table": "delivery_driver_locations",
+      "definition": "FOREIGN KEY (route_id) REFERENCES delivery_routes(id) ON DELETE SET NULL"
+    },
+    {
+      "name": "delivery_events_employee_number_fkey",
+      "type": "f",
+      "table": "delivery_events",
+      "definition": "FOREIGN KEY (employee_number) REFERENCES employees(employee_number)"
+    },
+    {
+      "name": "delivery_events_order_id_fkey",
+      "type": "f",
+      "table": "delivery_events",
+      "definition": "FOREIGN KEY (order_id) REFERENCES delivery_orders(id) ON DELETE SET NULL"
+    },
+    {
+      "name": "delivery_events_route_id_fkey",
+      "type": "f",
+      "table": "delivery_events",
+      "definition": "FOREIGN KEY (route_id) REFERENCES delivery_routes(id) ON DELETE CASCADE"
+    },
+    {
+      "name": "delivery_events_stop_id_fkey",
+      "type": "f",
+      "table": "delivery_events",
+      "definition": "FOREIGN KEY (stop_id) REFERENCES delivery_route_stops(id) ON DELETE CASCADE"
+    },
+    {
+      "name": "delivery_location_profiles_saved_location_id_fkey",
+      "type": "f",
+      "table": "delivery_location_profiles",
+      "definition": "FOREIGN KEY (saved_location_id) REFERENCES delivery_saved_locations(id) ON DELETE SET NULL"
+    },
+    {
+      "name": "delivery_master_versions_imported_by_fkey",
+      "type": "f",
+      "table": "delivery_master_versions",
+      "definition": "FOREIGN KEY (imported_by) REFERENCES employees(employee_number)"
+    },
+    {
+      "name": "delivery_orders_created_by_fkey",
+      "type": "f",
+      "table": "delivery_orders",
+      "definition": "FOREIGN KEY (created_by) REFERENCES employees(employee_number)"
+    },
+    {
+      "name": "delivery_orders_saved_location_id_fkey",
+      "type": "f",
+      "table": "delivery_orders",
+      "definition": "FOREIGN KEY (saved_location_id) REFERENCES delivery_saved_locations(id) ON DELETE SET NULL"
+    },
+    {
+      "name": "delivery_pods_order_id_fkey",
+      "type": "f",
+      "table": "delivery_pods",
+      "definition": "FOREIGN KEY (order_id) REFERENCES delivery_orders(id) ON DELETE SET NULL"
+    },
+    {
+      "name": "delivery_pods_route_id_fkey",
+      "type": "f",
+      "table": "delivery_pods",
+      "definition": "FOREIGN KEY (route_id) REFERENCES delivery_routes(id) ON DELETE SET NULL"
+    },
+    {
+      "name": "delivery_pods_stop_id_fkey",
+      "type": "f",
+      "table": "delivery_pods",
+      "definition": "FOREIGN KEY (stop_id) REFERENCES delivery_route_stops(id) ON DELETE SET NULL"
+    },
+    {
+      "name": "delivery_route_stops_order_id_fkey",
+      "type": "f",
+      "table": "delivery_route_stops",
+      "definition": "FOREIGN KEY (order_id) REFERENCES delivery_orders(id) ON DELETE RESTRICT"
+    },
+    {
+      "name": "delivery_route_stops_route_id_fkey",
+      "type": "f",
+      "table": "delivery_route_stops",
+      "definition": "FOREIGN KEY (route_id) REFERENCES delivery_routes(id) ON DELETE CASCADE"
+    },
+    {
+      "name": "delivery_routes_created_by_fkey",
+      "type": "f",
+      "table": "delivery_routes",
+      "definition": "FOREIGN KEY (created_by) REFERENCES employees(employee_number)"
+    },
+    {
+      "name": "delivery_routes_driver_employee_number_fkey",
+      "type": "f",
+      "table": "delivery_routes",
+      "definition": "FOREIGN KEY (driver_employee_number) REFERENCES employees(employee_number)"
+    },
+    {
+      "name": "delivery_saved_locations_created_by_fkey",
+      "type": "f",
+      "table": "delivery_saved_locations",
+      "definition": "FOREIGN KEY (created_by) REFERENCES employees(employee_number)"
+    },
+    {
+      "name": "delivery_tracking_devices_driver_employee_number_fkey",
+      "type": "f",
+      "table": "delivery_tracking_devices",
+      "definition": "FOREIGN KEY (driver_employee_number) REFERENCES employees(employee_number) ON UPDATE CASCADE ON DELETE CASCADE"
+    },
+    {
+      "name": "nwtb_delivery_roles_employee_number_fkey",
+      "type": "f",
+      "table": "nwtb_delivery_roles",
+      "definition": "FOREIGN KEY (employee_number) REFERENCES employees(employee_number) ON DELETE CASCADE"
+    },
+    {
+      "name": "nwtb_driver_push_subscriptions_driver_employee_number_fkey",
+      "type": "f",
+      "table": "nwtb_driver_push_subscriptions",
+      "definition": "FOREIGN KEY (driver_employee_number) REFERENCES employees(employee_number) ON DELETE CASCADE"
+    },
+    {
+      "name": "nwtb_driver_push_subscriptions_session_token_fkey",
+      "type": "f",
+      "table": "nwtb_driver_push_subscriptions",
+      "definition": "FOREIGN KEY (session_token) REFERENCES chat_sessions(token) ON DELETE CASCADE"
+    },
+    {
+      "name": "nwtb_restore_point_rows_restore_point_id_fkey",
+      "type": "f",
+      "table": "nwtb_restore_point_rows",
+      "definition": "FOREIGN KEY (restore_point_id) REFERENCES nwtb_restore_points(id) ON DELETE CASCADE"
+    },
+    {
+      "name": "nwtb_v2_route_plan_drivers_plan_id_fkey",
+      "type": "f",
+      "table": "nwtb_v2_route_plan_drivers",
+      "definition": "FOREIGN KEY (plan_id) REFERENCES nwtb_v2_route_plans(id) ON DELETE CASCADE"
+    },
+    {
+      "name": "nwtb_v2_route_plan_stops_plan_driver_id_fkey",
+      "type": "f",
+      "table": "nwtb_v2_route_plan_stops",
+      "definition": "FOREIGN KEY (plan_driver_id) REFERENCES nwtb_v2_route_plan_drivers(id) ON DELETE CASCADE"
+    },
+    {
+      "name": "nwtb_v2_route_plan_stops_plan_id_fkey",
+      "type": "f",
+      "table": "nwtb_v2_route_plan_stops",
+      "definition": "FOREIGN KEY (plan_id) REFERENCES nwtb_v2_route_plans(id) ON DELETE CASCADE"
+    }
+  ]
+}
