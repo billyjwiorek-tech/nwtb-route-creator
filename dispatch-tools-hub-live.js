@@ -3,7 +3,7 @@
 const IDS=['nwtbAddDriverBtn','nwtbShowDriversBtn','nwtbHealthBtn','nwtbExceptionsBtn','nwtbProfilesBtn','nwtbPodHistoryBtn','nwtbAuditBtn','nwtbRolesBtn','nwtbSystemControlBtn'];
 const ITEMS=[
  {id:'nwtbAddDriverBtn',label:'ADD DRIVER',sub:'Name and 4-digit employee number',tone:'green',icon:'+'},
- {id:'nwtbShowDriversBtn',label:'SHOW DRIVERS',sub:'All logged-in drivers on the NWTB map',tone:'blue',icon:'♟'},
+ {id:'nwtbShowDriversBtn',label:'SHOW DRIVERS',sub:'Active drivers and routes on the NWTB map',tone:'blue',icon:'♟'},
  {id:'nwtbHealthBtn',label:'DISPATCH HEALTH',sub:'Drivers, GPS, route warnings',tone:'red',icon:'●'},
  {id:'nwtbExceptionsBtn',label:'EXCEPTIONS',sub:'Failed deliveries and retry queue',tone:'orange',icon:'!'},
  {id:'nwtbProfilesBtn',label:'DELIVERY PROFILES',sub:'Receiving hours and driver instructions',tone:'purple',icon:'▦'},
