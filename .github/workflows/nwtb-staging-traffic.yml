@@ -1,0 +1,32 @@
+name: NWTB isolated test traffic
+on:
+  push:
+    branches: [feat/nwtb-isolated-staging-20261021]
+    paths: ['staging/**', '.github/workflows/nwtb-staging-traffic.yml']
+  pull_request:
+    paths: ['staging/**', '.github/workflows/nwtb-staging-traffic.yml']
+permissions:
+  contents: read
+concurrency:
+  group: nwtb-staging-traffic-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  offline-verification:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - run: npm ci --prefix tests --ignore-scripts
+      - name: Check isolated feature syntax
+        run: |
+          node --check staging/traffic/policy.mjs
+          node --check staging/traffic/backend/index.ts
+          node --check staging/traffic/backend/handler.mjs
+          node --check staging/traffic/frontend.mjs
+          node --check staging/traffic/install.mjs
+      - name: Verify traffic, ETA, cancellation and isolation with offline fixtures
+        run: node --test staging/traffic/tests/*.test.mjs
+      - name: Run existing NWTB regression suite with fixture data
+        run: npm --prefix tests test

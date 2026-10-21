@@ -23,7 +23,7 @@ The business search should find internal Customer Master, Vendor Master and Save
 
 ## Actual work completed
 
-Only preparation/read-only inspection and this checkpoint have been done. No test frontend, feature implementation, test database, test logins or public test link exists yet.
+The isolated test app is NOT deployed. No test database, test logins or public test link exists yet, and business-name search has not been implemented. Preparatory snapshots and the new traffic/ETA source described below are saved only on this feature branch.
 
 1. Verified exact GitHub main and its successful deployment, without changing main.
 2. Created the isolated local feature worktree from that exact commit.
@@ -31,6 +31,18 @@ Only preparation/read-only inspection and this checkpoint have been done. No tes
 4. Read 24 relevant deployed Edge Functions and saved their source snapshots in backend/functions with exact version/SHA metadata in backend/functions-manifest.json. These are unchanged snapshots, not test-ready deployments. Read the manifest rather than trusting old handoff version numbers.
 5. Saved source/legacy-dispatch.html from the exact pinned legacy page used by the Office Admin wrapper.
 6. Found the Vercel team for a future independent hostname: team_z4a4Io2DYq2RSdjLI4WmDupL, slug billyjwiorek-9806. No NWTB Vercel project or deployment was created.
+
+## Latest test-copy addition: traffic overlay and clicked-driver ETA
+
+The user additionally requested that opening the TEST Live Drivers tab automatically display traffic on the existing NWTB map, and clicking a driver display an ETA. Prepared implementation is in staging/traffic; read its README.md before integrating it. The existing map and popup modules are preserved. The frontend adds the traffic overlay and arrival block to the real existing tracker; its installer refuses unisolated output and runtime legacy-download wrappers. The backend is Office-authenticated, read-only, traffic-aware and explicitly refuses both production project refs.
+
+ETA is for the next pending stop on the ACTIVE route, or its actual return depot/custom endpoint when returning. Stale/missing/future/inaccurate GPS, no ACTIVE route, paused route and unavailable/unconfigured provider produce an unavailable message. Stop/route changes while a provider request is pending invalidate the estimate. No OSRM fallback may be called traffic-aware. API keys remain server-side and are never encoded in tile URLs sent to the browser.
+
+23 new offline backend/UI/installer tests passed locally, along with the entire existing NWTB regression suite. No real provider request, live route, session, driver GPS or notification was changed. Syntax checks passed. The primary runtime has Playwright but no installed browser executable, so a real-browser screenshot test could not be run here. Real provider data, separate staging deployment and physical-device testing are pending.
+
+The original pinned tracker HTML is now also saved at staging/source/legacy-tracker.html from commit 52681eac6ded426c7e65ff9a37c42f7bae95010c. It must be vendored and transformed in the isolated output; tracker-live-core.html currently downloads it at runtime in production. The new CI workflow nwtb-staging-traffic.yml runs offline feature/regression checks only; it has no deploy jobs or secrets and does not publish Pages.
+
+No TomTom API key has been supplied. Supabase project capacity remains blocked. Do not say the feature is live or that a working TEST link exists merely because this source is committed.
 
 ## Hard blocker: Supabase free-project limit
 
