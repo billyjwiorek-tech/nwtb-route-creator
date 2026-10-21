@@ -2,9 +2,9 @@ name: NWTB return lifecycle
 on:
   push:
     branches: [main, fix/nwtb-return-leg-lifecycle-20261020, fix/nwtb-driver-chat-seen-20261020, feat/nwtb-driver-presence-20261020]
-    paths: ['driver-*.html', 'driver-*.js', '*.webmanifest', 'nwtb-driver-sw.js', 'dispatch-*.js', 'tracker*.html', 'tracker*.js', 'office-pause-alerts.js', 'delivery-*.html', 'dispatch*.html', 'dispatch-route-admin-native.js', 'dispatch-chat-live.js', 'supabase/**', 'tests/**', '.github/workflows/nwtb-return-lifecycle.yml']
+    paths: ['driver-*.html', 'driver-*.js', '*.webmanifest', 'nwtb-driver-sw.js', 'dispatch-*.js', 'tracker*.html', 'tracker*.js', 'office-*.js', 'driver-*.svg', 'delivery-*.html', 'dispatch*.html', 'dispatch-route-admin-native.js', 'dispatch-chat-live.js', 'supabase/**', 'tests/**', '.github/workflows/nwtb-return-lifecycle.yml']
   pull_request:
-    paths: ['driver-*.html', 'driver-*.js', '*.webmanifest', 'nwtb-driver-sw.js', 'dispatch-*.js', 'tracker*.html', 'tracker*.js', 'office-pause-alerts.js', 'delivery-*.html', 'dispatch*.html', 'dispatch-route-admin-native.js', 'supabase/**', 'tests/**', '.github/workflows/nwtb-return-lifecycle.yml']
+    paths: ['driver-*.html', 'driver-*.js', '*.webmanifest', 'nwtb-driver-sw.js', 'dispatch-*.js', 'tracker*.html', 'tracker*.js', 'office-*.js', 'driver-*.svg', 'delivery-*.html', 'dispatch*.html', 'dispatch-route-admin-native.js', 'supabase/**', 'tests/**', '.github/workflows/nwtb-return-lifecycle.yml']
 permissions:
   contents: read
 jobs:
@@ -29,6 +29,8 @@ jobs:
         with:
           node-version: '24'
       - run: npm ci --prefix tests
+      - name: Check Office QR popup JavaScript syntax
+        run: node --check office-driver-qr.js
       - run: npm --prefix tests test
       - name: Validate return migration in disposable database
         run: |

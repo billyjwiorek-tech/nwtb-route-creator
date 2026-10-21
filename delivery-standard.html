@@ -31,6 +31,7 @@ button{font:inherit}.app{min-height:100vh;display:grid;grid-template-columns:230
  <div class="navlabel">COMMUNICATION</div>
  <button class="navbtn" data-view="chat" onclick="openView('chat')"><span class="ico">◌</span><span>Chat</span></button>
  <div class="navlabel">SYSTEM</div>
+ <button class="navbtn" id="nwtbDisplayDriverQR" type="button" aria-label="DISPLAY DRIVER QR CODE" aria-haspopup="dialog" aria-controls="nwtbDriverQRDialog" title="Display Driver QR Code"><span class="ico" aria-hidden="true">▦</span><span>DISPLAY DRIVER QR CODE</span></button>
  <button class="navbtn" data-view="admin" onclick="openView('admin')"><span class="ico">⚙</span><span>Admin</span></button>
  <div class="sidefoot"><div class="online"><span class="dot"></span><span>System Online</span></div><div class="hub">NWTB Delivery Operations</div></div>
 </aside>
@@ -93,6 +94,7 @@ function syncKpis(){const d=getDispatchDoc();if(!d)return;const map={kUn:'stUn',
 setInterval(syncKpis,5000);
 const initial=location.hash.replace('#','');if(titles[initial])openView(initial);else openView('dashboard');
 </script>
+<script src="office-driver-qr.js?v=20261021-driverqr1"></script>
 <script src="office-pause-alerts.js?v=20261020-returnleg1"></script>
 <script src="nwtb-system-lock-live.js?v=20260929-1200" data-control="1"></script>
 <div style="position:fixed;right:8px;bottom:5px;font:8px Arial;color:#98a2b3;z-index:99999;pointer-events:none">NWTB STANDARD NATIVE</div></body>
