@@ -4,7 +4,7 @@ const {setTimeout: delay} = require('node:timers/promises');
 const files = [
  'delivery-live.html','delivery-standard.html','office-driver-qr.js','driver-gps-qr.svg','driver-live.html','driver-standard.html',
  'dispatch-native.html','dispatch-live.html','dispatch.html','dispatch-route-admin-native.js',
- 'tracker-live.html','tracker-live-core.html','tracker-gps-status.js',
+ 'tracker-live.html','tracker-live-core.html','tracker-gps-status.js','tracker-driver-status.js','office-map-live.mjs','supabase/functions/nwtb-office-map/policy.mjs','unified-search.js','custom-master-search.js','custom-stop.js',
  'office-pause-alerts.js','nwtb-driver-sw.js','driver-chat-live.js','dispatch-chat-live.js','tracker-driver-presence.js','tracker-live-van.js','tracker-route-filter.js','tracker-active-route-guard.js','driver-tracking-engine-native.js','driver-phone-push.js','dispatch-driver-tools.js','dispatch-tools-hub-live.js','driver-gps.webmanifest','driver-standard.webmanifest'
 ];
 async function main(){

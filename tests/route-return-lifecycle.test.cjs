@@ -76,16 +76,16 @@ async function driverTests(){
  }
 }
 async function trackerTests(){
- const row={driver_employee_number:'1234',route_id:'fixture-route',display_name:'Fixture driver',captured_at:new Date().toISOString(),route:{id:'fixture-route',status:'ACTIVE',returning_started_at:new Date().toISOString(),returned_at:null,wave:'MORNING',end_name:'Northwest Trucks - Bolingbrook'}};
+ const row={driver_employee_number:'1234',route_id:'fixture-route',display_name:'Fixture driver',lat:41.69,lon:-88.06,captured_at:new Date().toISOString(),route:{id:'fixture-route',status:'ACTIVE',returning_started_at:new Date().toISOString(),returned_at:null,wave:'MORNING',end_name:'Northwest Trucks - Bolingbrook'}};
  const {window:dom}=parseHTML('<html><head></head><body><div id="drivers"><div class="card">Fixture driver (1234)<div class="actions"></div></div></div><div id="updated"></div></body></html>'),document=dom.document,intervals=[];
  let mapRows=[],cardRows=[],popup='';
  const ctx=vm.createContext({window:{addEventListener(){}},document,live:[row],Map,Set,Date,console,API:'fixture-base',post:async()=>({routes:[{id:row.route_id,status:'ACTIVE'}]}),renderMap(){mapRows=ctx.live.slice()},renderDrivers(){cardRows=ctx.live.slice()},refreshAll:async()=>{},markers:new Map([['1234',{getPopup:()=>({setContent:s=>popup=s})}]]),setInterval:f=>{intervals.push(f);return intervals.length},clearInterval(){},setTimeout:f=>{f();return 1}});
  vm.runInContext(read('tracker-route-filter.js'),ctx);intervals[0]();eq(mapRows[0].route_id,'fixture-route','Actual map filter retains returning ACTIVE route');
  const before=intervals.length;vm.runInContext(read('tracker-active-route-guard.js'),ctx);intervals[before]();for(let i=0;i<30;i++)await Promise.resolve();eq(ctx.live.length,1,'Periodic active-route guard also retains return');
- const gpsBefore=intervals.length;vm.runInContext(read('tracker-gps-status.js'),ctx);intervals[gpsBefore]();
+ vm.runInContext(read('tracker-driver-status.js'),ctx);const gpsBefore=intervals.length;vm.runInContext(read('tracker-gps-status.js'),ctx);intervals[gpsBefore]();
  eq(document.querySelector('.nwtbReturnPhase').textContent,'RETURNING TO NWTB','Office driver card labels the return');ok(popup.includes('RETURNING TO NWTB'),'Map popup labels return instead of completed route');ok(document.querySelector('.gpsLive'),'Freshness display preserved');
  eq(cardRows[0].route_id,'fixture-route');
- const core=read('tracker-live-core.html');ok(core.includes('tracker-gps-status.js?v=20261020-presence1'));ok(read('delivery-live.html').includes('tracker-live.html?v=20261020-presence1'));
+ const core=read('tracker-live-core.html');ok(core.includes('tracker-gps-status.js?v=20261021-mapsearch1'));ok(read('delivery-live.html').includes('tracker-live.html?v=20261021-mapsearch1'));
  const swContext=vm.createContext({self:{addEventListener(){}},console});vm.runInContext(read('nwtb-driver-sw.js'),swContext);
  eq(swContext.isDriverRead('https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-delivery-tracking',JSON.stringify({action:'route_return_driver'})),false,'Return confirmation cannot be faked from offline read cache');
 }

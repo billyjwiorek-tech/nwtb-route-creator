@@ -44,9 +44,9 @@ function vanIcon(heading,near,fresh=true){
 
 
 function driverHasRoute(r){return !!(r?.route&&r.route_id&&(r.route.status==='ACTIVE'||r.route.status==='PLANNED'&&r.route.released_to_driver===true))}
-function freshPosition(r){const t=r?.captured_at?new Date(r.captured_at).getTime():NaN;return Number.isFinite(t)&&Date.now()-t<=120000&&t<=Date.now()+60000}
+function freshPosition(r){return window.NWTBDriverStatus.gpsFresh(r)}
 function personIcon(r){
- style();const fresh=freshPosition(r),dot=fresh&&r.session_online?'#22c55e':fresh?'#f59e0b':'#98a2b3';
+ style();const fresh=freshPosition(r),dot=fresh&&window.NWTBDriverStatus.online(r)?'#22c55e':fresh?'#f59e0b':'#98a2b3';
  const svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 112" role="img" aria-label="NWTB driver without an active route"><path d="M30 31C21 25 22 12 28 6C34 0 47 1 53 8C60 16 58 26 50 31L73 48Q77 51 73 56L68 63Q66 66 62 63L53 57L54 75L64 102Q66 107 61 107L51 107Q47 107 46 104L40 91L35 103Q33 107 30 107L21 107Q16 107 18 102L27 75L28 57L19 63Q15 66 13 63L8 56Q4 52 8 48Z" fill="#fff" stroke="#15304e" stroke-width="2.5" stroke-linejoin="round"/><g fill="#f58220" font-family="Arial,sans-serif" font-size="12" font-weight="950" text-anchor="middle"><text x="40" y="46">N</text><text x="40" y="58">W</text><text x="40" y="70">T</text><text x="40" y="82">B</text></g><circle cx="59" cy="36" r="6" fill="'+dot+'" stroke="#fff" stroke-width="2.5"/></svg>';
  return L.divIcon({className:'nwtbPersonMarker',html:svg,iconSize:[54,76],iconAnchor:[27,73],popupAnchor:[0,-68]});
 }
@@ -68,8 +68,8 @@ function decorateMarkers(){
  if(typeof live==='undefined'||typeof markers==='undefined'||typeof L==='undefined')return;
  for(const r of live||[]){
   const m=markers.get(r.driver_employee_number);if(!m)continue;
-  const assigned=driverHasRoute(r),near=assigned&&nearStop(r),h=assigned?rowHeading(r):0;m.setIcon(assigned?vanIcon(h,near,freshPosition(r)):personIcon(r));
-  const label='<b>'+escv(r.display_name||r.driver_employee_number)+'</b><span>'+escv(assigned?(r.route.tracking_status==='RETURNING'?(r.route.end_mode==='RETURN_DEPOT'||!r.route.end_mode||/NWTB|NORTHWEST TRUCKS/i.test(r.route.end_name||'')?'RETURNING TO NWTB':'RETURN LEG IN PROGRESS'):r.route.status==='PLANNED'?'ROUTE RELEASED':r.route.paused?'ROUTE PAUSED':'ON ROUTE'):'LOGGED IN • NO ACTIVE ROUTE')+'</span>';
+  const assigned=driverHasRoute(r),near=assigned&&freshPosition(r)&&nearStop(r),h=assigned?rowHeading(r):0;m.setIcon(assigned?vanIcon(h,near,freshPosition(r)):personIcon(r));
+  const label='<b>'+escv(r.display_name||r.driver_employee_number)+'</b><span>'+escv(window.NWTBDriverStatus.phase(r))+'</span>'+(!freshPosition(r)?'<span>LAST KNOWN LOCATION</span>':'');
   if(typeof m.getTooltip==='function'&&m.getTooltip())m.setTooltipContent(label);else if(typeof m.bindTooltip==='function')m.bindTooltip(label,{permanent:true,direction:'top',offset:[0,assigned?-25:-70],className:'nwtbDriverName'});
   const t=targetCache.get(String(r.route_id||''));
   if(near&&t){const p=m.getPopup();if(p){let c=p.getContent()||'';if(!String(c).includes('NEAR NEXT STOP'))p.setContent(String(c)+`<div style="margin-top:7px;padding:6px 8px;border-radius:8px;background:#eef4ff;color:#175cd3;font-weight:900">NEAR NEXT STOP: ${escv(t.name||'Stop')}</div>`)}}

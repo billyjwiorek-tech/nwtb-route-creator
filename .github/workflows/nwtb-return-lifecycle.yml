@@ -1,10 +1,10 @@
 name: NWTB return lifecycle
 on:
   push:
-    branches: [main, fix/nwtb-return-leg-lifecycle-20261020, fix/nwtb-driver-chat-seen-20261020, feat/nwtb-driver-presence-20261020]
-    paths: ['driver-*.html', 'driver-*.js', '*.webmanifest', 'nwtb-driver-sw.js', 'dispatch-*.js', 'tracker*.html', 'tracker*.js', 'office-*.js', 'driver-*.svg', 'delivery-*.html', 'dispatch*.html', 'dispatch-route-admin-native.js', 'dispatch-chat-live.js', 'supabase/**', 'tests/**', '.github/workflows/nwtb-return-lifecycle.yml']
+    branches: [main, fix/nwtb-return-leg-lifecycle-20261020, fix/nwtb-driver-chat-seen-20261020, feat/nwtb-driver-presence-20261020, feat/nwtb-live-map-search-20261021]
+    paths: ['driver-*.html', 'driver-*.js', '*.webmanifest', 'nwtb-driver-sw.js', 'dispatch-*.js', 'tracker*.html', 'tracker*.js', 'office-*.js', 'office-*.mjs', 'unified-search.js', 'custom-master-search.js', 'driver-*.svg', 'delivery-*.html', 'dispatch*.html', 'dispatch-route-admin-native.js', 'dispatch-chat-live.js', 'supabase/**', 'tests/**', '.github/workflows/nwtb-return-lifecycle.yml']
   pull_request:
-    paths: ['driver-*.html', 'driver-*.js', '*.webmanifest', 'nwtb-driver-sw.js', 'dispatch-*.js', 'tracker*.html', 'tracker*.js', 'office-*.js', 'driver-*.svg', 'delivery-*.html', 'dispatch*.html', 'dispatch-route-admin-native.js', 'supabase/**', 'tests/**', '.github/workflows/nwtb-return-lifecycle.yml']
+    paths: ['driver-*.html', 'driver-*.js', '*.webmanifest', 'nwtb-driver-sw.js', 'dispatch-*.js', 'tracker*.html', 'tracker*.js', 'office-*.js', 'office-*.mjs', 'unified-search.js', 'custom-master-search.js', 'driver-*.svg', 'delivery-*.html', 'dispatch*.html', 'dispatch-route-admin-native.js', 'supabase/**', 'tests/**', '.github/workflows/nwtb-return-lifecycle.yml']
 permissions:
   contents: read
 jobs:
@@ -31,6 +31,15 @@ jobs:
       - run: npm ci --prefix tests
       - name: Check Office QR popup JavaScript syntax
         run: node --check office-driver-qr.js
+      - name: Check Office map module syntax
+        run: |
+          node --check office-map-live.mjs
+          node --check tracker-driver-status.js
+          node --check unified-search.js
+          node --check custom-master-search.js
+          node --check supabase/functions/nwtb-office-map/index.ts
+          node --check supabase/functions/nwtb-office-map/handler.mjs
+          node --check supabase/functions/nwtb-office-map/policy.mjs
       - run: npm --prefix tests test
       - name: Validate return migration in disposable database
         run: |

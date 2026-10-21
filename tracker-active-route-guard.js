@@ -14,7 +14,7 @@ async function reconcile(){
   if(typeof renderMap==='function')renderMap();
   if(typeof renderDrivers==='function')renderDrivers();
   const u=document.getElementById('updated');
-  if(u&&active.length===0)u.textContent='Updated '+new Date().toLocaleTimeString()+' • '+live.filter(r=>r.logged_in).length+' logged-in driver(s) • No released or active routes';
+  if(u&&active.length===0)u.textContent='Updated '+new Date().toLocaleTimeString()+' • '+live.filter(r=>window.NWTBDriverStatus.online(r)).length+' online driver(s) • No released or active routes';
  }catch(e){console.warn('Active route guard failed',e)}finally{busy=false}
 }
 function install(){

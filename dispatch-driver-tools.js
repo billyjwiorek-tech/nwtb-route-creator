@@ -48,7 +48,7 @@ async function save(){
 }
 function showDrivers(){
  ensure();if(typeof hostWin.openView==='function'&&hostDoc.getElementById('drivers')?.classList.contains('view')){hostWin.openView('drivers');return}
- let overlay=el('nwtbShowDriversOverlay');if(!overlay){overlay=hostDoc.createElement('div');overlay.id='nwtbShowDriversOverlay';overlay.setAttribute('role','dialog');overlay.setAttribute('aria-label','NWTB logged-in drivers map');overlay.innerHTML='<div class="ndtModal ndtMapModal"><div class="ndtHead"><b>SHOW DRIVERS — NWTB MAP</b><button type="button" id="ndtCloseMap">CLOSE</button></div><iframe id="ndtDriversMap" title="All logged-in NWTB drivers" src="tracker-live.html?v=20261020-presence1"></iframe></div>';hostDoc.body.appendChild(overlay);el('ndtCloseMap').onclick=()=>overlay.classList.remove('show')}
+ let overlay=el('nwtbShowDriversOverlay');if(!overlay){overlay=hostDoc.createElement('div');overlay.id='nwtbShowDriversOverlay';overlay.setAttribute('role','dialog');overlay.setAttribute('aria-label','NWTB logged-in drivers map');overlay.innerHTML='<div class="ndtModal ndtMapModal"><div class="ndtHead"><b>SHOW DRIVERS — NWTB MAP</b><button type="button" id="ndtCloseMap">CLOSE</button></div><iframe id="ndtDriversMap" title="All logged-in NWTB drivers" src="tracker-live.html?v=20261021-mapsearch1"></iframe></div>';hostDoc.body.appendChild(overlay);el('ndtCloseMap').onclick=()=>overlay.classList.remove('show')}
  overlay.classList.add('show');
 }
 window.nwtbAddDriver=openAdd;window.nwtbShowDrivers=showDrivers;
