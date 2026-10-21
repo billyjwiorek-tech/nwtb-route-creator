@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+<title>NWTB Office Route View</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f7f8fa;color:#182230;font:14px Arial,sans-serif}.wrap{max-width:1150px;margin:auto;padding:22px}.panel,.route{background:#fff;border:1px solid #e4e7ec;border-radius:14px;padding:18px;margin-bottom:14px}h1{font-size:21px;margin:0 0 8px}p,.meta{color:#667085;line-height:1.5}.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px}.btn{border:0;border-radius:9px;padding:10px 14px;font:800 12px Arial,sans-serif;background:#15304e;color:#fff;cursor:pointer}.btn:disabled{opacity:.6;cursor:wait}.route{display:flex;align-items:center;justify-content:space-between;gap:16px}.route b{font-size:15px}.meta{font-size:12px;margin-top:7px}.state{display:inline-block;font-size:11px;font-weight:900;margin-top:9px;border-radius:7px;padding:6px 9px;background:#fff8e8;color:#93370d}.state.released{background:#ecfdf3;color:#067647}.state.active{background:#eff8ff;color:#1849a9}#status{font-size:12px;color:#667085}#status.error{color:#b42318}@media(max-width:600px){.wrap{padding:12px}.route{align-items:flex-start;flex-direction:column}}
+</style>
+</head>
+<body><main class="wrap"><section class="panel"><h1>OFFICE ROUTE VIEW</h1><p>Choose a route to review its NWTB map, stop order, mileage and return leg.</p><div class="toolbar"><button class="btn" id="refreshRoutes" type="button">REFRESH ROUTES</button><span id="status" role="status">Connecting to the Office workspace…</span></div></section><div id="routes"></div></main>
+<script>
+'use strict';
+const DELIVERY='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-delivery';
+const el=id=>document.getElementById(id),esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+let busy=false;
+function officeDesk(){try{const desk=window.parent.document.getElementById('fDispatch')?.contentWindow;return desk?.__nwtbOfficeSignedIn===true&&typeof desk.post==='function'?desk:null}catch{return null}}
+function message(text,error=false){el('status').textContent=text;el('status').className=error?'error':''}
+async function refreshRoutes(){
+ const desk=officeDesk();if(!desk){message('Office is still connecting. Open this view from NWTB Office, then click REFRESH ROUTES.',true);return}
+ if(busy)return;busy=true;el('refreshRoutes').disabled=true;message('Loading saved routes…');
+ try{
+  const [saved,people]=await Promise.all([desk.post(DELIVERY,{action:'routes_list'}),desk.post(DELIVERY,{action:'drivers'})]);
+  const names=new Map((people.drivers||[]).map(d=>[String(d.employee_number),d.display_name]));
+  const routes=(saved.routes||[]).filter(r=>r.status==='ACTIVE'||r.status==='PLANNED').sort((a,b)=>Number(b.status==='ACTIVE')-Number(a.status==='ACTIVE')||String(a.route_date).localeCompare(String(b.route_date))||String(a.id).localeCompare(String(b.id)));
+  el('routes').innerHTML=routes.map(r=>{const active=r.status==='ACTIVE',released=r.released_to_driver===true,returning=active&&r.returning_started_at&&!r.returned_at,phase=returning?'RETURN LEG IN PROGRESS':active?'ACTIVE ROUTE':released?'RELEASED TO DRIVER':'OFFICE ONLY — NOT RELEASED';return '<section class="route"><div><b>'+esc(names.get(String(r.driver_employee_number))||r.driver_name||r.driver_employee_number)+'</b><div class="meta">'+esc(r.route_date)+' • '+esc(r.depot||'BOLINGBROOK')+' • '+esc(r.wave||'ROUTE')+'</div><span class="state '+(active?'active':released?'released':'')+'">'+phase+'</span></div><button class="btn" type="button" data-office-route="'+esc(r.id)+'">ROUTE SCREEN</button></section>'}).join('')||'<section class="panel">No planned or active routes are available.</section>';
+  el('routes').querySelectorAll('[data-office-route]').forEach(button=>button.addEventListener('click',()=>previewRoute(button.dataset.officeRoute)));
+  message(routes.length+' saved route'+(routes.length===1?'':'s')+' available.');
+ }catch(e){message(e.message||'Could not load Office routes.',true)}finally{busy=false;el('refreshRoutes').disabled=false}
+}
+async function previewRoute(id){
+ const desk=officeDesk();if(!desk||typeof desk.viewOfficeRoute!=='function'||typeof window.parent.openView!=='function'){message('Office Route Screen is still loading. Try again shortly.',true);return}
+ window.parent.openView('dispatch');await desk.viewOfficeRoute(id);
+}
+el('refreshRoutes').addEventListener('click',refreshRoutes);
+let attempts=0;const ready=setInterval(()=>{if(officeDesk()){clearInterval(ready);void refreshRoutes()}else if(++attempts>=150){clearInterval(ready);message('Open this view from NWTB Office, then click REFRESH ROUTES.',true)}},200);
+</script></body></html>
