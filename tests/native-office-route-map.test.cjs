@@ -18,7 +18,7 @@ assert.equal(valid({lat:null,lon:-88}),false);assert.equal(valid({lat:Infinity,l
 const admin=fs.readFileSync(path.join(__dirname,'../dispatch-route-admin-native.js'),'utf8');
 assert.ok(!/google\.com\/maps/.test(admin),'Office preview stays inside NWTB');
 assert.ok(!/route_start|driver_token|geolocation|driver-bootstrap/.test(source+admin),'Office preview cannot start routes, create driver sessions or GPS');
-for(const f of ['dispatch-native.html','dispatch-live.html']){const html=fs.readFileSync(path.join(__dirname,'..',f),'utf8');assert.ok(html.indexOf('office-route-map.js?v=20261022-trafficeta1')<html.indexOf('dispatch-route-admin-native.js?v=20261022-trafficeta1'));assert.ok(html.includes('viewOfficeRoute'));}
+for(const f of ['dispatch-native.html','dispatch-live.html']){const html=fs.readFileSync(path.join(__dirname,'..',f),'utf8');assert.ok(html.indexOf('office-route-map.js?v=20261022-trafficeta1')<html.indexOf('dispatch-route-admin-native.js?v=20261022-trafficeta2'));assert.ok(html.includes('viewOfficeRoute'));}
 console.log('PASS: saved route order and identity, depots, custom endpoints, last-stop ending, missing coordinates, no route mutations, no driver/GPS actions, native Office wiring');
 async function rendererTest(){
  const els=new Map(),lines=[],pins=[],maps=[],calls=[];let started=0;

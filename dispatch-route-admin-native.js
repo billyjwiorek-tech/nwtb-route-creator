@@ -52,7 +52,7 @@ async function openOfficeRoute(request){
   document.getElementById('routeModalBody').dataset.officeRouteMode='preview';
   document.getElementById('routeModalBody').innerHTML=
    '<div class="banner show ok" style="margin-top:12px"><b>READ-ONLY OFFICE PREVIEW</b> — opening this screen does not start the route, create a driver session, change route status, or affect the driver’s 4-digit login.</div>'+releaseState+
-   '<div class="routeSummary">'+
+   '<h3 class="small" style="margin:14px 0 8px">SAVED ROUTE TOTALS</h3><div class="routeSummary">'+
     '<div class="routeMetric"><span>Driver</span><b>'+esc(r.driver_name)+'</b></div>'+
     '<div class="routeMetric"><span>Stops</span><b>'+stops.length+'</b></div>'+
     '<div class="routeMetric"><span>Total Miles</span><b>'+(r.estimated_miles!=null?Number(r.estimated_miles).toFixed(1)+' mi':'Recalculate needed')+'</b></div>'+
@@ -62,7 +62,7 @@ async function openOfficeRoute(request){
     '<div class="routeMetric"><span>Return Depot</span><b>'+esc(mapModel.end?.name||'Ends at last stop')+'</b></div>'+
     '<div class="routeMetric"><span>Return Leg</span><b>'+(retMi!=null?retMi.toFixed(1)+' mi':'—')+(retMin!=null?' • '+formatMinutes(retMin):'')+'</b></div>'+
    '</div>'+
-   '<div class="small" style="margin-top:10px">Routing source: '+esc(r.matrix_source||'Unavailable')+' • '+(r.traffic_aware?'Traffic-adjusted estimate':'No live traffic adjustment')+'. Return leg is included in total miles and drive time.</div>'+
+   '<div class="small" style="margin-top:10px">Saved routing source: '+esc(r.matrix_source||'Unavailable')+' • '+(r.traffic_aware?'Traffic-adjusted when saved':'Saved without live traffic adjustment')+'. Return leg is included in saved total miles and drive time. Current traffic arrival estimates appear below the map.</div>'+
    window.NWTBOfficeRouteMap.html(mapModel)+
    '<div class="toolbar" style="margin-top:12px"><button type="button" class="btn ghost" onclick="window.viewOfficeRoute(\''+esc(r.id)+'\')">REFRESH SAVED ROUTE</button></div>'+
    '<div class="officeStartReturn"><div class="stopNum">S</div><div><b>START — '+esc(mapModel.start.name)+'</b><span>'+esc(mapModel.start.address)+'</span></div></div>'+
