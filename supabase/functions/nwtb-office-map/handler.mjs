@@ -1,4 +1,5 @@
 import { officeConfigProblem, gpsProblem, selectDestination, destinationKey, unavailableMessage, DEPOTS, validPoint } from './policy.mjs';
+import { previewContext, previewEstimate } from './preview.mjs';
 
 const BUSINESS_RADII = new Set([5, 10, 25, 50, 100]);
 function businessRadius(value) {
@@ -32,10 +33,31 @@ export function normalizeBusiness(feature, depot) {
 // Factory injection keeps tests offline; no route, session or location writes are made.
 export function createOfficeMapHandler({ db, config, providerKey, fetcher = fetch, clock = Date.now }) {
   const configProblem = officeConfigProblem(config);
-  const tiles = new Map(), estimates = new Map(), inFlight = new Map(), businesses = new Map(), searchLimits = new Map();
+  const tiles = new Map(), estimates = new Map(), inFlight = new Map(), businesses = new Map(), searchLimits = new Map(), previews = new Map();
   const headers = origin => ({ 'Access-Control-Allow-Origin': origin === config?.siteOrigin ? origin : 'null', 'Vary': 'Origin', 'Access-Control-Allow-Headers': 'content-type, apikey, x-nwtb-session', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Cache-Control': 'no-store' });
   const json = (origin, body, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...headers(origin), 'Content-Type': 'application/json' } });
   const unavailable = (origin, code, extra = {}) => json(origin, { ok: true, available: false, code, message: unavailableMessage(code), ...extra });
+
+  async function routePreviewContext(id) {
+    const routeResult = await db.from('delivery_routes').select('id,updated_at,route_date,status,depot,driver_employee_number,route_mode,service_minutes,paused_at,resumed_at,returning_started_at,returned_at,start_name,start_lat,start_lon,end_mode,end_name,end_address,end_lat,end_lon').eq('id', id).maybeSingle();
+    if (routeResult.error) throw Error('DATABASE_UNAVAILABLE');
+    const route = routeResult.data;
+    if (!route || !['PLANNED','ACTIVE'].includes(route.status)) return { problem: 'PREVIEW_ROUTE_UNAVAILABLE' };
+    const stops = await db.from('delivery_route_stops').select('id,stop_sequence,status,arrived_at,delivery_orders(customer_name,address,lat,lon,stop_type)').eq('route_id', id).order('stop_sequence').limit(152);
+    if (stops.error) throw Error('DATABASE_UNAVAILABLE');
+    if (stops.data?.length >= 152) return { problem: 'PREVIEW_TOO_MANY_STOPS' };
+    let point;
+    if (route.status === 'ACTIVE') {
+      const [employee, location] = await Promise.all([
+        db.from('employees').select('active').eq('employee_number', route.driver_employee_number).maybeSingle(),
+        db.from('delivery_driver_locations').select('lat,lon,accuracy_m,captured_at').eq('driver_employee_number', route.driver_employee_number).order('captured_at', { ascending: false }).limit(1)
+      ]);
+      if (employee.error || location.error) throw Error('DATABASE_UNAVAILABLE');
+      if (!employee.data?.active) return { problem: 'DRIVER_UNAVAILABLE' };
+      point = location.data?.[0];
+    }
+    return previewContext(route, stops.data || [], point, clock());
+  }
 
   async function context(driver) {
     const [employee, routes, locations] = await Promise.all([
@@ -93,6 +115,32 @@ export function createOfficeMapHandler({ db, config, providerKey, fetcher = fetc
     }
     catch { return json(origin, { error: 'Invalid request.' }, 400); }
     if (input.action === 'config') return json(origin, { ok: true, enabled: !!providerKey, source: 'TOMTOM', environment: 'PRODUCTION', business_search: true, tile_refresh_seconds: 60, eta_refresh_seconds: 30 });
+
+    if (input.action === 'route_preview_eta') {
+      if (req.method !== 'POST') return json(origin, { error: 'POST required.' }, 405);
+      const id = String(input.route_id || '');
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return json(origin, { error: 'A saved route ID is required.' }, 400);
+      if (!providerKey) return unavailable(origin, 'TRAFFIC_NOT_CONFIGURED');
+      try {
+        const ctx = await routePreviewContext(id);
+        if (ctx.problem) return unavailable(origin, ctx.problem);
+        if (input.expected_updated_at && Date.parse(input.expected_updated_at) !== Date.parse(ctx.route.updated_at)) return unavailable(origin, 'ROUTE_CHANGED');
+        const key = JSON.stringify([id, ctx.revision, Number(ctx.origin.lat).toFixed(3), Number(ctx.origin.lon).toFixed(3)]), cached = previews.get(key);
+        if (cached && clock()-Date.parse(cached.calculated_at) < 30000 && (!ctx.gps || !gpsProblem({ ...ctx.gps, captured_at: cached.gps_captured_at },clock()))) return json(origin,cached);
+        const pendingKey = 'preview:'+key;
+        let result;
+        try {
+          if (!inFlight.has(pendingKey)) inFlight.set(pendingKey, previewEstimate(ctx,{providerKey,fetcher,clock}));
+          result = await inFlight.get(pendingKey);
+        } finally { inFlight.delete(pendingKey); }
+        const current = await routePreviewContext(id);
+        if (current.problem) return unavailable(origin,current.problem);
+        if (current.revision !== ctx.revision) return unavailable(origin,'ROUTE_CHANGED');
+        if (ctx.gps && gpsProblem(ctx.gps,clock())) return unavailable(origin,'GPS_STALE');
+        if (previews.size >= 128) previews.delete(previews.keys().next().value);
+        previews.set(key,result); return json(origin,result);
+      } catch { return unavailable(origin,'TRAFFIC_UNAVAILABLE'); }
+    }
 
     if (input.action === 'business_search') {
       if (req.method !== 'POST') return json(origin, { error: 'POST required.' }, 405);

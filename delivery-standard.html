@@ -50,7 +50,7 @@ button{font:inherit}.app{min-height:100vh;display:grid;grid-template-columns:230
    <div class="grid2">
     <div class="card"><h3>Quick Actions</h3><p>Jump directly into the most common office workflows.</p><div class="actions">
      <button class="action" onclick="openView('dispatch')"><b>Optimize / Assign Routes</b><span>Select drivers and depots; NWTB divides all stops automatically.</span></button>
-     <button class="action" onclick="openView('driver')"><b>Open Driver View</b><span>Open the actual Standard driver app with 4-digit employee sign-in.</span></button>
+     <button class="action" onclick="openView('driver')"><b>Open Driver View</b><span>Review saved routes with live traffic and arrival estimates.</span></button>
      <button class="action" onclick="openView('chat')"><b>Delivery / Pickup Chat</b><span>Open the operations-only chat channel.</span></button>
      <button class="action" onclick="openView('admin')"><b>Master Data</b><span>Maintain customer and vendor directories.</span></button>
     </div></div>
@@ -62,9 +62,9 @@ button{font:inherit}.app{min-height:100vh;display:grid;grid-template-columns:230
     </div>
    </div>
   </section>
-  <section id="dispatch" class="view"><div class="pageIntro"><div><h2>Dispatch</h2><p>Create stops, optimize routes and assign drivers.</p></div><span class="chip">AUTO MULTI-DRIVER • PER-DRIVER DEPOT</span></div><div class="frameWrap"><iframe id="fDispatch" src="dispatch-native.html?v=20261022-radius1" title="Dispatch"></iframe></div></section>
-  <section id="driver" class="view"><div class="pageIntro"><div><h2>Driver View</h2><p>Review saved driver routes on the NWTB map.</p></div><span class="chip">OFFICE ROUTE PREVIEW</span></div><div class="frameWrap"><iframe id="fDriver" src="office-driver-preview.html?v=20261021-mapsearch1" title="Office Route View"></iframe></div></section>
-  <section id="chat" class="view"><div class="pageIntro"><div><h2>Delivery / Pickup Chat</h2><p>Operations-only messaging.</p></div><span class="chip">SEPARATE FROM SALES</span></div><div class="frameWrap"><iframe id="fChat" src="dispatch-native.html?v=20261022-radius1#chat" title="Delivery Pickup Chat"></iframe></div></section>
+  <section id="dispatch" class="view"><div class="pageIntro"><div><h2>Dispatch</h2><p>Create stops, optimize routes and assign drivers.</p></div><span class="chip">AUTO MULTI-DRIVER • PER-DRIVER DEPOT</span></div><div class="frameWrap"><iframe id="fDispatch" src="dispatch-native.html?v=20261022-trafficeta1" title="Dispatch"></iframe></div></section>
+  <section id="driver" class="view"><div class="pageIntro"><div><h2>Driver View</h2><p>Review saved driver routes on the NWTB map.</p></div><span class="chip">OFFICE ROUTE PREVIEW</span></div><div class="frameWrap"><iframe id="fDriver" src="office-driver-preview.html?v=20261022-trafficeta1" title="Office Route View"></iframe></div></section>
+  <section id="chat" class="view"><div class="pageIntro"><div><h2>Delivery / Pickup Chat</h2><p>Operations-only messaging.</p></div><span class="chip">SEPARATE FROM SALES</span></div><div class="frameWrap"><iframe id="fChat" src="dispatch-native.html?v=20261022-trafficeta1#chat" title="Delivery Pickup Chat"></iframe></div></section>
   <section id="admin" class="view"><div class="pageIntro"><div><h2>Administration</h2><p>Manage Delivery customer and vendor master data.</p></div><span class="chip">MASTER DATA</span></div><div class="frameWrap"><iframe id="fAdmin" src="dispatch.html?v=20261021-android1#data" title="Master Data"></iframe></div></section>
  </div>
 </main>

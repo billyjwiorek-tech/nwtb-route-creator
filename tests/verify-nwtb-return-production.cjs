@@ -11,7 +11,7 @@ const files = [
 // Cover the production entry pages and their local modules, including modules loaded dynamically.
 for(let pass=0;pass<6;pass++)for(const file of [...files]){
  if(!/\.(?:html|js|mjs)$/.test(file)||file.startsWith('supabase/'))continue;
- for(const match of fs.readFileSync(file,'utf8').matchAll(/["']([a-zA-Z0-9_-]+\.(?:js|mjs|html))(?:\?[^"']*)?["']/g)){
+ for(const match of fs.readFileSync(file,'utf8').matchAll(/["'](?:\.\/)?([a-zA-Z0-9_-]+\.(?:js|mjs|html))(?:\?[^"']*)?["']/g)){
   if(fs.existsSync(match[1])&&!files.includes(match[1]))files.push(match[1]);
  }
 }

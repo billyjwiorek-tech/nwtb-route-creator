@@ -139,7 +139,7 @@ async function notificationClicks(){
 }
 function productionInventory(){
  const files=new Set(['driver-live.html','driver-standard.html','delivery-live.html','delivery-standard.html','dispatch-native.html','dispatch-live.html','tracker-live.html','office-driver-preview.html']);
- for(let pass=0;pass<6;pass++)for(const file of [...files])for(const match of read(file).matchAll(/["']([a-zA-Z0-9_-]+\.(?:js|mjs|html))(?:\?[^"']*)?["']/g))if(fs.existsSync(path.join(root,match[1])))files.add(match[1]);
+ for(let pass=0;pass<6;pass++)for(const file of [...files])for(const match of read(file).matchAll(/["'](?:\.\/)?([a-zA-Z0-9_-]+\.(?:js|mjs|html))(?:\?[^"']*)?["']/g))if(fs.existsSync(path.join(root,match[1])))files.add(match[1]);
  for(const file of files){if(file.endsWith('.html')){for(const match of read(file).matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g))new vm.Script(match[1],{filename:file});ok(/<meta[^>]*name="viewport"/.test(read(file)),file+' declares mobile viewport')}else{execFileSync(process.execPath,['--check',path.join(root,file)],{stdio:'pipe'});checks++}}
  for(const file of ['driver-gps.webmanifest','driver-standard.webmanifest']){const m=JSON.parse(read(file));eq(m.display,'standalone');ok(m.start_url.startsWith('./driver-'),'Home Screen opens correct Driver page');eq(m.scope,'./');for(const icon of m.icons)ok(fs.existsSync(path.join(root,icon.src)),'Manifest icon exists')}
  for(const file of ['driver-live.html','driver-standard.html','delivery-live.html','delivery-standard.html','dispatch-native.html','dispatch-live.html'])ok(read(file).includes('nwtb-notifications.js?v=20261021-android1'),file+' loads shared mobile notifications');

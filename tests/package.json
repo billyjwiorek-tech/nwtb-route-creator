@@ -1,7 +1,7 @@
 {
   "private": true,
   "scripts": {
-    "test": "cd .. && node tests/driver-map-lifecycle.test.cjs && node tests/driver-voice-guidance.test.cjs && node tests/driver-route-progress.test.cjs && node tests/android-compatibility.test.cjs && node tests/office-return-alerts.test.cjs && node tests/route-return-lifecycle.test.cjs && node tests/driver-chat-receipts.test.cjs && node tests/native-office-route-map.test.cjs && node tests/release-gate.test.cjs && node tests/sales-route-safety.test.cjs && node tests/driver-presence-endpoints.test.cjs && node tests/driver-presence-ui.test.cjs && node tests/driver-phone-push.test.cjs && node tests/dispatch-geocode.test.cjs && node tests/office-preview-isolation.test.cjs && node --test tests/office-map-backend.test.mjs tests/office-map-ui.test.mjs tests/business-search-ui.test.mjs"
+    "test": "cd .. && node tests/driver-map-lifecycle.test.cjs && node tests/driver-voice-guidance.test.cjs && node tests/driver-route-progress.test.cjs && node tests/android-compatibility.test.cjs && node tests/office-return-alerts.test.cjs && node tests/route-return-lifecycle.test.cjs && node tests/driver-chat-receipts.test.cjs && node tests/native-office-route-map.test.cjs && node tests/release-gate.test.cjs && node tests/sales-route-safety.test.cjs && node tests/driver-presence-endpoints.test.cjs && node tests/driver-presence-ui.test.cjs && node tests/driver-phone-push.test.cjs && node tests/dispatch-geocode.test.cjs && node tests/office-preview-isolation.test.cjs && node --test tests/office-map-backend.test.mjs tests/office-map-ui.test.mjs tests/business-search-ui.test.mjs tests/office-route-traffic-backend.test.mjs tests/office-route-traffic-ui.test.mjs"
   },
   "devDependencies": {
     "leaflet": "1.9.4",
