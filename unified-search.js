@@ -3,6 +3,7 @@
 const $=id=>document.getElementById(id);
 const h=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 const MAP_API='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-office-map';
+const businessSearch=window.NWTBBusinessSearch;
 let searchGeneration=0,loadedBusiness=null;
 
 function installUnifiedSearchUI(){
@@ -22,11 +23,10 @@ function installUnifiedSearchUI(){
  q.placeholder='Customer, vendor, account #, business name or address';
  const btn=q.parentElement?.querySelector('button');
  if(btn)btn.textContent='SEARCH ALL';
- if(!$('nwtbBusinessDepot')){
-  const near=document.createElement('div');near.className='small';near.style.cssText='margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap';
-  near.innerHTML='<label for="nwtbBusinessDepot" style="margin:0">Business search near</label><select id="nwtbBusinessDepot" style="width:auto;padding:6px"><option value="BOLINGBROOK">NWTB Bolingbrook</option><option value="PALATINE">NWTB Palatine</option></select><span>Include the city in your search to find a specific branch.</span>';
-  q.parentElement?.insertAdjacentElement('afterend',near);
- }
+ businessSearch.mount(q.parentElement.parentElement,'nwtbBusiness',()=>{
+  searchGeneration++;
+  if($('searchResults'))$('searchResults').textContent='Search area changed. Click SEARCH ALL to refresh the results.';
+ });
  return true;
 }
 
@@ -76,13 +76,14 @@ function dedupe(rows){
   seen.add(key);return true;
  });
 }
-function renderResults(rows,raw,errors,businessStatus=''){
+function renderResults(rows,raw,errors,businessStatus='',scope=businessSearch.scope('nwtbBusiness')){
  const box=$('searchResults');if(!box)return;
  if(!rows.length){
   box.innerHTML='<div class="result"><b>No matching location found.</b><div class="small" style="margin-top:4px">Try the business name with its city, account number, or full street address.</div></div><div class="small" role="status" style="margin-top:8px">'+h(businessStatus)+'</div>';
   return;
  }
- rows=dedupe(rows).sort((a,b)=>Number(!!a._business)-Number(!!b._business)||exactScore(a,raw)-exactScore(b,raw)||((a._business&&b._business)?a.distance_miles-b.distance_miles:0)||String(a.name||'').localeCompare(String(b.name||''))).slice(0,90);
+ const unique=dedupe(rows);
+ rows=[...unique.filter(r=>!r._business).sort((a,b)=>exactScore(a,raw)-exactScore(b,raw)||String(a.name||'').localeCompare(String(b.name||''))).slice(0,90),...unique.filter(r=>r._business).sort((a,b)=>businessSearch.compare(a,b,raw,scope)).slice(0,50)];
  box.innerHTML=rows.map((r,i)=>{
   window['_search_'+i]=r;
   const ref=r.source_ref||r.customer_number||r.vendor_id||r.location_code||'';
@@ -91,36 +92,38 @@ function renderResults(rows,raw,errors,businessStatus=''){
   const group=r._search_group||r.source_type||'LOCATION';
   const badge=group==='CUSTOMER'?'delivery':group==='VENDOR'?'pickup':'statusAvailable';
   const action=r._business?'loadBusinessLocation('+i+')':'useResult('+i+','+(r._saved?'true':'false')+')';
-  return '<div class="result"><button class="btn ghost right" onclick="'+action+'">'+(r._business?'LOAD / REVIEW':'USE LOCATION')+'</button><span class="pill '+badge+'">'+h(group)+'</span><div style="margin-top:6px"><b>'+h(r.name||'Unnamed Location')+'</b>'+(ref&&!r._business?' <span class="small">#'+h(ref)+'</span>':'')+'</div><div class="small" style="margin-top:4px">'+h(addr||'No physical address on file')+(phone?' • '+h(phone):'')+'</div>'+(r._business?'<div class="small" style="margin-top:5px">'+Number(r.distance_miles).toFixed(1)+' mi from selected depot • '+(r.address_complete?'Confirm the correct branch.':'Street number missing — address review required.')+'</div>':'')+'</div>';
+  return '<div class="result"><button class="btn ghost right" onclick="'+action+'">'+(r._business?'LOAD / REVIEW':'USE LOCATION')+'</button><span class="pill '+badge+'">'+h(group)+'</span><div style="margin-top:6px"><b>'+h(r.name||'Unnamed Location')+'</b>'+(ref&&!r._business?' <span class="small">#'+h(ref)+'</span>':'')+'</div><div class="small" style="margin-top:4px">'+h(addr||'No physical address on file')+(phone?' • '+h(phone):'')+'</div>'+(r._business?'<div class="small" style="margin-top:5px">'+h(businessSearch.distanceText(r,scope))+' • '+(r.address_complete?'Confirm the correct branch.':'Street number missing — address review required.')+'</div>':'')+'</div>';
  }).join('')+(errors?'<div class="small" style="margin-top:8px;color:#b54708">Some NWTB directories could not be searched. Other results are shown.</div>':'')+'<div class="small" role="status" style="margin-top:8px">'+h(businessStatus)+'</div>';
 }
 
 window.searchDirectory=async function(){
  const raw=$('dirQ')?.value.trim()||'';
  const generation=++searchGeneration;
+ const scope=businessSearch.scope('nwtbBusiness');
+ const current=()=>generation===searchGeneration&&$('dirQ')?.value.trim()===raw&&JSON.stringify(businessSearch.scope('nwtbBusiness'))===JSON.stringify(scope);
  const box=$('searchResults');
  if(raw.length<2){if(box)box.innerHTML='<div class="small" style="margin-top:8px">Enter at least 2 characters.</div>';return;}
  if(box)box.innerHTML='<div class="result"><b>Searching NWTB locations and businesses…</b></div>';
  try{
-  const external=raw.length>=3&&!/^\d+$/.test(raw)?post(MAP_API,{action:'business_search',q:raw,depot:$('nwtbBusinessDepot')?.value||'BOLINGBROOK'}).then(data=>({data}),error=>({error})):Promise.resolve(null);
+  const external=raw.length>=3&&!/^\d+$/.test(raw)?post(MAP_API,{action:'business_search',q:raw,...scope}).then(data=>({data}),error=>({error})):Promise.resolve(null);
   const calls=[
    post(API,{action:'directory_search',kind:'CUSTOMER',q:raw}),
    post(API,{action:'directory_search',kind:'VENDOR',q:raw}),
    post(API,{action:'saved_locations_search',q:raw})
   ];
   const [c,v,s]=await Promise.allSettled(calls);
-  if(generation!==searchGeneration||$('dirQ')?.value.trim()!==raw)return;
+  if(!current())return;
   const rows=[];let errors=0;
   if(c.status==='fulfilled')rows.push(...(c.value.results||[]).map(r=>normalizeMaster(r,'CUSTOMER')));else errors++;
   if(v.status==='fulfilled')rows.push(...(v.value.results||[]).map(r=>normalizeMaster(r,'VENDOR')));else errors++;
   if(s.status==='fulfilled')rows.push(...(s.value.locations||[]).map(normalizeSaved));else errors++;
   renderResults(rows,raw,errors,'Checking the public business directory…');
   const business=await external;
-  if(generation!==searchGeneration||$('dirQ')?.value.trim()!==raw)return;
+  if(!current())return;
   const known=new Set(rows.map(r=>[r.name,r.address||[r.addr1,r.addr2,r.city,r.state].filter(Boolean).join(', ')].join('|').toLowerCase()));
   if(business?.data)rows.push(...(business.data.results||[]).filter(r=>!known.has([r.name,r.address].join('|').toLowerCase())).map(r=>({...r,_business:true,_saved:false,_search_group:'BUSINESS DIRECTORY'})));
-  renderResults(rows,raw,errors,business?.error?'Public business directory unavailable. Existing NWTB locations are shown; you can still enter a full address manually.':business?'Business directory: © OpenStreetMap contributors. Coverage varies; confirm the branch and address before adding a stop.':'Enter at least 3 letters to include the public business directory.');
- }catch(e){if(box)box.innerHTML='<div class="banner show err">'+h(e.message||'Search failed.')+'</div>';}
+  renderResults(rows,raw,errors,business?.error?'Public business directory unavailable. Existing NWTB locations are shown; you can still enter a full address manually.':business?businessSearch.summary(scope,business.data.results?.length||0):'Enter at least 3 letters to include the public business directory.',scope);
+ }catch(e){if(current()&&box)box.innerHTML='<div class="banner show err">'+h(e.message||'Search failed.')+'</div>';}
 };
 
 function boot(){if(installUnifiedSearchUI())return;let n=0;const t=setInterval(()=>{n++;if(installUnifiedSearchUI()||n>30)clearInterval(t)},200)}

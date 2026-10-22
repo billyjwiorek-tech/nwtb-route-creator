@@ -129,7 +129,7 @@ test('business lookup works without traffic key, preserves data and caches expli
 test('public business results reject road names and invalid coordinates, and flag incomplete addresses',async()=>{
  const incomplete={...businessFeature,properties:{...businessFeature.properties,housenumber:null}};
  const f=fixture({businessFeatures:[incomplete,{...businessFeature,properties:{...businessFeature.properties,osm_key:'highway'}},{...businessFeature,geometry:{coordinates:[0,0]}}]});
- const {body}=await f.call({action:'business_search',q:'Fixture',depot:'PALATINE'});assert.equal(body.results.length,1);assert.equal(body.results[0].address_complete,false);assert.equal(body.searched_near,'NWTB Palatine');
+ const {body}=await f.call({action:'business_search',q:'Fixture',depot:'PALATINE'});assert.equal(body.results.length,1);assert.equal(body.results[0].address_complete,false);assert.equal(body.distance_from,'NWTB Palatine');assert.equal(body.searched_near,null);
 });
 test('business lookup is Office-only, validates queries, and does not forward Office credentials',async()=>{
  const driver=fixture({employee:'9001'});assert.equal((await driver.call({action:'business_search',q:'Fixture'})).status,403);assert.equal(driver.providerCalls,0);
@@ -139,4 +139,47 @@ test('business lookup is Office-only, validates queries, and does not forward Of
 test('expired and inactive Office sessions cannot query business locations or traffic',async()=>{
  for(const mode of ['expired','inactive']){const f=fixture();if(mode==='expired')f.tables.chat_sessions[0].expires_at=new Date(now-1).toISOString();else f.tables.chat_sessions[0].employees.active=false;
   for(const action of ['config','business_search','driver_eta'])assert.equal((await f.call({action,q:'Fixture',driver_employee_number:'9001'})).status,401);assert.equal(f.providerCalls,0);assert.equal(f.writes,0);}
+});
+
+const candidate=(id,lat,lon,name='Fixture Business')=>({geometry:{coordinates:[lon,lat]},properties:{...businessFeature.properties,name,osm_id:id,housenumber:String(id)}});
+test('no radius searches by name without a depot bias or area restriction',async()=>{
+ const f=fixture({businessFeatures:[candidate(1,40.7,-74,'Fixture Business'),candidate(2,41.7,-88.07,'Fixture Business')]});
+ for(const radius_miles of [undefined,null,'']){
+  const {body,status}=await f.call({action:'business_search',q:"Fixture's Business",depot:'PALATINE',radius_miles});
+  assert.equal(status,200);assert.equal(body.search_scope,'US_NAME');assert.equal(body.radius_miles,null);assert.equal(body.searched_near,null);assert.equal(body.results.length,2);
+  assert.equal(body.results[0].source_ref,'OSM:N:1','Directory relevance order is preserved across distant branches');
+ }
+ const params=f.requests[0].url.searchParams;
+ assert.equal(params.get('q'),"Fixture's Business");assert.equal(params.get('countrycode'),'US');assert.equal(params.get('limit'),'50');
+ for(const key of ['lat','lon','zoom','bbox','location_bias_scale'])assert.equal(params.has(key),false,key+' must not bias a name-only search');
+ assert.equal(f.providerCalls,1);assert.equal(f.writes,0);
+});
+test('radius filters the actual circle and sorts nearest first before returning results',async()=>{
+ const f=fixture({businessFeatures:[candidate(4,41.7547,-88.072262),candidate(3,41.744,-87.99),candidate(2,41.73,-88.072262),candidate(1,41.70,-88.072262,'Fixture Business Nearby'),candidate(5,41.755,-88.072262)]});
+ const {body,status}=await f.call({action:'business_search',q:'Fixture Business',depot:'BOLINGBROOK',radius_miles:5});
+ assert.equal(status,200);assert.equal(body.search_scope,'DEPOT_RADIUS');assert.equal(body.searched_near,'NWTB Bolingbrook');assert.equal(body.radius_miles,5);
+ assert.deepEqual(body.results.map(r=>r.source_ref),['OSM:N:1','OSM:N:2','OSM:N:4']);
+ assert.ok(body.results.every(r=>r.distance_miles<=5));
+ const u=f.requests[0].url,box=u.searchParams.get('bbox').split(',').map(Number);
+ assert.ok(-87.99>box[0]&&-87.99<box[2]&&41.744>box[1]&&41.744<box[3],'The rejected corner candidate is inside the provider box but outside the circle');
+ assert.equal(u.searchParams.get('lat'),'41.682487');assert.equal(u.searchParams.get('lon'),'-88.072262');assert.equal(f.writes,0);
+});
+test('radius uses the selected depot and separate caches for each area',async()=>{
+ const f=fixture({businessFeatures:[candidate(1,41.7,-88.07),candidate(2,42.15,-88.03)]});
+ const call=(depot,radius_miles)=>f.call({action:'business_search',q:'Fixture Business',depot,radius_miles});
+ for(const radius of [5,10,25,50,100]){const {body}=await call('PALATINE',radius);assert.equal(body.radius_miles,radius);assert.ok(body.results.every(r=>r.distance_miles<=radius));}
+ const palatine=await call('PALATINE',5);assert.deepEqual(palatine.body.results.map(r=>r.source_ref),['OSM:N:2']);
+ const bolingbrook=await call('BOLINGBROOK',5);assert.deepEqual(bolingbrook.body.results.map(r=>r.source_ref),['OSM:N:1']);
+ const all=await call('PALATINE',null);assert.equal(all.body.results.length,2);assert.equal(f.providerCalls,7);
+ await call('PALATINE',10);await call('BOLINGBROOK','5');assert.equal(f.providerCalls,7,'String and numeric forms share only the same scope cache');assert.equal(f.writes,0);
+});
+test('invalid radius or inherited depot names cannot broaden a local search',async()=>{
+ const f=fixture();
+ for(const radius_miles of [-1,0,1,101,'bad',false,true,[],{},'Infinity'])assert.equal((await f.call({action:'business_search',q:'Fixture',radius_miles})).status,400);
+ for(const depot of ['OTHER','__proto__','toString'])assert.equal((await f.call({action:'business_search',q:'Fixture',depot})).status,400);
+ assert.equal(f.providerCalls,0);assert.equal(f.writes,0);
+});
+test('business search retains more than the previous fifteen candidates',async()=>{
+ const f=fixture({businessFeatures:Array.from({length:30},(_,i)=>candidate(i+1,41.7+i/100000,-88.07))});
+ const {body}=await f.call({action:'business_search',q:'Fixture Business',radius_miles:5});assert.equal(body.results.length,30);assert.equal(f.writes,0);
 });

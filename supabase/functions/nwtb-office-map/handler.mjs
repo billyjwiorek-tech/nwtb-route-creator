@@ -1,5 +1,17 @@
 import { officeConfigProblem, gpsProblem, selectDestination, destinationKey, unavailableMessage, DEPOTS, validPoint } from './policy.mjs';
 
+const BUSINESS_RADII = new Set([5, 10, 25, 50, 100]);
+function businessRadius(value) {
+  if (value === undefined || value === null || value === '') return null;
+  if (!['number', 'string'].includes(typeof value) || !BUSINESS_RADII.has(Number(value))) return undefined;
+  return Number(value);
+}
+function businessBounds(depot, miles) {
+  const radians = Math.PI / 180, angle = miles / 3958.7613;
+  const latSpan = angle / radians, lonSpan = Math.asin(Math.sin(angle) / Math.cos(depot.lat * radians)) / radians;
+  return [depot.lon - lonSpan, depot.lat - latSpan, depot.lon + lonSpan, depot.lat + latSpan].join(',');
+}
+
 // Directory candidates are reviewed by Office. Search never saves a location or creates a stop.
 export function normalizeBusiness(feature, depot) {
   const p = feature?.properties || {}, coordinates = feature?.geometry?.coordinates;
@@ -84,9 +96,10 @@ export function createOfficeMapHandler({ db, config, providerKey, fetcher = fetc
 
     if (input.action === 'business_search') {
       if (req.method !== 'POST') return json(origin, { error: 'POST required.' }, 405);
-      const q = String(input.q || '').trim().replace(/\s+/g, ' '), depotName = String(input.depot || 'BOLINGBROOK'), depot = DEPOTS[depotName];
+      const q = String(input.q || '').trim().replace(/\s+/g, ' '), depotName = String(input.depot || 'BOLINGBROOK'), depot = Object.hasOwn(DEPOTS, depotName) ? DEPOTS[depotName] : null, radius = businessRadius(input.radius_miles);
       if (q.length < 3 || q.length > 160 || /[\u0000-\u001f\u007f]/.test(q) || !depot) return json(origin, { error: 'Enter a business name of 3–160 characters and select a depot.' }, 400);
-      const key = depotName + ':' + q.toLowerCase(), cached = businesses.get(key);
+      if (radius === undefined) return json(origin, { error: 'Choose No radius, 5, 10, 25, 50 or 100 miles.' }, 400);
+      const key = JSON.stringify([depotName, radius, q.toLowerCase()]), cached = businesses.get(key);
       if (cached && clock() - cached.at < 900000) return json(origin, cached.data);
       const limit = searchLimits.get(token);
       if (limit && clock() - limit.start < 60000 && limit.count >= 12) return json(origin, { error: 'Please wait a minute before searching again.', code: 'SEARCH_RATE_LIMIT' }, 429);
@@ -98,18 +111,25 @@ export function createOfficeMapHandler({ db, config, providerKey, fetcher = fetc
         const pendingKey = 'business:' + key;
         if (!inFlight.has(pendingKey)) inFlight.set(pendingKey, (async () => {
           const u = new URL('https://photon.komoot.io/api/');
-          for (const [name, value] of Object.entries({ q, lat: depot.lat, lon: depot.lon, countrycode: 'US', limit: 15, lang: 'en', zoom: 10 })) u.searchParams.set(name, String(value));
+          for (const [name, value] of Object.entries({ q, countrycode: 'US', limit: 50, lang: 'en' })) u.searchParams.set(name, String(value));
+          if (radius !== null) {
+            u.searchParams.set('bbox', businessBounds(depot, radius));
+            u.searchParams.set('lat', String(depot.lat)); u.searchParams.set('lon', String(depot.lon));
+            u.searchParams.set('location_bias_scale', '0');
+          }
           const response = await fetcher(u, { signal: AbortSignal.timeout(10000), headers: { Accept: 'application/json', 'User-Agent': 'NWTB-Delivery/1.0 (Office business lookup)' } });
           if (!response.ok) throw Error('DIRECTORY_UNAVAILABLE');
           const data = await response.json();
           if (!Array.isArray(data.features)) throw Error('DIRECTORY_UNAVAILABLE');
           const seen = new Set(), results = data.features.map(f => normalizeBusiness(f, depot)).filter(r => {
-            if (!r) return false;
+            // The provider's bounding box includes corners outside the actual circle.
+            if (!r || (radius !== null && r.distance_miles > radius)) return false;
             const identity = [r.name, r.address].join('|').toLowerCase();
             if (seen.has(identity)) return false;
             seen.add(identity); return true;
-          }).slice(0, 15);
-          const result = { ok: true, results, source: 'OPENSTREETMAP', attribution: '© OpenStreetMap contributors', searched_near: depot.name, queried_at: new Date(clock()).toISOString() };
+          });
+          if (radius !== null) results.sort((a, b) => a.distance_miles - b.distance_miles);
+          const result = { ok: true, results: results.slice(0, 50), source: 'OPENSTREETMAP', attribution: '© OpenStreetMap contributors', search_scope: radius === null ? 'US_NAME' : 'DEPOT_RADIUS', radius_miles: radius, searched_near: radius === null ? null : depot.name, distance_from: depot.name, queried_at: new Date(clock()).toISOString() };
           if (businesses.size >= 128) businesses.delete(businesses.keys().next().value);
           businesses.set(key, { at: clock(), data: result }); return result;
         })());
