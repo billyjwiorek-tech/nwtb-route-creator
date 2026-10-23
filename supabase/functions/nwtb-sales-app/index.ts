@@ -36,17 +36,24 @@ Deno.serve(async(req:Request)=>{
   return reply(req,{ok:true,token:session.token,employee_number:employee.employee_number,display_name:employee.display_name})
  }
 
- const session=await getSession(req)
- if(!session)return reply(req,{error:'Sales session expired. Sign in again.'},401)
- if(action==='whoami')return reply(req,{ok:true,employee_number:session.employee_number,display_name:session.display_name})
+ // Sales account reads and route validation open directly, as requested.
+ // Employee identity and session changes remain separate from public Sales reads.
  if(action==='accounts'){
-  try { const accounts=await loadSalesDatabase(db); return reply(req,{ok:true,count:accounts.length,accounts,source:'SUPABASE_PRIVATE'}) }
+  try {
+   const all=await loadSalesDatabase(db)
+   const truth=(v:any)=>v===true||v==='true'||v===1||v==='1'
+   const accounts=all.filter((a:any)=>truth(a.finalIncluded)&&truth(a.finalRouteApproved)&&((a.finalLayer??a.layer)!=='GO FIRST'||truth(a.finalGoFirstRouteApproved)))
+   return reply(req,{ok:true,count:accounts.length,accounts,source:'SUPABASE_SALES_DIRECT_ACCESS_ROUTE_APPROVED'})
+  }
   catch(e){return reply(req,{error:(e as Error).message},503)}
  }
  if(action==='validate_route'){
   try { const result=await validateSalesRoute(db,input.stops); return reply(req,result.ok?result:{...result,error:salesHoldMessage},result.ok?200:409) }
   catch(e){return reply(req,{error:(e as Error).message},503)}
  }
+ const session=await getSession(req)
+ if(!session)return reply(req,{error:'Sales session expired. Sign in again.'},401)
+ if(action==='whoami')return reply(req,{ok:true,employee_number:session.employee_number,display_name:session.display_name})
  if(action==='logout'){
   await db.from('chat_sessions').delete().eq('token',session.token)
   return reply(req,{ok:true})

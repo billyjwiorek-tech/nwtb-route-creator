@@ -1,5 +1,7 @@
 # Sales navigation and List Mode
 
+Sales opens directly from its permanent link, without an employee PIN. Account reads and route validation do not create employee sessions. Employee chat retains its separate sign-in. The backend still filters the approved account list and checks current HOLD/visit restrictions for every route.
+
 After **Build Today's Route → Create + Preview → Done**, choose:
 
 - **Start NWTB Turn-by-Turn**: follow the optimized stops in order. **Visit Complete / Next Stop** advances to the next business, then returns to Northwest Trucks in Bolingbrook.
