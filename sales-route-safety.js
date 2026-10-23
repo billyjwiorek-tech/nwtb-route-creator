@@ -26,6 +26,11 @@
   window.nwtbSalesRouteReason = a => policy.reason(policy.resolve(a,database()));
   window.nwtbSalesRouteAllowed = a => !window.nwtbSalesRouteReason(a);
   window.nwtbSalesSafetyWarning = warning;
+  window.nwtbCancelSalesRouteRender = function() {
+    ++revision;
+    currentRoute = []; currentMapLinks = [];
+    window.nwtbSalesEndNav?.();
+  };
 
   const previousRender = window.renderRoute;
   window.renderRoute = async function(order,meta={}) {

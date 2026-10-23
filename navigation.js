@@ -320,8 +320,7 @@
     };
   }
 
-  function applySubFilterFinal(cand,t){
-    const sub=$('routeSubFilter')?.value||'';
+  function applySubFilterFinal(cand,t,sub=$('routeSubFilter')?.value||''){
     if(t==='new_business'){
       if(sub==='go_first_prospects')return cand.filter(a=>a.broadType==='PROSPECT'&&a.layer==='GO FIRST');
       if(sub==='regular_prospects')return cand.filter(a=>a.broadType==='PROSPECT'&&a.layer==='VERIFIED PROSPECTS');
@@ -336,15 +335,16 @@
     return cand;
   }
 
-  async function selectEfficientNewBusinessFinal(cand,n){
+  async function selectEfficientNewBusinessFinal(cand,n,kept=[]){
     if(cand.length<=n)return cand.slice();
     try{
-      const pts=[depot,...cand];
+      const pts=[depot,...kept,...cand];
       const matrix=await deliveryRoadMatrix(pts);
       if(matrix.code!=='Ok'||!matrix.durations)throw new Error('NWTB Delivery road matrix unavailable');
-      const m=matrix.durations,remaining=new Set(Array.from({length:cand.length},(_,i)=>i+1));
-      const tour=[0,0];
-      while(tour.length-2<n&&remaining.size){
+      const m=matrix.durations,offset=kept.length+1,remaining=new Set(Array.from({length:cand.length},(_,i)=>i+offset));
+      const tour=[0,...kept.map((_,i)=>i+1),0];
+      let added=0;
+      while(added<n&&remaining.size){
         let bestIdx=null,bestPos=null,bestDelta=Infinity;
         for(const idx of remaining){
           for(let pos=0;pos<tour.length-1;pos++){
@@ -357,24 +357,27 @@
         if(bestIdx==null)break;
         tour.splice(bestPos,0,bestIdx);
         remaining.delete(bestIdx);
+        added++;
       }
-      const chosen=tour.slice(1,-1).map(i=>cand[i-1]);
+      const chosen=tour.slice(1,-1).filter(i=>i>=offset).map(i=>cand[i-offset]);
       if(chosen.length===n)return chosen;
     }catch(e){throw new Error('NWTB Delivery routing engine could not select the New Business group: '+(e.message||e))}
   }
 
-  // Final route builder uses routeEligible as the completed safety decision.
-  // This lets Iron Way #11060 route at its corrected Oak Brook commercial office while
-  // preserving all residential / duplicate blocks and all master-reconciliation changes.
-  async function buildFinalAuditedRoute(){
-    applyAllReconciliation();
-    const out=$('output'),t=$('routeType').value,r=+$('radius').value,includeFollow=$('includeFollowUps')?.checked;
-    let n=Math.max(1,Math.min(25,+$('stopCount').value||10));
+  function salesRouteSettings(){
+    const type=$('routeType');
+    return {type:type.value,subType:$('routeSubFilter')?.value||'',radius:+$('radius').value,
+      includeFollow:!!$('includeFollowUps')?.checked,targetCount:Math.max(1,Math.min(25,+$('stopCount').value||10)),
+      label:type.options[type.selectedIndex]?.textContent||'Sales route'};
+  }
+
+  function salesRouteCandidates(settings){
+    const {type:t,radius:r,includeFollow}=settings;
     let cand=accounts.filter(a=>a.finalIncluded!==false)
       .filter(a=>window.nwtbSalesRouteAllowed(a))
       .filter(filterFn(t))
       .filter(a=>r>=999||miles(depot,a)<=r);
-    cand=applySubFilterFinal(cand,t);
+    cand=applySubFilterFinal(cand,t,settings.subType);
     cand=cand.filter(a=>{
       if(a.broadType!=='PROSPECT')return true;
       const s=a.visitStatus||'NOT_VISITED';
@@ -382,18 +385,36 @@
       if(t==='new_business'&&s==='FOLLOW_UP'&&!includeFollow)return false;
       return true;
     });
-    if(!cand.length){alert('No eligible audited-commercial accounts matched these filters.');return}
+    return cand;
+  }
+
+  async function chooseSalesStops(cand,n,settings,kept=[]){
     n=Math.min(n,cand.length);
+    if(n<=0)return [];
+    if(settings.type==='new_business')return selectEfficientNewBusinessFinal(cand,n,kept);
+    if(settings.type==='mixed')return selectMixed(cand,n);
+    return selectCluster(cand,n,settings.type);
+  }
+
+  window.NwtbSalesRoutePlanner={settings:salesRouteSettings,candidates:salesRouteCandidates,
+    select:chooseSalesStops,optimize:deliveryOptimizeSales,annotate:annotateDeliveryEngine};
+
+  let salesBuildRevision=0;
+  async function buildFinalAuditedRoute(){
+    const ownRevision=++salesBuildRevision;
+    window.nwtbSalesRoutePreview?.reset();
+    applyAllReconciliation();
+    const out=$('output'),settings=salesRouteSettings(),cand=salesRouteCandidates(settings);
+    if(!cand.length){alert('No eligible audited-commercial accounts matched these filters.');return}
     out.style.display='block';out.innerHTML='<b>Choosing the sales stops and optimizing with the NWTB Delivery routing engine...</b>';
     try{
-      let sel;
-      if(t==='new_business')sel=await selectEfficientNewBusinessFinal(cand,n);
-      else if(t==='mixed')sel=selectMixed(cand,n);
-      else sel=selectCluster(cand,n,t);
+      const sel=await chooseSalesStops(cand,settings.targetCount,settings);
       const j=await deliveryOptimizeSales(sel);
-      await renderRoute(j.order.map(i=>sel[i]),{miles:j.miles,minutes:j.minutes,efficiencyFirst:t==='new_business'});
-      annotateDeliveryEngine(j);
-    }catch(e){out.innerHTML=`<div class="notice"><b>ROUTE NOT CREATED:</b> ${esc(e.message||e)}</div>`}
+      if(ownRevision!==salesBuildRevision)return;
+      const order=j.order.map(i=>sel[i]),meta={...j,efficiencyFirst:settings.type==='new_business'};
+      if(!window.nwtbSalesRoutePreview)throw Error('Route preview did not load. Refresh the Sales page and try again.');
+      await window.nwtbSalesRoutePreview.start(order,meta,settings);
+    }catch(e){if(ownRevision===salesBuildRevision)out.innerHTML=`<div class="notice"><b>ROUTE NOT CREATED:</b> ${esc(e.message||e)}</div>`}
   }
 
   window.buildRoute=async function(){

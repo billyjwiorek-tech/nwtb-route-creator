@@ -1,9 +1,9 @@
 name: Sales route safety
 on:
   push:
-    paths: ['sales-*.js', 'chat.js', 'navigation.js', 'index.html', 'app.html', 'supabase/functions/**', 'tests/sales-route-safety.test.cjs', '.github/workflows/sales-route-safety.yml']
+    paths: ['sales-*.js', 'chat.js', 'navigation.js', 'index.html', 'app.html', 'supabase/functions/**', 'tests/sales-route-safety.test.cjs', 'tests/sales-route-preview.test.cjs', '.github/workflows/sales-route-safety.yml']
   pull_request:
-    paths: ['sales-*.js', 'chat.js', 'navigation.js', 'index.html', 'app.html', 'supabase/functions/**', 'tests/sales-route-safety.test.cjs', '.github/workflows/sales-route-safety.yml']
+    paths: ['sales-*.js', 'chat.js', 'navigation.js', 'index.html', 'app.html', 'supabase/functions/**', 'tests/sales-route-safety.test.cjs', 'tests/sales-route-preview.test.cjs', '.github/workflows/sales-route-safety.yml']
 jobs:
   sales-policy:
     runs-on: ubuntu-latest
@@ -12,4 +12,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: node --test tests/sales-route-safety.test.cjs
+      - run: npm ci --prefix tests --ignore-scripts
+      - run: node --test tests/sales-route-safety.test.cjs tests/sales-route-preview.test.cjs
