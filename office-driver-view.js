@@ -134,6 +134,7 @@ if(window.L){const map=L.map('driverMap',{scrollWheelZoom:false}).setView([41.68
  mapOverlay=window.NWTBOfficeDriverMap.create({map,L,onStatus:(msg,warn)=>{$('mapStatus').textContent=msg;$('mapStatus').className='small'+(warn?' error':'');}});$('fitMap').onclick=()=>{map.invalidateSize();mapOverlay.fit();};
  void import('./office-map-live.mjs?v=20261021-mapsearch1').then(({installOfficeTraffic})=>installOfficeTraffic({map,L,config:{environment:'PRODUCTION',projectRef:'ufnjyidhxuytrmbjzgtu',backendUrl:'https://ufnjyidhxuytrmbjzgtu.supabase.co',siteOrigin:location.origin,publishableKey:PUB,officeTokenKey:'nwtb_delivery_token'},getRows:()=>[],getMarkers:()=>new Map(),getOfficeToken:session,isVisible:visible})).catch(()=>{});
  window.addEventListener('resize',()=>map.invalidateSize());window.addEventListener('nwtb-office-view-visible',()=>{map.invalidateSize();void refresh(true);});
+ if(typeof ResizeObserver==='function'){const sizeObserver=new ResizeObserver(()=>map.invalidateSize());sizeObserver.observe($('driverMap'));}
 }
 setInterval(()=>{if(visible())void refresh();},5000);document.addEventListener('visibilitychange',()=>{if(visible())void refresh(true);});window.addEventListener('focus',()=>{if(visible())void refresh(true);});
 window.addEventListener('storage',e=>{if(e.key==='nwtb_delivery_token'){closeOverride();detail=null;void refresh(true);}});window.addEventListener('pagehide',closeOverride);
