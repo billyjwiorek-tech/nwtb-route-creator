@@ -12,6 +12,8 @@ Searching and loading a candidate remain read-only. ADD STOP, SAVE AS FREQUENT L
 
 Validation covers primary and backup providers, California versus local ordering, no radius, selected-depot caches, exact radius boundaries, malformed/foreign/non-POI results, incomplete addresses, missing coordinates, provider access/outage fallback, credential isolation, query encoding and stale search responses. Full existing NWTB and Sales regression checks are required before deployment. Real production verification uses business searches only and must not create or activate deliveries.
 
-Office and Dispatch cache references use `20261026-nearby1`; public app addresses and the existing Driver QR remain unchanged.
+Office and Dispatch cache references use `20261026-nearby2`; public app addresses and the existing Driver QR remain unchanged.
 
 Provider reference: https://docs.tomtom.com/search-api/documentation/search-service/points-of-interest-search
+
+Live read-only verification: the GPS Office name-only Grainger search returned the Downers Grove branch at 2701 Ogden Avenue first (8.5 straight-line miles), with all 28 located public matches in increasing distance order. A 10-mile Bolingbrook search returned only the 8.5-mile and 8.7-mile public branches. Standard Office custom-builder search from Palatine returned 33 located matches in increasing distance order while the main search retained its independent Bolingbrook selection. No ADD STOP, save, route creation, release, Driver login or start actions were used.
