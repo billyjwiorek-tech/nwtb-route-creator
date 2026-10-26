@@ -13,8 +13,8 @@ function fixture(options = {}) {
   const { document, window: dom } = parseHTML('<html><head></head><body><div id="map"></div><div id="popupA"><div class="leaflet-popup-content">EXISTING GPS DETAILS</div></div><div id="popupB"><div class="leaflet-popup-content">SECOND DRIVER</div></div></body></html>');
   let now = start, id = 0, officeToken = 'fixture-office', visible = true;
   Object.defineProperty(document, 'visibilityState', { get: () => visible ? 'visible' : 'hidden' });
-  const intervals = new Map(), calls = [], blobUrls = [], pending = [];
-  const timers = { setInterval(fn, ms) { const key = ++id; intervals.set(key, { fn, ms }); return key; }, clearInterval(key) { intervals.delete(key); } };
+  const intervals = new Map(), timeouts = new Map(), calls = [], blobUrls = [], pending = [], pendingTiles=[],pendingConfig=[];
+  const timers = { setInterval(fn, ms) { const key = ++id; intervals.set(key, { fn, ms }); return key; }, clearInterval(key) { intervals.delete(key); },setTimeout(fn,ms){const key=++id;timeouts.set(key,{fn,ms});return key},clearTimeout(key){timeouts.delete(key)} };
   const map = new Emitter(); map.layers = new Set(); map.panes = new Map();
   map.getPane = name => map.panes.get(name); map.createPane = name => { const pane = document.createElement('div'); map.panes.set(name, pane); return pane; };
   map.hasLayer = layer => map.layers.has(layer); map.removeLayer = layer => { map.layers.delete(layer); return map; }; map.getContainer = () => document.getElementById('map');
@@ -27,19 +27,28 @@ function fixture(options = {}) {
   const fetcher = async (url, init) => {
     assert.ok(String(url).startsWith(config.backendUrl)); assert.ok(!String(url).includes('fixture-office')); assert.ok(!String(url).includes('fixture-provider'));
     const body = init.method === 'GET' ? Object.fromEntries(new URL(url).searchParams) : JSON.parse(init.body); calls.push({ url, init, body });
-    if (body.action === 'config') return new Response(JSON.stringify({ ok: true, environment: 'PRODUCTION', source: 'TOMTOM', enabled: !options.unconfigured }));
-    if (body.action === 'flow_tile') return new Response(new Uint8Array([137,80,78,71,13,10,26,10]), { headers: { 'content-type': 'image/png', 'x-nwtb-traffic-fetched-at': new Date(now).toISOString() } });
-    if (options.defer) return new Promise(resolve => pending.push({ driver: body.driver_employee_number, resolve, signal: init.signal }));
+    if (body.action === 'config') {
+      const reply=()=>Response.json({ok:true,environment:'PRODUCTION',source:'TOMTOM',enabled:!options.unconfigured});
+      if(options.deferConfig)return new Promise((resolve,reject)=>{pendingConfig.push({resolve:()=>resolve(reply()),signal:init.signal});init.signal.addEventListener('abort',()=>reject(Error('Aborted')),{once:true})});
+      return reply();
+    }
+    if (body.action === 'flow_tile') {
+      const reply=()=>new Response(new Uint8Array([137,80,78,71,13,10,26,10]), { headers: { 'content-type': 'image/png', 'x-nwtb-traffic-fetched-at': new Date(now).toISOString() } });
+      if(options.deferTiles)return new Promise((resolve,reject)=>{pendingTiles.push({body,resolve:()=>resolve(reply()),signal:init.signal});init.signal.addEventListener('abort',()=>reject(Error('Aborted')),{once:true})});
+      return reply();
+    }
+    if (options.defer) return new Promise((resolve,reject) => {pending.push({ driver: body.driver_employee_number, resolve, signal: init.signal });init.signal.addEventListener('abort',()=>reject(Error('Aborted')),{once:true})});
     return new Response(JSON.stringify(options.unavailable ? { ok: true, available: false, code: 'TRAFFIC_UNAVAILABLE' } : eta(body.driver_employee_number)));
   };
   const window = { location: { origin: config.siteOrigin }, URL: { createObjectURL() { const value = 'blob:fixture-' + blobUrls.length; blobUrls.push(value); return value; }, revokeObjectURL() {} } };
   const ui = installOfficeTraffic({ map, L, config, getRows: () => rows, getMarkers: () => markers, getOfficeToken: () => officeToken, fetcher, document, window, clock: () => now, timers, isVisible: () => visible });
-  return { document, dom, ui, map, rows, calls, pending, eta, intervals,
+  return { document, dom, ui, map, rows, calls, pending, pendingTiles, pendingConfig, eta, intervals, timeouts,
     get popupText() { return document.getElementById('popupA').textContent; },
     async open(index = 0) { for (const popup of popups) if (popup.open) { popup.open = false; map.fire('popupclose', { popup }); } popups[index].open = true; map.fire('popupopen', { popup: popups[index] }); await flush(); },
     async close(index = 0) { popups[index].open = false; map.fire('popupclose', { popup: popups[index] }); await flush(); },
     async tick(ms) { now += ms; for (const value of [...intervals.values()]) if (value.ms <= ms) value.fn(); await flush(); },
     async hide() { visible = false; document.dispatchEvent(new dom.Event('visibilitychange')); await flush(); },
+    async timeout(){for(const value of [...timeouts.values()])value.fn();await flush()},
     logout() { officeToken = ''; },
     rewritePopup() { popups[0].getElement().querySelector('.leaflet-popup-content').innerHTML = 'REFRESHED GPS DETAILS'; popups[0].fire('contentupdate'); },
     finishPending(index = 0) { const request = pending[index]; request.resolve(new Response(JSON.stringify(eta(request.driver)))); }
@@ -102,4 +111,22 @@ test('tile requests authenticate in headers, not URLs, and retain provider times
   const f = fixture(); await flush(); let done;
   const image = f.ui.layer.createTile({ z: 2, x: 1, y: 1 }, (error, tile) => { done = { error, tile }; }); await flush(); assert.match(image.src, /^blob:fixture/); image.onload(); assert.equal(done.error, null); assert.equal(done.tile, image);
   const call = f.calls.find(r => r.body.action === 'flow_tile'); assert.equal(call.init.headers['x-nwtb-session'], 'fixture-office'); assert.ok(!call.url.includes('fixture-office')); f.ui.destroy();
+});
+test('traffic tiles limit parallel requests and discard tiles removed by panning before fetching them',async()=>{
+ const f=fixture({deferTiles:true});await flush();const finished=[];
+ const tiles=Array.from({length:12},(_,i)=>f.ui.layer.createTile({z:5,x:i,y:1},error=>finished.push({i,error})));await flush();
+ assert.equal(f.pendingTiles.length,4,'A map must not send its entire traffic tile burst at once');
+ f.ui.layer.fire('tileunload',{tile:tiles[8]});await flush();assert.equal(finished.filter(x=>x.i===8).length,1);
+ f.pendingTiles[0].resolve();await flush();assert.equal(f.pendingTiles.length,5);assert.match(tiles[0].src,/^blob:/);tiles[0].onload();
+ await f.hide();assert.ok(f.pendingTiles.slice(1).every(r=>r.signal.aborted));assert.equal(finished.length,12);
+ assert.ok(!f.calls.some(c=>c.body.action==='flow_tile'&&c.body.x==='8'));f.ui.destroy();assert.equal(f.timeouts.size,0);
+});
+test('a stalled Live Drivers ETA times out visibly and a later request can recover',async()=>{
+ const options={defer:true},f=fixture(options);await flush();await f.open();assert.match(f.popupText,/CALCULATING ARRIVAL/);
+ assert.ok(f.timeouts.size>0,'A traffic request needs a bounded client timeout');await f.timeout();assert.equal(f.pending[0].signal.aborted,true);assert.match(f.popupText,/ETA UNAVAILABLE/);
+ options.defer=false;await f.ui.refreshEta();await flush();assert.match(f.popupText,/ARRIVAL:/);f.ui.destroy();assert.equal(f.timeouts.size,0);
+});
+test('opening a Driver popup while traffic connects does not cancel traffic initialization',async()=>{
+ const f=fixture({deferConfig:true});await flush();await f.open();assert.equal(f.pendingConfig[0].signal.aborted,false);
+ f.pendingConfig[0].resolve();await flush();assert.equal(f.map.hasLayer(f.ui.layer),true);assert.match(f.popupText,/ARRIVAL:/);f.ui.destroy();assert.equal(f.timeouts.size,0);
 });

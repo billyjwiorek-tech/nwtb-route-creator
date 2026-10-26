@@ -43,6 +43,21 @@ test('Office preview composes the existing traffic overlay with planned per-stop
 test('health checks preserve existing arrival buttons and keyboard focus until estimates change',async()=>{
  const f=fixture();await flush();const button=f.document.querySelector('.officeEtaFocus');await f.tick(5000);assert.equal(f.document.querySelector('.officeEtaFocus'),button);f.ui.destroy();
 });
+test('the actual Refresh ETA button requests a fresh calculation and shows progress and a second-accurate confirmation',async()=>{
+ const options={},f=fixture(options);await flush();
+ options.defer=true;await f.tick(1000,{poll:false});const button=f.document.querySelector('.officeEtaHead button');button.click();await flush();
+ const request=f.calls.filter(c=>c.body.action==='route_preview_eta').at(-1);
+ assert.equal(request.body.refresh,true,'A manual refresh must bypass the automatic estimate cache');assert.equal(request.init.cache,'no-store');
+ assert.equal(button.disabled,true);assert.equal(button.textContent,'REFRESHING ETA…');assert.match(f.text(),/REFRESHING ARRIVALS WITH TRAFFIC/);
+ button.click();await flush();assert.equal(f.pending.length,1,'Repeated clicks cannot issue duplicate calculations');
+ f.finish();await flush();assert.equal(button.disabled,false);assert.equal(button.textContent,'REFRESH ETA');assert.match(f.text(),/REFRESHED/);assert.match(f.text(),/9:00:01 AM/);
+ assert.equal(f.document.querySelectorAll('.officeEtaFocus').length,3);assert.equal(f.storage.get('nwtb_driver_token'),'fixture-driver');f.ui.destroy();
+});
+test('From now counts down from the actual arrival timestamp without replacing focused stop controls',async()=>{
+ const f=fixture({transform:p=>({...p,arrivals:p.arrivals.map((r,i)=>i===0?{...r,arrival_at:new Date(start+605000).toISOString(),minutes:11}:r)})});await flush();
+ const target=f.document.querySelector('.officeEtaFocus');assert.equal(f.document.querySelector('tbody tr td:nth-child(3)').textContent,'11 min');
+ await f.tick(10000,{poll:false});assert.equal(f.document.querySelector('tbody tr td:nth-child(3)').textContent,'10 min');assert.equal(f.document.querySelector('.officeEtaFocus'),target);f.ui.destroy();
+});
 test('active route labels GPS origin and removes arrivals as soon as its last fix becomes stale',async()=>{
  const f=fixture({active:true});await flush();assert.match(f.text(),/ACTIVE ROUTE • FROM DRIVER GPS/);assert.match(f.text(),/ARRIVAL/);await f.tick(121000,{poll:false});assert.match(f.text(),/GPS IS OUT OF DATE|TRAFFIC SERVICE/);assert.equal(f.document.querySelectorAll('.officeEtaFocus').length,0);f.ui.destroy();
 });

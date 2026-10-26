@@ -7,7 +7,7 @@ export { normalizeBusiness } from './business.mjs';
 export function createOfficeMapHandler({ db, config, providerKey, fetcher = fetch, clock = Date.now }) {
   const configProblem = officeConfigProblem(config);
   const tiles = new Map(), estimates = new Map(), inFlight = new Map(), businesses = new Map(), searchLimits = new Map(), previews = new Map();
-  const headers = origin => ({ 'Access-Control-Allow-Origin': origin === config?.siteOrigin ? origin : 'null', 'Vary': 'Origin', 'Access-Control-Allow-Headers': 'content-type, apikey, x-nwtb-session', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Cache-Control': 'no-store' });
+  const headers = origin => ({ 'Access-Control-Allow-Origin': origin === config?.siteOrigin ? origin : 'null', 'Vary': 'Origin', 'Access-Control-Allow-Headers': 'content-type, apikey, x-nwtb-session', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Max-Age':'600', 'Cache-Control': 'no-store' });
   const json = (origin, body, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...headers(origin), 'Content-Type': 'application/json' } });
   const unavailable = (origin, code, extra = {}) => json(origin, { ok: true, available: false, code, message: unavailableMessage(code), ...extra });
 
@@ -91,6 +91,7 @@ export function createOfficeMapHandler({ db, config, providerKey, fetcher = fetc
 
     if (input.action === 'route_preview_eta') {
       if (req.method !== 'POST') return json(origin, { error: 'POST required.' }, 405);
+      if (input.refresh !== undefined && typeof input.refresh !== 'boolean') return json(origin, { error: 'Refresh must be true or false.' }, 400);
       const id = String(input.route_id || '');
       if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return json(origin, { error: 'A saved route ID is required.' }, 400);
       if (!providerKey) return unavailable(origin, 'TRAFFIC_NOT_CONFIGURED');
@@ -99,8 +100,9 @@ export function createOfficeMapHandler({ db, config, providerKey, fetcher = fetc
         if (ctx.problem) return unavailable(origin, ctx.problem);
         if (input.expected_updated_at && Date.parse(input.expected_updated_at) !== Date.parse(ctx.route.updated_at)) return unavailable(origin, 'ROUTE_CHANGED');
         const key = JSON.stringify([id, ctx.revision, Number(ctx.origin.lat).toFixed(3), Number(ctx.origin.lon).toFixed(3)]), cached = previews.get(key);
-        if (cached && clock()-Date.parse(cached.calculated_at) < 30000 && (!ctx.gps || !gpsProblem({ ...ctx.gps, captured_at: cached.gps_captured_at },clock()))) return json(origin,cached);
-        const pendingKey = 'preview:'+key;
+        if (!input.refresh && cached && clock()-Date.parse(cached.calculated_at) < 30000 && (!ctx.gps || !gpsProblem({ ...ctx.gps, captured_at: cached.gps_captured_at },clock()))) return json(origin,{...cached,cache_hit:true,checked_at:new Date(clock()).toISOString()});
+        // Explicit Office refreshes must not attach to an older automatic request.
+        const pendingKey = 'preview:'+key+(input.refresh?':refresh':'');
         let result;
         try {
           if (!inFlight.has(pendingKey)) inFlight.set(pendingKey, previewEstimate(ctx,{providerKey,fetcher,clock}));
@@ -110,8 +112,12 @@ export function createOfficeMapHandler({ db, config, providerKey, fetcher = fetc
         if (current.problem) return unavailable(origin,current.problem);
         if (current.revision !== ctx.revision) return unavailable(origin,'ROUTE_CHANGED');
         if (ctx.gps && gpsProblem(ctx.gps,clock())) return unavailable(origin,'GPS_STALE');
-        if (previews.size >= 128) previews.delete(previews.keys().next().value);
-        previews.set(key,result); return json(origin,result);
+        const newer=previews.get(key);
+        if (!newer || Date.parse(newer.calculated_at)<=Date.parse(result.calculated_at)) {
+          if (previews.size >= 128) previews.delete(previews.keys().next().value);
+          previews.set(key,result);
+        }
+        return json(origin,{...result,cache_hit:false,checked_at:new Date(clock()).toISOString()});
       } catch { return unavailable(origin,'TRAFFIC_UNAVAILABLE'); }
     }
 

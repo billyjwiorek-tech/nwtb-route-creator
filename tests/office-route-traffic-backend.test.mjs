@@ -71,6 +71,29 @@ test('bounded preview caching rechecks saved state and expires rather than repor
  const f=fixture();const first=await f.call();await f.call();assert.equal(f.requests.length,1);f.advance(31000);const second=await f.call();assert.equal(f.requests.length,2);assert.notEqual(first.body.calculated_at,second.body.calculated_at);
  f.tables.delivery_route_stops[0].status='DELIVERED';const changed=await f.call();assert.deepEqual(changed.body.arrivals.map(r=>r.id),['s2','return']);assert.equal(f.requests.length,3);assert.equal(f.writes,0);
 });
+test('an explicit refresh recalculates traffic immediately instead of reusing the automatic-poll cache',async()=>{
+ const f=fixture(),before=JSON.stringify(f.tables),first=(await f.call()).body;
+ f.advance(1000);const automatic=(await f.call()).body;assert.equal(f.requests.length,1);assert.equal(automatic.calculated_at,first.calculated_at);
+ const refreshed=(await f.call({refresh:true})).body;
+ assert.equal(f.requests.length,2,'The Refresh ETA button must reach the traffic provider even inside the 30-second cache window');
+ assert.equal(refreshed.calculated_at,new Date(start+1000).toISOString());assert.notEqual(refreshed.calculated_at,first.calculated_at);
+ assert.equal(refreshed.cache_hit,false);assert.equal(refreshed.checked_at,refreshed.calculated_at);
+ f.advance(1000);const reused=(await f.call()).body;assert.equal(f.requests.length,2);assert.equal(reused.cache_hit,true);assert.equal(reused.calculated_at,refreshed.calculated_at);assert.equal(reused.checked_at,new Date(start+2000).toISOString());
+ assert.equal(JSON.stringify(f.tables),before);assert.equal(f.writes,0);
+});
+test('manual refresh preserves Office authorization and saved-route revision checks',async()=>{
+ const f=fixture({employee:'9001'});assert.equal((await f.call({refresh:true})).status,403);assert.equal(f.requests.length,0);
+ const changed=fixture();assert.equal((await changed.call({refresh:true,expected_updated_at:'2020-01-01T00:00:00Z'})).body.code,'ROUTE_CHANGED');assert.equal(changed.requests.length,0);
+ const invalid=fixture();assert.equal((await invalid.call({refresh:'true'})).status,400);assert.equal(invalid.requests.length,0);
+});
+test('an older automatic request cannot overwrite the cache after a newer manual refresh finishes',async()=>{
+ const pending=[],f=fixture({during:()=>new Promise(resolve=>pending.push(resolve))});
+ const flush=async()=>{for(let i=0;i<100;i++)await Promise.resolve()};
+ const automatic=f.call();await flush();assert.equal(pending.length,1);f.advance(1000);
+ const manual=f.call({refresh:true});await flush();assert.equal(pending.length,2);pending[1]();const fresh=(await manual).body;
+ pending[0]();const older=(await automatic).body;assert.ok(Date.parse(older.calculated_at)<Date.parse(fresh.calculated_at));
+ const cached=(await f.call()).body;assert.equal(cached.calculated_at,fresh.calculated_at);assert.equal(cached.cache_hit,true);assert.equal(f.requests.length,2);assert.equal(f.writes,0);
+});
 test('provider outages and malformed legs cannot produce fabricated arrivals or OSRM fallback',async()=>{
  for(const options of [{noKey:true},{outage:true},{payload:{routes:[{legs:[]}]}},{payload:{routes:[{legs:Array.from({length:3},()=>({summary:{travelTimeInSeconds:-1,lengthInMeters:100}}))}]}}]){
   const f=fixture(options),{body}=await f.call();assert.equal(body.available,false);assert.ok(['TRAFFIC_NOT_CONFIGURED','TRAFFIC_UNAVAILABLE'].includes(body.code));assert.equal(body.arrivals,undefined);assert.equal(f.writes,0);

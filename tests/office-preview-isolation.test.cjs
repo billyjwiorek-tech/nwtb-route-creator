@@ -10,7 +10,7 @@ async function officeBoot(employee){
  await vm.runInContext('startGuest()',context);return {window,stored,calls};
 }
 (async()=>{
- for(const file of ['delivery-live.html','delivery-standard.html']){const html=read(file);ok(html.includes('office-driver-preview.html?v=20261026-driverdesk1'),'Both Office editions use Office-only preview');ok(!/src="driver-(?:live|standard)\.html/.test(html),'No hidden authenticated Driver app in Office');}
+ for(const file of ['delivery-live.html','delivery-standard.html']){const html=read(file);ok(html.includes('office-driver-preview.html?v=20261026-etarefresh1'),'Both Office editions use Office-only preview');ok(!/src="driver-(?:live|standard)\.html/.test(html),'No hidden authenticated Driver app in Office');}
  let f=fixture();await f.boot();ok(f.requests.every(x=>['roster','view','dispatch_threads'].includes(x.body.action)),'Office observer reads only Office data');ok(f.document.getElementById('stops').textContent.includes('Fixture business'));await f.click('savedRoute');eq(f.views,['dispatch']);ok(f.storageReads.every(k=>k==='nwtb_delivery_token'),'Office never reads Driver credentials');
  f=fixture({ready:false});await f.boot();eq(f.requests.length,0,'No request before Office authentication');ok(f.document.getElementById('viewStatus').textContent.includes('Office'));
  let b=await officeBoot('9998');eq(b.calls[0].body.action,'delivery_guest_start');eq(b.calls[0].need,false,'Office starts a fresh Delivery Desk session');eq(b.window.__nwtbOfficeSignedIn,true);eq(b.stored.get('nwtb_driver_token'),'fixture-driver-token','Driver credentials are preserved');eq(b.stored.get('nwtb_delivery_token'),'fixture-office-token');

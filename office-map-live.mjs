@@ -4,7 +4,8 @@ import { officeConfigProblem, gpsProblem, MAX_ETA_AGE_MS, unavailableMessage } f
 export function installOfficeTraffic({ map, L, config, getRows, getMarkers, getOfficeToken, fetcher = fetch, document = globalThis.document, window = globalThis.window, clock = Date.now, timers = globalThis, isVisible }) {
   if (officeConfigProblem(config) || window.location.origin !== config.siteOrigin) throw Error('NWTB Office configuration required.');
   const endpoint = config.backendUrl.replace(/\/$/, '') + '/functions/v1/nwtb-office-map';
-  const ownRequests = new Set(), tileRequests = new Set(), popupListeners = new Map();
+  const ownRequests = new Set(), tileRequests = new Set(), popupListeners = new Map(), tileControllers = new WeakMap(), tileQueue = [];
+  let activeTiles=0,etaController=null;
   let enabled = true, available = false, disposed = false, intersects = true, layer, selected = null, epoch = 0, lastToken = '', configBusy = false, etaBusy = false, lastFetched = null, trafficError = false, configurationProblem = 'TRAFFIC_NOT_CONFIGURED';
   const visible = () => !disposed && document.visibilityState !== 'hidden' && (isVisible ? isVisible() : intersects);
   const token = () => String(getOfficeToken() || '');
@@ -32,26 +33,53 @@ export function installOfficeTraffic({ map, L, config, getRows, getMarkers, getO
     let url = endpoint, body;
     if (method === 'GET') url += '?' + new URLSearchParams({ action, ...extra });
     else { headers['content-type'] = 'application/json'; body = JSON.stringify({ action, ...extra }); }
-    const response = await fetcher(url, { method, headers, body, signal, cache: 'no-store' });
-    if (!response.ok) { const data = await response.json().catch(() => ({})); throw Object.assign(Error('Traffic service unavailable.'), { code: data.code || (response.status === 401 ? 'SESSION_EXPIRED' : 'TRAFFIC_UNAVAILABLE') }); }
-    return response;
+    const controller=new AbortController(),abort=()=>controller.abort();let timedOut=false;
+    signal?.addEventListener('abort',abort,{once:true});if(signal?.aborted)controller.abort();
+    const timeout=timers.setTimeout(()=>{timedOut=true;controller.abort()},18000);
+    try {
+      if(controller.signal.aborted)throw Error('Traffic inactive.');
+      const response = await fetcher(url, { method, headers, body, signal:controller.signal, cache: 'no-store' });
+      if (!response.ok) { const data = await response.json().catch(() => ({})); throw Object.assign(Error('Traffic service unavailable.'), { code: data.code || (response.status === 401 ? 'SESSION_EXPIRED' : 'TRAFFIC_UNAVAILABLE') }); }
+      const data=action==='flow_tile'?await response.blob():await response.json();
+      if(controller.signal.aborted)throw Error('Traffic request canceled.');
+      return {data,headers:response.headers};
+    } catch(error) {
+      if(timedOut)throw Object.assign(Error('Traffic request timed out.'),{code:'TRAFFIC_UNAVAILABLE'});
+      throw error;
+    } finally {timers.clearTimeout(timeout);signal?.removeEventListener('abort',abort)}
+  }
+
+  function drainTiles(){
+    while(activeTiles<4&&tileQueue.length){
+      const job=tileQueue.shift();job.signal.removeEventListener('abort',job.cancel);
+      if(job.signal.aborted){job.reject(Error('Traffic inactive.'));continue}
+      activeTiles++;
+      Promise.resolve().then(job.run).then(job.resolve,job.reject).finally(()=>{activeTiles--;drainTiles()});
+    }
+  }
+  function requestTile(run,signal){
+    return new Promise((resolve,reject)=>{
+      if(signal.aborted){reject(Error('Traffic inactive.'));return}
+      const job={run,signal,resolve,reject,cancel(){const index=tileQueue.indexOf(job);if(index>=0){tileQueue.splice(index,1);reject(Error('Traffic inactive.'))}}};
+      signal.addEventListener('abort',job.cancel,{once:true});tileQueue.push(job);drainTiles();
+    });
   }
 
   const FlowLayer = L.GridLayer.extend({
     createTile(coords, done) {
       const image = document.createElement('img'); image.alt = ''; image.setAttribute('role', 'presentation');
-      const controller = new AbortController(); tileRequests.add(controller);
+      const controller = new AbortController(); tileRequests.add(controller);tileControllers.set(image,controller);
       let objectUrl, completed = false;
       const finish = error => { if(completed)return; completed=true; tileRequests.delete(controller); if (objectUrl) window.URL.revokeObjectURL(objectUrl); done(error, image); };
       controller.signal.addEventListener('abort',()=>finish(Error('Traffic inactive.')),{once:true});
       image.onload = () => finish(null); image.onerror = () => { trafficError = true; finish(Error('Traffic tile unavailable.')); };
       if (!visible() || !enabled || !available || !token()) { finish(Error('Traffic inactive.')); return image; }
-      request('flow_tile', { z: String(coords.z), x: String(coords.x), y: String(coords.y) }, { method: 'GET', signal: controller.signal }).then(async response => {
+      requestTile(()=>request('flow_tile', { z: String(coords.z), x: String(coords.x), y: String(coords.y) }, { method: 'GET', signal: controller.signal }),controller.signal).then(response => {
         if (controller.signal.aborted || !enabled || !visible()) return;
         if (!response.headers.get('content-type')?.startsWith('image/png')) throw Error('Traffic tile unavailable.');
         const fetched = response.headers.get('x-nwtb-traffic-fetched-at');
         if (!Number.isFinite(Date.parse(fetched)) || clock() - Date.parse(fetched) > 120000 || Date.parse(fetched) > clock() + 15000) throw Error('Traffic tile is out of date.');
-        lastFetched = fetched; objectUrl = window.URL.createObjectURL(await response.blob());
+        lastFetched = fetched; objectUrl = window.URL.createObjectURL(response.data);
         if (controller.signal.aborted || !enabled || !visible()) { window.URL.revokeObjectURL(objectUrl); return; }
         image.src = objectUrl;
       }).catch(() => { if (!controller.signal.aborted) { trafficError = true; status.textContent = 'TRAFFIC UNAVAILABLE — RETRYING'; finish(Error('Traffic unavailable.')); } });
@@ -59,6 +87,7 @@ export function installOfficeTraffic({ map, L, config, getRows, getMarkers, getO
     }
   });
   layer = new FlowLayer({ pane: 'nwtbTraffic', opacity: 0.85, tileSize: 256, minZoom: 0, maxZoom: 22, maxNativeZoom: 20, attribution: 'Traffic © TomTom', keepBuffer: 1 });
+  const tileUnloaded=event=>tileControllers.get(event.tile)?.abort();layer.on('tileunload',tileUnloaded);
   layer.on('loading', () => { trafficError = false; status.textContent = 'REFRESHING TRAFFIC…'; });
   layer.on('load', () => { status.textContent = trafficError ? 'TRAFFIC PARTLY UNAVAILABLE — RETRYING' : lastFetched ? 'TRAFFIC ON • LOADED ' + time(lastFetched) : 'TRAFFIC UNAVAILABLE'; });
 
@@ -111,12 +140,12 @@ export function installOfficeTraffic({ map, L, config, getRows, getMarkers, getO
     const row = rowFor(selected.id), problem = currentProblem(row);
     if (problem || !available || !token()) { selected.data = null; selected.problem = problem || (!token() ? 'SESSION_EXPIRED' : configurationProblem); renderEta(); return; }
     if (etaBusy && !force) { renderEta(); return; }
+    if(force)etaController?.abort();
     const id = selected.id, initialToken = token(), routeId = row.route_id, requestEpoch = ++epoch;
-    const controller = new AbortController(); ownRequests.add(controller); etaBusy = true;
+    const controller = new AbortController();etaController=controller; ownRequests.add(controller); etaBusy = true;
     selected.problem = null; renderEta();
     try {
-      const response = await request('driver_eta', { driver_employee_number: id }, { signal: controller.signal });
-      const data = await response.json();
+      const {data} = await request('driver_eta', { driver_employee_number: id }, { signal: controller.signal });
       if (disposed || controller.signal.aborted || epoch !== requestEpoch || selected?.id !== id || token() !== initialToken || rowFor(id)?.route_id !== routeId || !popupFor(id)?.isOpen?.()) return;
       if (data.available === false) { selected.data = null; selected.problem = data.code || 'TRAFFIC_UNAVAILABLE'; }
       else if (data.ok === true && data.traffic_aware === true && data.source === 'TOMTOM' && data.route_id === routeId && data.destination?.name && ['NEXT_STOP', 'RETURN_TO_NWTB', 'RETURN_DESTINATION'].includes(data.destination.kind) && Number.isFinite(data.minutes) && data.minutes >= 0 && Number.isFinite(Date.parse(data.arrival_at)) && Number.isFinite(Date.parse(data.calculated_at)) && clock() - Date.parse(data.calculated_at) <= MAX_ETA_AGE_MS && Date.parse(data.calculated_at) <= clock() + 15000 && !gpsProblem({ ...rowFor(id), captured_at: data.gps_captured_at }, clock())) { selected.data = data; selected.problem = null; }
@@ -124,28 +153,28 @@ export function installOfficeTraffic({ map, L, config, getRows, getMarkers, getO
       renderEta();
     } catch (error) {
       if (epoch === requestEpoch && selected?.id === id && !controller.signal.aborted) { selected.data = null; selected.problem = error.code || 'TRAFFIC_UNAVAILABLE'; renderEta(); }
-    } finally { ownRequests.delete(controller); if (epoch === requestEpoch) etaBusy = false; }
+    } finally { ownRequests.delete(controller);if(etaController===controller)etaController=null; if (epoch === requestEpoch) etaBusy = false; }
   }
 
   function opened(event) {
     const pair = [...getMarkers()].find(([, marker]) => marker.getPopup() === event.popup);
     if (!pair) return;
-    epoch++; abortAll(ownRequests); etaBusy = false; selected = { id: pair[0], data: null, problem: null };
+    epoch++;etaController?.abort();etaController=null; etaBusy = false; selected = { id: pair[0], data: null, problem: null };
     if (!popupListeners.has(event.popup)) {
       const listener = () => { if (selected?.id === pair[0]) renderEta(); };
       popupListeners.set(event.popup, listener); event.popup.on('contentupdate', listener);
     }
     renderEta(); void refreshEta(true);
   }
-  function closed(event) { if (selected && popupFor(selected.id) === event.popup) { epoch++; abortAll(ownRequests); etaBusy = false; selected = null; } }
+  function closed(event) { if (selected && popupFor(selected.id) === event.popup) { epoch++;etaController?.abort();etaController=null; etaBusy = false; selected = null; } }
 
   async function configure() {
     if (configBusy || disposed || !token()) { syncOverlay(); return; }
     configBusy = true; const initialToken = token(), controller = new AbortController(); ownRequests.add(controller);
     try {
-      const response = await request('config', {}, { signal: controller.signal }), data = await response.json();
-      if (!disposed && token() === initialToken) { available = data.ok === true && data.environment === 'PRODUCTION' && data.source === 'TOMTOM' && data.enabled === true; configurationProblem = available ? null : data.ok === true && data.environment === 'PRODUCTION' ? 'TRAFFIC_NOT_CONFIGURED' : 'TRAFFIC_UNAVAILABLE'; syncOverlay(); renderEta(); if (selected) void refreshEta(true); }
-    } catch (error) { available = false; configurationProblem = error.code || 'TRAFFIC_UNAVAILABLE'; if(selected){selected.data=null;selected.problem=configurationProblem;} syncOverlay(); renderEta(); }
+      const {data} = await request('config', {}, { signal: controller.signal });
+      if (!disposed && !controller.signal.aborted && token() === initialToken) { available = data.ok === true && data.environment === 'PRODUCTION' && data.source === 'TOMTOM' && data.enabled === true; configurationProblem = available ? null : data.ok === true && data.environment === 'PRODUCTION' ? 'TRAFFIC_NOT_CONFIGURED' : 'TRAFFIC_UNAVAILABLE'; syncOverlay(); renderEta(); if (selected) void refreshEta(true); }
+    } catch (error) { if(disposed||controller.signal.aborted||token()!==initialToken)return;available = false; configurationProblem = error.code || 'TRAFFIC_UNAVAILABLE'; if(selected){selected.data=null;selected.problem=configurationProblem;} syncOverlay(); renderEta(); }
     finally { configBusy = false; ownRequests.delete(controller); }
   }
 
@@ -165,7 +194,7 @@ export function installOfficeTraffic({ map, L, config, getRows, getMarkers, getO
     timers.clearInterval(tileTimer); timers.clearInterval(etaTimer); timers.clearInterval(sessionTimer);
     map.off('popupopen', opened); map.off('popupclose', closed); map.off('unload', destroy); document.removeEventListener('visibilitychange', visibilityChanged);
     for (const [popup, listener] of popupListeners) popup.off('contentupdate', listener);
-    if (map.hasLayer(layer)) map.removeLayer(layer); control.remove(); style.remove();
+    if (map.hasLayer(layer)) map.removeLayer(layer);layer.off('tileunload',tileUnloaded); control.remove(); style.remove();
   }
   map.on('unload', destroy); lastToken = token(); void configure();
   return { destroy, refreshEta, syncOverlay, panel, layer, get enabled() { return enabled; } };

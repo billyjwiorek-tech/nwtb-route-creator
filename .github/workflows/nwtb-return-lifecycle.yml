@@ -1,7 +1,7 @@
 name: NWTB return lifecycle
 on:
   push:
-    branches: [main, fix/nwtb-return-leg-lifecycle-20261020, fix/nwtb-driver-chat-seen-20261020, feat/nwtb-driver-presence-20261020, feat/nwtb-live-map-search-20261021, feat/nwtb-business-nearby-20261026, feat/nwtb-office-driver-view-20261026]
+    branches: [main, fix/nwtb-return-leg-lifecycle-20261020, fix/nwtb-driver-chat-seen-20261020, feat/nwtb-driver-presence-20261020, feat/nwtb-live-map-search-20261021, feat/nwtb-business-nearby-20261026, feat/nwtb-office-driver-view-20261026, fix/nwtb-eta-refresh-20261026]
     paths: ['driver-*.html', 'driver-*.js', '*.webmanifest', 'nwtb-driver-sw.js', 'nwtb-notifications.js', 'dispatch-*.js', 'tracker*.html', 'tracker*.js', 'office-*.js', 'office-*.html', 'office-*.mjs', 'unified-search.js', 'custom-master-search.js', 'custom-stop.js', 'driver-*.svg', 'delivery-*.html', 'dispatch*.html', 'dispatch-route-admin-native.js', 'dispatch-chat-live.js', 'supabase/**', 'tests/**', '.github/workflows/nwtb-return-lifecycle.yml']
   pull_request:
     paths: ['driver-*.html', 'driver-*.js', '*.webmanifest', 'nwtb-driver-sw.js', 'nwtb-notifications.js', 'dispatch-*.js', 'tracker*.html', 'tracker*.js', 'office-*.js', 'office-*.html', 'office-*.mjs', 'unified-search.js', 'custom-master-search.js', 'custom-stop.js', 'driver-*.svg', 'delivery-*.html', 'dispatch*.html', 'dispatch-route-admin-native.js', 'supabase/**', 'tests/**', '.github/workflows/nwtb-return-lifecycle.yml']
