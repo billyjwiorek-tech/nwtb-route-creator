@@ -22,8 +22,13 @@ function fixture(options = {}) {
   } };
   const fetcher = async (url, init) => {
     providerCalls++; const u = new URL(url); requests.push({ url: u, init });
+    assert.equal(init.headers['x-nwtb-session'], undefined); assert.equal(init.headers.apikey, undefined);
     if(u.origin==='https://photon.komoot.io') return new Response(JSON.stringify({features:options.businessFeatures||[]}));
     assert.equal(u.origin, 'https://api.tomtom.com'); assert.equal(u.searchParams.get('key'), 'fixture-provider-key');
+    if(u.pathname.includes('/poiSearch/')) {
+      if(options.searchThrows)throw Error('provider error that must not leak fixture-provider-key');
+      return new Response(JSON.stringify(options.searchPayload||{results:[]}),{status:options.searchStatus||200});
+    }
     assert.equal(init.headers['x-nwtb-session'], undefined); assert.equal(init.headers.apikey, undefined);
     if (options.providerError) throw Error('Fixture provider failure');
     if (options.changeDuringRequest) options.changeDuringRequest(tables);
@@ -128,8 +133,8 @@ test('business lookup works without traffic key, preserves data and caches expli
 });
 test('public business results reject road names and invalid coordinates, and flag incomplete addresses',async()=>{
  const incomplete={...businessFeature,properties:{...businessFeature.properties,housenumber:null}};
- const f=fixture({businessFeatures:[incomplete,{...businessFeature,properties:{...businessFeature.properties,osm_key:'highway'}},{...businessFeature,geometry:{coordinates:[0,0]}}]});
- const {body}=await f.call({action:'business_search',q:'Fixture',depot:'PALATINE'});assert.equal(body.results.length,1);assert.equal(body.results[0].address_complete,false);assert.equal(body.distance_from,'NWTB Palatine');assert.equal(body.searched_near,null);
+ const f=fixture({providerKey:'',businessFeatures:[incomplete,{...businessFeature,properties:{...businessFeature.properties,osm_key:'highway'}},{...businessFeature,geometry:{coordinates:[0,0]}}]});
+ const {body}=await f.call({action:'business_search',q:'Fixture',depot:'PALATINE'});assert.equal(body.results.length,1);assert.equal(body.results[0].address_complete,false);assert.equal(body.distance_from,'NWTB Palatine');assert.equal(body.searched_near,'NWTB Palatine');
 });
 test('business lookup is Office-only, validates queries, and does not forward Office credentials',async()=>{
  const driver=fixture({employee:'9001'});assert.equal((await driver.call({action:'business_search',q:'Fixture'})).status,403);assert.equal(driver.providerCalls,0);
@@ -142,20 +147,21 @@ test('expired and inactive Office sessions cannot query business locations or tr
 });
 
 const candidate=(id,lat,lon,name='Fixture Business')=>({geometry:{coordinates:[lon,lat]},properties:{...businessFeature.properties,name,osm_id:id,housenumber:String(id)}});
-test('no radius searches by name without a depot bias or area restriction',async()=>{
- const f=fixture({businessFeatures:[candidate(1,40.7,-74,'Fixture Business'),candidate(2,41.7,-88.07,'Fixture Business')]});
+test('no radius keeps nationwide coverage while preferring the depot and sorting closest first',async()=>{
+ const f=fixture({providerKey:'',businessFeatures:[candidate(1,40.7,-74,'Fixture Business'),candidate(2,41.7,-88.07,'Fixture Business')]});
  for(const radius_miles of [undefined,null,'']){
   const {body,status}=await f.call({action:'business_search',q:"Fixture's Business",depot:'PALATINE',radius_miles});
-  assert.equal(status,200);assert.equal(body.search_scope,'US_NAME');assert.equal(body.radius_miles,null);assert.equal(body.searched_near,null);assert.equal(body.results.length,2);
-  assert.equal(body.results[0].source_ref,'OSM:N:1','Directory relevance order is preserved across distant branches');
+  assert.equal(status,200);assert.equal(body.search_scope,'US_NAME');assert.equal(body.radius_miles,null);assert.equal(body.searched_near,'NWTB Palatine');assert.equal(body.results.length,2);
+  assert.equal(body.results[0].source_ref,'OSM:N:2','Nearby branch precedes a distant exact-name match');
  }
  const params=f.requests[0].url.searchParams;
  assert.equal(params.get('q'),"Fixture's Business");assert.equal(params.get('countrycode'),'US');assert.equal(params.get('limit'),'50');
- for(const key of ['lat','lon','zoom','bbox','location_bias_scale'])assert.equal(params.has(key),false,key+' must not bias a name-only search');
+ assert.equal(params.get('lat'),'42.148326');assert.equal(params.get('lon'),'-88.03308');assert.equal(params.get('location_bias_scale'),'0');
+ assert.equal(params.has('bbox'),false,'No radius must not become a hidden geographic filter');
  assert.equal(f.providerCalls,1);assert.equal(f.writes,0);
 });
 test('radius filters the actual circle and sorts nearest first before returning results',async()=>{
- const f=fixture({businessFeatures:[candidate(4,41.7547,-88.072262),candidate(3,41.744,-87.99),candidate(2,41.73,-88.072262),candidate(1,41.70,-88.072262,'Fixture Business Nearby'),candidate(5,41.755,-88.072262)]});
+ const f=fixture({providerKey:'',businessFeatures:[candidate(4,41.7547,-88.072262),candidate(3,41.744,-87.99),candidate(2,41.73,-88.072262),candidate(1,41.70,-88.072262,'Fixture Business Nearby'),candidate(5,41.755,-88.072262)]});
  const {body,status}=await f.call({action:'business_search',q:'Fixture Business',depot:'BOLINGBROOK',radius_miles:5});
  assert.equal(status,200);assert.equal(body.search_scope,'DEPOT_RADIUS');assert.equal(body.searched_near,'NWTB Bolingbrook');assert.equal(body.radius_miles,5);
  assert.deepEqual(body.results.map(r=>r.source_ref),['OSM:N:1','OSM:N:2','OSM:N:4']);
@@ -165,7 +171,7 @@ test('radius filters the actual circle and sorts nearest first before returning 
  assert.equal(u.searchParams.get('lat'),'41.682487');assert.equal(u.searchParams.get('lon'),'-88.072262');assert.equal(f.writes,0);
 });
 test('radius uses the selected depot and separate caches for each area',async()=>{
- const f=fixture({businessFeatures:[candidate(1,41.7,-88.07),candidate(2,42.15,-88.03)]});
+ const f=fixture({providerKey:'',businessFeatures:[candidate(1,41.7,-88.07),candidate(2,42.15,-88.03)]});
  const call=(depot,radius_miles)=>f.call({action:'business_search',q:'Fixture Business',depot,radius_miles});
  for(const radius of [5,10,25,50,100]){const {body}=await call('PALATINE',radius);assert.equal(body.radius_miles,radius);assert.ok(body.results.every(r=>r.distance_miles<=radius));}
  const palatine=await call('PALATINE',5);assert.deepEqual(palatine.body.results.map(r=>r.source_ref),['OSM:N:2']);
@@ -180,6 +186,40 @@ test('invalid radius or inherited depot names cannot broaden a local search',asy
  assert.equal(f.providerCalls,0);assert.equal(f.writes,0);
 });
 test('business search retains more than the previous fifteen candidates',async()=>{
- const f=fixture({businessFeatures:Array.from({length:30},(_,i)=>candidate(i+1,41.7+i/100000,-88.07))});
+ const f=fixture({providerKey:'',businessFeatures:Array.from({length:30},(_,i)=>candidate(i+1,41.7+i/100000,-88.07))});
  const {body}=await f.call({action:'business_search',q:'Fixture Business',radius_miles:5});assert.equal(body.results.length,30);assert.equal(f.writes,0);
+});
+
+const poi=(id,lat,lon,name='Grainger')=>({type:'POI',id,poi:{name,phone:'+1-800-555-0100'},position:{lat,lon},address:{streetNumber:'2701',streetName:id==='downers'?'Ogden Avenue':id+' Fixture Street',municipality:'Downers Grove',countrySubdivision:'IL',postalCode:'60515',countryCode:'US',freeformAddress:'2701 '+(id==='downers'?'Ogden Ave':id+' Fixture Street')+', Downers Grove, IL 60515'}});
+test('TomTom business directory uses the existing server key and returns nearby branches before California',async()=>{
+ const downers=poi('downers',41.803767,-88.050597,'Grainger Industrial Supply');
+ const f=fixture({searchPayload:{results:[poi('california',34.0393,-118.2378),downers,downers,poi('palatine',42.1483,-88.033)]}}),before=JSON.stringify(f.tables);
+ const {status,body}=await f.call({action:'business_search',q:'GRAINGER',depot:'BOLINGBROOK',radius_miles:null});
+ assert.equal(status,200);assert.equal(body.source,'TOMTOM');assert.equal(body.fallback,false);assert.equal(body.sort,'DISTANCE');assert.equal(body.search_scope,'US_NAME');
+ assert.deepEqual(body.results.map(r=>r.source_ref),['TOMTOM:downers','TOMTOM:palatine','TOMTOM:california']);assert.equal(body.results[0].address_complete,true);assert.match(body.results[0].address,/2701 Ogden/);assert.equal(body.results[0].phone,'+1-800-555-0100');
+ const u=f.requests[0].url;assert.equal(u.pathname,'/search/2/poiSearch/GRAINGER.json');assert.equal(u.searchParams.get('countrySet'),'US');assert.equal(u.searchParams.get('limit'),'100');assert.equal(u.searchParams.get('lat'),'41.682487');assert.equal(u.searchParams.get('lon'),'-88.072262');assert.equal(u.searchParams.has('radius'),false);
+ assert.equal(f.providerCalls,1);assert.equal(f.writes,0);assert.equal(JSON.stringify(f.tables),before);assert.ok(!JSON.stringify(body).includes('fixture-provider-key'));
+});
+test('TomTom radius is optional, uses the chosen depot, and enforces the exact circle',async()=>{
+ const f=fixture({searchPayload:{results:[poi('bolingbrook',41.7,-88.07),poi('palatine',42.15,-88.03),poi('outside',42.3,-88.03)]}});
+ let r=await f.call({action:'business_search',q:'Grainger',depot:'PALATINE',radius_miles:5});assert.deepEqual(r.body.results.map(v=>v.source_ref),['TOMTOM:palatine']);assert.equal(f.requests[0].url.searchParams.get('radius'),'8047');
+ assert.equal(f.requests[0].url.searchParams.get('lat'),'42.148326');assert.equal(f.requests[0].url.searchParams.get('lon'),'-88.03308');
+ r=await f.call({action:'business_search',q:'Grainger',depot:'BOLINGBROOK',radius_miles:null});assert.equal(r.body.results[0].source_ref,'TOMTOM:bolingbrook');assert.equal(r.body.results.length,3);assert.equal(f.providerCalls,2);
+ await f.call({action:'business_search',q:'Grainger',depot:'PALATINE',radius_miles:'5'});assert.equal(f.providerCalls,2);assert.equal(f.writes,0);
+});
+test('TomTom rejects non-business, foreign and invalid-coordinate candidates and flags missing street numbers',async()=>{
+ const missing=poi('missing',41.7,-88.07);delete missing.address.streetNumber;
+ const foreign=poi('foreign',42,-88);foreign.address.countryCode='CA';
+ const f=fixture({searchPayload:{results:[missing,{...poi('street',41.7,-88.07),type:'Street'},foreign,poi('invalid',0,0),{...poi('no-name',41.7,-88.07),poi:{}}]}});
+ const {body}=await f.call({action:'business_search',q:'Grainger'});assert.equal(body.source,'TOMTOM');assert.equal(body.results.length,1);assert.equal(body.results[0].address_complete,false);assert.equal(f.writes,0);
+});
+test('TomTom outages, entitlement errors and malformed responses use an explicitly identified backup',async()=>{
+ for(const options of [{searchThrows:true},{searchStatus:403},{searchStatus:429},{searchPayload:{routes:[]}},{searchPayload:{results:[]}}]){
+  const f=fixture({...options,businessFeatures:[candidate(1,34,-118),candidate(2,41.7,-88.07)]});const {status,body}=await f.call({action:'business_search',q:'Grainger'});
+  assert.equal(status,200);assert.equal(body.source,'OPENSTREETMAP');assert.equal(body.fallback,true);assert.equal(body.results[0].source_ref,'OSM:N:2');assert.ok(!JSON.stringify(body).includes('fixture-provider-key'));assert.equal(f.providerCalls,2);assert.equal(f.writes,0);
+ }
+});
+test('business query punctuation stays in the encoded path and never creates new URL parameters',async()=>{
+ const f=fixture({searchPayload:{results:[poi('near',41.7,-88.07)]}});await f.call({action:'business_search',q:"McDonald's / Parts?key=other&countrySet=CA"});
+ const u=f.requests[0].url;assert.equal(u.searchParams.get('key'),'fixture-provider-key');assert.equal(u.searchParams.get('countrySet'),'US');assert.match(u.pathname,/%2F/);assert.equal(f.writes,0);
 });

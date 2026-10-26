@@ -16,10 +16,10 @@ function fixture(options={}){
   if(body.action==='business_search'){
    if(options.defer)return new Promise(resolve=>pending.push({q:body.q,resolve}));
    if(options.outage)throw Error('Fixture directory unavailable');
-   return {ok:true,results:options.results||[business]};
+   return {ok:true,source:options.source||'TOMTOM',results:options.results||[business]};
   }
-  if(body.action==='directory_search')return {results:body.kind==='CUSTOMER'&&options.internal?[{name:'Existing Customer',address:'456 Internal Street',source_type:'CUSTOMER',customer_number:'C1'}]:[]};
-  if(body.action==='saved_locations_search')return {locations:[]};
+  if(body.action==='directory_search')return {results:body.kind==='CUSTOMER'?(options.internalResults||(options.internal?[{name:'Existing Customer',address:'456 Internal Street',source_type:'CUSTOMER',customer_number:'C1'}]:[])):[]};
+  if(body.action==='saved_locations_search')return {locations:options.savedResults||[]};
   if(body.action==='geocode')return {lat:42.1,lon:-88.2};
   if(body.action==='saved_location_create')return {location:{id:'fixture-saved-location'}};
   return {ok:true};
@@ -36,7 +36,7 @@ function fixture(options={}){
 }
 
 test('public business is loaded for review without creating a stop, route, saved location or Driver session',async()=>{
- const f=fixture({internal:true});await f.search();assert.match(f.document.getElementById('searchResults').textContent,/Existing Customer/);assert.match(f.document.getElementById('searchResults').textContent,/BUSINESS DIRECTORY/);assert.match(f.document.getElementById('searchResults').textContent,/OpenStreetMap/);
+ const f=fixture({internal:true});await f.search();assert.match(f.document.getElementById('searchResults').textContent,/Existing Customer/);assert.match(f.document.getElementById('searchResults').textContent,/BUSINESS DIRECTORY/);assert.match(f.document.getElementById('searchResults').textContent,/TomTom/);
  assert.match(f.document.getElementById('searchResults').innerHTML,/LOAD \/ REVIEW/);f.load();assert.equal(f.document.getElementById('stopName').value,business.name);assert.equal(f.document.getElementById('lat').value,String(business.lat));assert.equal(f.document.getElementById('sourceType').value,'OTHER');assert.equal(f.document.getElementById('stopType').value,'VENDOR_PICKUP');
  assert.ok(f.calls.every(c=>['directory_search','saved_locations_search','business_search'].includes(c.body.action)));
 });
@@ -106,10 +106,10 @@ test('Office search defaults to no radius, then sends the explicitly selected ra
  assert.match(f.document.getElementById('searchResults').textContent,/mi straight-line from NWTB Palatine/);
  choose(f,'nwtbBusinessRadius','');await f.search();assert.equal(f.calls.filter(c=>c.body.action==='business_search').at(-1).body.radius_miles,null);
 });
-test('no radius ranks matching business names while a selected radius ranks distance first',async()=>{
+test('matching businesses are closest first with or without a radius',async()=>{
  const results=[{...business,name:"McDonald's",address:'Far branch',distance_miles:4},{...business,name:"McDonald's",address:'Near branch',distance_miles:2},{...business,name:"McDonald's Park",address:'Nearby partial name',distance_miles:1}];
- const f=fixture({results});await f.search('mcdonalds');assert.deepEqual(businessRows(f),["McDonald's","McDonald's","McDonald's Park"]);
- assert.ok(f.document.getElementById('searchResults').textContent.indexOf('Far branch')<f.document.getElementById('searchResults').textContent.indexOf('Near branch'),'Name-only relevance order is not replaced by depot distance');
+ const f=fixture({results});await f.search('mcdonalds');assert.deepEqual(businessRows(f),["McDonald's Park","McDonald's","McDonald's"]);
+ assert.ok(f.document.getElementById('searchResults').textContent.indexOf('Near branch')<f.document.getElementById('searchResults').textContent.indexOf('Far branch'),'Removing the radius must not disable nearest-first ordering');
  choose(f,'nwtbBusinessRadius',5);await f.search('mcdonalds');assert.deepEqual(businessRows(f),["McDonald's Park","McDonald's","McDonald's"]);
  assert.ok(f.document.getElementById('searchResults').textContent.indexOf('Near branch')<f.document.getElementById('searchResults').textContent.indexOf('Far branch'));
 });
@@ -126,10 +126,10 @@ test('empty local search offers expansion without automatically widening its rad
  assert.match(f.document.getElementById('searchResults').textContent,/No public business matches inside this radius/);assert.match(f.document.getElementById('searchResults').textContent,/larger radius or No radius/);
  assert.equal(f.calls.filter(c=>c.body.action==='business_search').length,1);
 });
-test('custom builder has visible independent radius controls, name-only default and nearest-first local results',async()=>{
+test('custom builder has independent radius controls and nearest-first results with or without a radius',async()=>{
  const f=customFixture(false,{results:[{...business,name:'Fixture Business',distance_miles:4},{...business,name:'Fixture Business Nearby',distance_miles:1}]});
  f.document.getElementById('customMasterQ').value='Fixture Business';await f.window.searchCustomMasters();assert.equal(f.calls.find(c=>c.body.action==='business_search').body.radius_miles,null);
- assert.deepEqual(businessRows(f,true),['Fixture Business','Fixture Business Nearby']);
+ assert.deepEqual(businessRows(f,true),['Fixture Business Nearby','Fixture Business']);
  choose(f,'nwtbCustomBusinessRadius',25);choose(f,'nwtbCustomBusinessDepot','PALATINE');await f.window.searchCustomMasters();
  const request=f.calls.filter(c=>c.body.action==='business_search').at(-1).body;assert.equal(request.radius_miles,25);assert.equal(request.depot,'PALATINE');
  assert.deepEqual(businessRows(f,true),['Fixture Business Nearby','Fixture Business']);assert.match(f.document.getElementById('customMasterStatus').textContent,/Within 25 miles of NWTB Palatine/);
@@ -140,4 +140,20 @@ test('custom builder discards old responses after its radius changes',async()=>{
  choose(f,'nwtbCustomBusinessRadius',5);const latest=f.window.searchCustomMasters();await settle();
  f.pending[1].resolve({results:[{...business,name:'New local branch'}]});await latest;f.pending[0].resolve({results:[{...business,name:'Old nationwide branch'}]});await old;
  assert.match(f.document.getElementById('customMasterResults').textContent,/New local branch/);assert.doesNotMatch(f.document.getElementById('customMasterResults').textContent,/Old nationwide branch/);
+});
+
+test('known NWTB locations and public matches share distance order while unknown addresses stay available last',async()=>{
+ const f=fixture({internalResults:[{name:'Unlocated Grainger vendor',address:'DEPT 123, PALATINE, IL',source_type:'VENDOR',source_ref:'1255'}],savedResults:[{id:'saved-near',name:'Nearby saved Grainger',address:'Saved physical address',lat:41.69,lon:-88.072262}],results:[{...business,name:'Grainger Downers Grove',distance_miles:8.5},{...business,name:'Grainger California',address:'California address',distance_miles:1718}]});
+ await f.search('Grainger');assert.deepEqual(businessRows(f),['Nearby saved Grainger','Grainger Downers Grove','Grainger California','Unlocated Grainger vendor']);
+ assert.match(f.document.getElementById('searchResults').textContent,/Distance unavailable/);assert.match(f.document.getElementById('searchResults').textContent,/1255/);assert.ok(f.calls.every(c=>['directory_search','saved_locations_search','business_search'].includes(c.body.action)));
+});
+test('selected depot changes the computed distance of saved locations and never treats missing coordinates as zero',async()=>{
+ const f=fixture({savedResults:[{id:'bb',name:'Saved Bolingbrook',address:'BB',lat:41.683,lon:-88.072},{id:'pal',name:'Saved Palatine',address:'PAL',lat:42.149,lon:-88.033},{id:'unknown',name:'Saved Unknown',address:'Unknown',lat:null,lon:null}],results:[]});
+ await f.search('Saved');assert.deepEqual(businessRows(f),['Saved Bolingbrook','Saved Palatine','Saved Unknown']);
+ choose(f,'nwtbBusinessDepot','PALATINE');await f.search('Saved');assert.deepEqual(businessRows(f),['Saved Palatine','Saved Bolingbrook','Saved Unknown']);
+ assert.match(f.document.getElementById('nwtbBusinessScope').textContent,/closest to NWTB Palatine first/);
+});
+test('backup directory is visibly identified instead of claiming TomTom results',async()=>{
+ const f=fixture({source:'OPENSTREETMAP'});await f.search();assert.match(f.document.getElementById('searchResults').textContent,/Backup business directory: © OpenStreetMap/);
+ const g=fixture();await g.search();assert.match(g.document.getElementById('searchResults').textContent,/Business directory: © TomTom/);assert.doesNotMatch(g.document.getElementById('searchResults').textContent,/OpenStreetMap/);
 });

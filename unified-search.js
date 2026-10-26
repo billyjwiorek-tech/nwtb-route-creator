@@ -83,7 +83,7 @@ function renderResults(rows,raw,errors,businessStatus='',scope=businessSearch.sc
   return;
  }
  const unique=dedupe(rows);
- rows=[...unique.filter(r=>!r._business).sort((a,b)=>exactScore(a,raw)-exactScore(b,raw)||String(a.name||'').localeCompare(String(b.name||''))).slice(0,90),...unique.filter(r=>r._business).sort((a,b)=>businessSearch.compare(a,b,raw,scope)).slice(0,50)];
+ rows=unique.sort((a,b)=>(/^\d+$/.test(raw)?0:businessSearch.compare(a,b,raw,scope))||exactScore(a,raw)-exactScore(b,raw)||String(a.name||'').localeCompare(String(b.name||'')));
  box.innerHTML=rows.map((r,i)=>{
   window['_search_'+i]=r;
   const ref=r.source_ref||r.customer_number||r.vendor_id||r.location_code||'';
@@ -92,7 +92,7 @@ function renderResults(rows,raw,errors,businessStatus='',scope=businessSearch.sc
   const group=r._search_group||r.source_type||'LOCATION';
   const badge=group==='CUSTOMER'?'delivery':group==='VENDOR'?'pickup':'statusAvailable';
   const action=r._business?'loadBusinessLocation('+i+')':'useResult('+i+','+(r._saved?'true':'false')+')';
-  return '<div class="result"><button class="btn ghost right" onclick="'+action+'">'+(r._business?'LOAD / REVIEW':'USE LOCATION')+'</button><span class="pill '+badge+'">'+h(group)+'</span><div style="margin-top:6px"><b>'+h(r.name||'Unnamed Location')+'</b>'+(ref&&!r._business?' <span class="small">#'+h(ref)+'</span>':'')+'</div><div class="small" style="margin-top:4px">'+h(addr||'No physical address on file')+(phone?' • '+h(phone):'')+'</div>'+(r._business?'<div class="small" style="margin-top:5px">'+h(businessSearch.distanceText(r,scope))+' • '+(r.address_complete?'Confirm the correct branch.':'Street number missing — address review required.')+'</div>':'')+'</div>';
+  return '<div class="result"><button class="btn ghost right" onclick="'+action+'">'+(r._business?'LOAD / REVIEW':'USE LOCATION')+'</button><span class="pill '+badge+'">'+h(group)+'</span><div style="margin-top:6px"><b>'+h(r.name||'Unnamed Location')+'</b>'+(ref&&!r._business?' <span class="small">#'+h(ref)+'</span>':'')+'</div><div class="small" style="margin-top:4px">'+h(addr||'No physical address on file')+(phone?' • '+h(phone):'')+'</div><div class="small" style="margin-top:5px">'+h(businessSearch.distanceText(r,scope))+(r._business?' • '+(r.address_complete?'Confirm the correct branch.':'Street number missing — address review required.'):'')+'</div></div>';
  }).join('')+(errors?'<div class="small" style="margin-top:8px;color:#b54708">Some NWTB directories could not be searched. Other results are shown.</div>':'')+'<div class="small" role="status" style="margin-top:8px">'+h(businessStatus)+'</div>';
 }
 
@@ -122,7 +122,7 @@ window.searchDirectory=async function(){
   if(!current())return;
   const known=new Set(rows.map(r=>[r.name,r.address||[r.addr1,r.addr2,r.city,r.state].filter(Boolean).join(', ')].join('|').toLowerCase()));
   if(business?.data)rows.push(...(business.data.results||[]).filter(r=>!known.has([r.name,r.address].join('|').toLowerCase())).map(r=>({...r,_business:true,_saved:false,_search_group:'BUSINESS DIRECTORY'})));
-  renderResults(rows,raw,errors,business?.error?'Public business directory unavailable. Existing NWTB locations are shown; you can still enter a full address manually.':business?businessSearch.summary(scope,business.data.results?.length||0):'Enter at least 3 letters to include the public business directory.',scope);
+  renderResults(rows,raw,errors,business?.error?'Public business directory unavailable. Existing NWTB locations are shown; you can still enter a full address manually.':business?businessSearch.summary(scope,business.data.results?.length||0,business.data):'Enter at least 3 letters to include the public business directory.',scope);
  }catch(e){if(current()&&box)box.innerHTML='<div class="banner show err">'+h(e.message||'Search failed.')+'</div>';}
 };
 
