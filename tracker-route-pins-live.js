@@ -6,8 +6,9 @@ const BASE='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/',PUB='sb_publ
 const overlays=new Map();let busy=false,control=null,fitOnce=false;
 async function read(endpoint,body){const r=await fetch(BASE+endpoint,{method:'POST',cache:'no-store',headers:{'content-type':'application/json','apikey':PUB,'x-nwtb-session':localStorage.getItem('nwtb_delivery_token')||''},body:JSON.stringify(body)}),j=await r.json();if(!r.ok)throw Error(j.error||'Route unavailable');return j;}
 function shell(){let w=window;for(let n=0;n<5;n++){if(typeof w.nwtbOpenOfficeDriverView==='function')return w;if(w===w.parent)break;w=w.parent;}return null;}
+function fitAll(){const map=window.__nwtbTrackerMap,points=[...overlays.values()].flatMap(overlay=>overlay.getBoundsPoints());if(map&&points.length)map.fitBounds(L.latLngBounds(points),{padding:[38,38],maxZoom:14});}
 function addControl(map){
- if(control)return;control=L.control({position:'topright'});control.onAdd=()=>{const div=L.DomUtil.create('div');div.style.cssText='background:white;border-radius:8px;padding:8px;max-width:270px;font:11px/1.5 Arial;box-shadow:0 2px 8px #0003';div.innerHTML='<button type="button" style="border:0;padding:7px;background:#15304e;color:white;border-radius:6px;font-weight:bold">ALL ROUTE STOPS</button><div id="nwtbAssignedRoadStatus" role="status">Loading assigned routes…</div>';div.querySelector('button').onclick=()=>{for(const overlay of overlays.values())overlay.fit();};L.DomEvent.disableClickPropagation(div);return div;};control.addTo(map);
+ if(control)return;control=L.control({position:'topright'});control.onAdd=()=>{const div=L.DomUtil.create('div');div.style.cssText='background:white;border-radius:8px;padding:8px;max-width:270px;font:11px/1.5 Arial;box-shadow:0 2px 8px #0003';div.innerHTML='<button type="button" style="border:0;padding:7px;background:#15304e;color:white;border-radius:6px;font-weight:bold">ALL ROUTE STOPS</button><div id="nwtbAssignedRoadStatus" role="status">Loading assigned routes…</div>';div.querySelector('button').onclick=()=>{fitAll();};L.DomEvent.disableClickPropagation(div);return div;};control.addTo(map);
 }
 async function refresh(){
  const map=window.__nwtbTrackerMap;if(busy||!map||!window.NWTBOfficeDriverMap||!localStorage.getItem('nwtb_delivery_token'))return;busy=true;
@@ -22,10 +23,10 @@ async function refresh(){
    await overlays.get(route.id).update(j);
   }catch{failed++;}}}
   await Promise.all([worker(),worker()]);const el=document.getElementById('nwtbAssignedRoadStatus');if(el&&!rows.length)el.textContent='No released or active routes. Online driver locations remain visible.';else if(el&&failed)el.textContent='Some route paths are temporarily unavailable. Driver markers remain visible.';
-  if(!fitOnce&&overlays.size){fitOnce=true;overlays.values().next().value.fit();}
+  if(!fitOnce&&overlays.size){fitOnce=true;fitAll();}
  }catch{const el=document.getElementById('nwtbAssignedRoadStatus');if(el)el.textContent='Route paths unavailable. Driver locations continue to refresh.';}finally{busy=false;}
 }
 document.addEventListener('click',e=>{const button=e.target.closest?.('[data-office-driver-view],[data-office-driver-chat]');if(!button)return;const host=shell();if(button.dataset.officeDriverChat)host?.nwtbChatWithDriver(button.dataset.officeDriverChat);else host?.nwtbOpenOfficeDriverView(button.dataset.officeDriverView,button.dataset.routeId);});
 let tries=0;const timer=setInterval(()=>{if(window.__nwtbTrackerMap&&window.NWTBOfficeDriverMap){clearInterval(timer);void refresh();setInterval(refresh,10000);}else if(++tries>150)clearInterval(timer);},100);
-window.nwtbShowAllOfficeRouteStops=()=>{for(const overlay of overlays.values())overlay.fit();};
+window.nwtbShowAllOfficeRouteStops=()=>{fitAll();};
 })();

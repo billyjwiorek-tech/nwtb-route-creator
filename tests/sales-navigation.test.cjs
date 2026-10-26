@@ -35,7 +35,7 @@ function fixture({mobile='android',emptySteps=false,speech=true}={}){
   watchPosition(success,error,options){gpsRequests.push(options);const id=serial++;watches.set(id,{success,error});return id},clearWatch(id){watches.delete(id)}
  }};
  const localStorage={getItem:key=>local.get(key)||null,setItem:(key,value)=>local.set(key,String(value)),removeItem:key=>local.delete(key)};
- const synth={getVoices:()=>[],addEventListener(){},cancel(){},resume(){},speak:u=>spoken.push(u.text)};
+ const synth={getVoices:()=>[],addEventListener(){},cancel(){},resume(){},speak:u=>{u.onstart?.();spoken.push(u.text);u.onend?.()}};
  const window={document,navigator,localStorage,HTMLElement:dom.HTMLElement,screen:{deviceXDPI:1,logicalXDPI:1},addEventListener:document.addEventListener.bind(document),removeEventListener:document.removeEventListener.bind(document),matchMedia:()=>({matches:true}),requestAnimationFrame:fn=>schedule(fn,16),cancelAnimationFrame:id=>timers.delete(id),getComputedStyle:el=>({getPropertyValue:key=>el.style[key]||'',position:'relative'}),NwtbSalesPolicy:policy};
  dom.getComputedStyle=window.getComputedStyle;
  if(speech)window.speechSynthesis=synth;
@@ -72,7 +72,7 @@ test('Sales uses the Delivery road-progress/ETA, voice cue and GPS algorithms',(
   const extract=text=>text.slice(text.indexOf(start),text.indexOf(end));
   assert.equal(extract(sales),extract(driver),'Copied Delivery algorithm drift: '+start);
  }
- for(const entry of ['index.html','app.html']){const html=read(entry);assert.ok(html.includes('sales-built-in-navigation.js?v=20261023SALESNAV1'));assert.ok(html.includes('driver-voice-live.js?v=20261021-voice1'));assert.ok(!html.includes('driver-navigation-native.js'));}
+ for(const entry of ['index.html','app.html']){const html=read(entry);assert.ok(html.includes('sales-built-in-navigation.js?v=20261026-SALESVOICE1'));assert.ok(html.includes('driver-voice-live.js?v=20261026-returnvoice1'));assert.ok(!html.includes('driver-navigation-native.js'));}
 });
 
 test('iPhone/Android movement updates road miles and segment ETA; standing still invents no progress',async()=>{

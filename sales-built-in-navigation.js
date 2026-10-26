@@ -33,11 +33,11 @@ function instruction(step){
  if(type==='turn')return `Turn ${mod||''}${road?' onto '+road:''}`.trim();
  return `${type||'Continue'} ${mod||''}${road?' on '+road:''}`.trim();
 }
-function speak(text,force=false){
+function speak(text,force=false,callbacks={}){
  if(!text||!('speechSynthesis'in window)||!force&&text===navLastSpoken)return false;
  try{
-  if(typeof window.nwtbVoiceSay==='function'){if(window.nwtbVoiceSay(text)===false)return false}
-  else{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.rate=.95;u.pitch=1;speechSynthesis.speak(u)}
+  if(typeof window.nwtbVoiceSay==='function'){if(window.nwtbVoiceSay(text,callbacks)===false)return false}
+  else{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.rate=.95;u.pitch=1;speechSynthesis.speak(u);callbacks.onStart?.()}
   navLastSpoken=text;return true;
  }catch{return false}
 }
@@ -50,8 +50,9 @@ function announceTurn(step,distance,initial=false){
  let cue=navVoiceCues.find(c=>c.identity===identity&&(point&&c.point?hav(point,c.point)<=20:!point&&!c.point&&c.index===navStepIndex));
  if(!cue){cue={identity,point,index:navStepIndex,stage:0};navVoiceCues.push(cue)}
  const stage=distance<45?2:1;
- if(cue.stage>=stage)return;
- if(speak((stage===2?'Now, ':'')+text,true))cue.stage=stage;
+ if(cue.stage>=stage||cue.pending>=stage)return;
+ const prior=cue.stage;cue.pending=stage;
+ if(!speak((stage===2?'Now, ':'')+text,true,{onStart:()=>{cue.stage=Math.max(cue.stage,stage);cue.pending=0},onError:()=>{cue.pending=0;cue.stage=prior}}))cue.pending=0;
 }
 function routingLabel(){return navTrafficAware?'NWTB SALES • LIVE FLEET TRAFFIC':'NWTB SALES — BUILT-IN TURN-BY-TURN'}
 function bannerText(base){return navTrafficAware?`LIVE TRAFFIC • ${base}`:base}
