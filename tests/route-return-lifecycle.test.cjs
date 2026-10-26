@@ -85,7 +85,7 @@ async function trackerTests(){
  vm.runInContext(read('tracker-driver-status.js'),ctx);const gpsBefore=intervals.length;vm.runInContext(read('tracker-gps-status.js'),ctx);intervals[gpsBefore]();
  eq(document.querySelector('.nwtbReturnPhase').textContent,'RETURNING TO NWTB','Office driver card labels the return');ok(popup.includes('RETURNING TO NWTB'),'Map popup labels return instead of completed route');ok(document.querySelector('.gpsLive'),'Freshness display preserved');
  eq(cardRows[0].route_id,'fixture-route');
- const core=read('tracker-live-core.html');ok(core.includes('tracker-gps-status.js?v=20261021-activepresence1'));ok(read('delivery-live.html').includes('tracker-live.html?v=20261026-driverdesk1'));
+ const core=read('tracker-live-core.html');ok(core.includes('tracker-gps-status.js?v=20261021-activepresence1'));ok(read('delivery-live.html').includes('tracker-live.html?v=20261026-driverdesk2'));
  const swContext=vm.createContext({self:{addEventListener(){}},console});vm.runInContext(read('nwtb-driver-sw.js'),swContext);
  eq(swContext.isDriverRead('https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-delivery-tracking',JSON.stringify({action:'route_return_driver'})),false,'Return confirmation cannot be faked from offline read cache');
 }

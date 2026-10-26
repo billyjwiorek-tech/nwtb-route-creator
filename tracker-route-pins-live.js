@@ -4,6 +4,14 @@
 if(window.__nwtbTrackerRoutePinsLive)return;window.__nwtbTrackerRoutePinsLive=true;
 const BASE='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/',PUB='sb_publishable_EqF-iooqhmngSG5BbzOxfQ_Vnf9Altc';
 const overlays=new Map();let busy=false,control=null,fitOnce=false;
+function selectRoutes(routes,drivers,isOnline){
+ const ranked=(routes||[]).filter(r=>r.status==='ACTIVE'||r.status==='PLANNED'&&r.released_to_driver===true).sort((a,b)=>Number(b.status==='ACTIVE')-Number(a.status==='ACTIVE')||String(a.route_date).localeCompare(String(b.route_date))||String(a.created_at).localeCompare(String(b.created_at)));
+ const selected=new Map();
+ for(const r of ranked)if(r.status==='ACTIVE'&&!selected.has(r.driver_employee_number))selected.set(r.driver_employee_number,r);
+ for(const d of drivers||[]){if(selected.has(d.driver_employee_number)||!isOnline(d))continue;const assigned=ranked.find(r=>r.id===d.route_id&&r.driver_employee_number===d.driver_employee_number)||ranked.find(r=>r.driver_employee_number===d.driver_employee_number);if(assigned)selected.set(d.driver_employee_number,assigned);}
+ return [...selected.values()];
+}
+window.NWTBOfficeDriverRoutes=Object.freeze({select:selectRoutes});
 async function read(endpoint,body){const r=await fetch(BASE+endpoint,{method:'POST',cache:'no-store',headers:{'content-type':'application/json','apikey':PUB,'x-nwtb-session':localStorage.getItem('nwtb_delivery_token')||''},body:JSON.stringify(body)}),j=await r.json();if(!r.ok)throw Error(j.error||'Route unavailable');return j;}
 function shell(){let w=window;for(let n=0;n<5;n++){if(typeof w.nwtbOpenOfficeDriverView==='function')return w;if(w===w.parent)break;w=w.parent;}return null;}
 function fitAll(){const map=window.__nwtbTrackerMap,points=[...overlays.values()].flatMap(overlay=>overlay.getBoundsPoints());if(map&&points.length)map.fitBounds(L.latLngBounds(points),{padding:[38,38],maxZoom:14});}
@@ -14,7 +22,7 @@ async function refresh(){
  const map=window.__nwtbTrackerMap;if(busy||!map||!window.NWTBOfficeDriverMap||!localStorage.getItem('nwtb_delivery_token'))return;busy=true;
  try{
   const saved=await read('nwtb-delivery',{action:'routes_list'});
-  const rows=saved.routes.filter(r=>r.status==='ACTIVE'||r.status==='PLANNED'&&r.released_to_driver===true);
+  const rows=selectRoutes(saved.routes,typeof live==='undefined'?[]:live,row=>window.NWTBDriverStatus?.online(row)===true);
   const current=new Set(rows.map(r=>r.id));for(const [id,overlay]of overlays)if(!current.has(id)){overlay.destroy();overlays.delete(id);}
   addControl(map);let next=0,failed=0;
   async function worker(){while(next<rows.length){const route=rows[next++];try{
