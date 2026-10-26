@@ -30,7 +30,7 @@ jobs:
           psql "$FIXTURE_DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/route-return-fixture-schema.sql
           psql "$FIXTURE_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261020165715_preserve_return_leg_until_confirmation.sql
           psql "$FIXTURE_DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/office-driver-view-fixture-schema.sql
-          psql "$FIXTURE_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261026144603_office_driver_screen_and_override.sql
+          psql "$FIXTURE_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261026155337_office_driver_screen_and_override.sql
           psql "$FIXTURE_DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/office-driver-view-db.test.sql
   lifecycle:
     runs-on: ubuntu-latest
