@@ -7,6 +7,25 @@ let navMap=null,navPanel=null,navLine=null,navPos=null,navGlow=null,navDest=null
 let navTrafficAware=false,navRouteSource='',navLastTrafficCheck=0,navTrafficBusy=false;
 let navVoiceCues=[];
 let navProgress=null,navLastFix=null,navHealthTimer=null,navWatchSerial=0,navLastRecovery=0,navPermissionBlocked=false,navRouteSequence=0,navRoutingRequest=0;
+let navGeometryRevision=0;
+let navManeuverAlong=[];
+let navHandoffPending=null;
+function syncVoiceStatus(){
+ const panel=document.getElementById('nwtbNavPanel');if(!panel)return;
+ let box=document.getElementById('nwtbVoiceHealth');if(!box){box=document.createElement('div');box.id='nwtbVoiceHealth';box.className='navBanner warn';box.innerHTML='<span>VOICE PAUSED — TAP TO RESUME VOICE. Keep NWTB visible for web navigation.</span> <button class="btn navVoice" type="button">RESUME VOICE</button>';box.querySelector('button').onclick=()=>{window.nwtbPrimeVoice?.(false);window.nwtbRepeatTurn();syncVoiceStatus();};panel.appendChild(box);}
+ const state=window.nwtbVoiceScreenState?.();box.hidden=!state?.needs_tap;
+}
+document.addEventListener('nwtb-voice-status',syncVoiceStatus);
+// Read-only screen state. Office observes these exact displayed values; this getter never starts GPS or navigation.
+window.nwtbNavigationScreenState=()=>({route_id:navRouteId||null,navigation_active:!!navTarget&&!!document.getElementById('nwtbNavPanel')?.classList.contains('show'),
+ target:navTarget?{...navTarget}:null,arrived_stop_id:navTarget?.stop_id&&arrivalFor===navTarget.stop_id?navTarget.stop_id:null,
+ arrival_visible:!!document.getElementById('nwtbArrival')?.classList.contains('show'),
+ eta:document.getElementById('nwtbEta')?.textContent||'',distance:document.getElementById('nwtbRemain')?.textContent||'',
+ turn:document.getElementById('nwtbTurn')?.textContent||'',turn_distance:document.getElementById('nwtbTurnDist')?.textContent||'',
+ banner:document.getElementById('nwtbNavBanner')?.textContent||'',mode:document.getElementById('nwtbNavMode')?.textContent||'',
+ traffic_aware:navTrafficAware,source:navRouteSource,fix_at:navLastFix?new Date(navLastFix.at).toISOString():null,
+ position:navLastFix?.pos?{...navLastFix.pos}:null,geometry_key:navTarget&&navRouteCoords.length?navRouteId+':'+navGeometryRevision:null,geometry:navRouteCoords,
+ handoff_pending:!!navHandoffPending});
 
 const hav=(a,b)=>{const R=6371008.8,p=Math.PI/180,dLat=(b.lat-a.lat)*p,dLon=(b.lon-a.lon)*p,x=Math.sin(dLat/2)**2+Math.cos(a.lat*p)*Math.cos(b.lat*p)*Math.sin(dLon/2)**2;return 2*R*Math.asin(Math.sqrt(x))};
 const feet=m=>m<160.934?`${Math.max(10,Math.round(m/0.3048/10)*10)} ft`:`${(m/1609.344).toFixed(1)} mi`;
@@ -27,11 +46,11 @@ function instruction(step){
  if(type==='turn')return `Turn ${mod||''}${road?' onto '+road:''}`.trim();
  return `${type||'Continue'} ${mod||''}${road?' on '+road:''}`.trim();
 }
-function speak(text,force=false){
+function speak(text,force=false,callbacks={}){
  if(!text||!('speechSynthesis'in window)||!force&&text===navLastSpoken)return false;
  try{
-  if(typeof window.nwtbVoiceSay==='function'){if(window.nwtbVoiceSay(text)===false)return false}
-  else{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.rate=.95;u.pitch=1;speechSynthesis.speak(u)}
+  if(typeof window.nwtbVoiceSay==='function'){if(window.nwtbVoiceSay(text,callbacks)===false)return false}
+  else{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.rate=.95;u.pitch=1;speechSynthesis.speak(u);callbacks.onStart?.()}
   navLastSpoken=text;return true;
  }catch{return false}
 }
@@ -44,8 +63,9 @@ function announceTurn(step,distance,initial=false){
  let cue=navVoiceCues.find(c=>c.identity===identity&&(point&&c.point?hav(point,c.point)<=20:!point&&!c.point&&c.index===navStepIndex));
  if(!cue){cue={identity,point,index:navStepIndex,stage:0};navVoiceCues.push(cue)}
  const stage=distance<45?2:1;
- if(cue.stage>=stage)return;
- if(speak((stage===2?'Now, ':'')+text,true))cue.stage=stage;
+ if(cue.stage>=stage||cue.pending>=stage)return;
+ const prior=cue.stage;cue.pending=stage;
+ if(!speak((stage===2?'Now, ':'')+text,true,{onStart:()=>{cue.stage=Math.max(cue.stage,stage);cue.pending=0},onError:()=>{cue.pending=0;cue.stage=prior}}))cue.pending=0;
 }
 function routingLabel(){return navTrafficAware?'NWTB TURN-BY-TURN • LIVE TRAFFIC':'NWTB TURN-BY-TURN'}
 function bannerText(base){return navTrafficAware?`LIVE TRAFFIC • ${base}`:base}
@@ -88,6 +108,7 @@ function receiveNavFix(position,generation=navGeneration,routeIfMissing=true){
  if(!validCoord(pos.lat,pos.lon)||age>NAV_GPS_STALE_MS||age< -5000||navLastFix&&at<navLastFix.at)return false;
  if(accuracy>100){gpsWarning('GPS ACCURACY LOW — WAITING TO UPDATE ETA AND DISTANCE');return false}
  navPermissionBlocked=false;navLastFix={pos,at,gps:{accuracy,speed:c.speed,heading:c.heading}};window.__nwtbLastSpeedMps=c.speed??null;
+ if(navHandoffPending){clearMetrics();return true;}
  if(!navProgress){if(routeIfMissing){initMap(pos.lat,pos.lon);reroute(pos,true)}return true;}
  if(navPos&&navMap)navPos.setLatLng([pos.lat,pos.lon]);updateDisplay(pos,false,navLastFix.gps);
  if(navMap&&document.visibilityState==='visible')navMap.panTo([pos.lat,pos.lon],{animate:true,duration:.4});
@@ -162,7 +183,10 @@ function updateDisplay(pos,forceSpeak=false,gps={}){
  const remaining=hav(pos,navTarget),arriveDistance=Math.min(remaining,routeArrivalDistance(pos)),threshold=arrivalThreshold(gps),exact=arriveDistance<=ARRIVAL_M,soft=arriveDistance<=threshold&&Number(gps.speed||0)<=3.5;
  if(exact)arrivalHits=2;else if(soft)arrivalHits++;else arrivalHits=0;
  const step=currentStep();if(step){const loc=step?.maneuver?.location||[],mpos=loc.length===2?{lat:Number(loc[1]),lon:Number(loc[0])}:navTarget;let d=hav(pos,mpos);
-  while(d<28&&navStepIndex<navSteps.length-1){navStepIndex++;const n=currentStep(),nl=n?.maneuver?.location||[];if(nl.length===2)d=hav(pos,{lat:Number(nl[1]),lon:Number(nl[0])});else break}
+  const onRoad=projectRoute(pos),passed=()=>onRoad&&onRoad.off<=Math.max(60,Math.min(100,Number(gps.accuracy)||0))&&navManeuverAlong[navStepIndex]!=null&&onRoad.along>navManeuverAlong[navStepIndex]+20;
+  // A phone can report on either side of a turn without ever entering its 28 m radius.
+  // Use progress along the road to retire passed instructions instead of remaining silent on the old turn.
+  while((d<28||passed())&&navStepIndex<navSteps.length-1){navStepIndex++;const n=currentStep(),nl=n?.maneuver?.location||[];if(nl.length===2)d=hav(pos,{lat:Number(nl[1]),lon:Number(nl[0])});else break}
   const now=currentStep(),txt=instruction(now);document.getElementById('nwtbTurn').textContent=txt;document.getElementById('nwtbTurnDist').textContent=feet(d);if(!arrivalFor&&!exact&&arrivalHits<2)announceTurn(now,d,forceSpeak)
  }
  const progress=remainingProgress(pos,gps),arrived=exact||arrivalHits>=2;document.getElementById('nwtbRemain').textContent=arrived?'0 ft':progress?feet(progress.meters):'—';document.getElementById('nwtbEta').textContent=arrived?'0 min':progress?.seconds!=null?eta(progress.seconds):'—';updateNearGlow(pos,remaining);document.getElementById('nwtbNavBanner').className='navBanner';
@@ -170,8 +194,11 @@ function updateDisplay(pos,forceSpeak=false,gps={}){
 }
 function distanceToRoute(pos){return projectRoute(pos)?.off??Infinity}
 function applyRoute(j,pos,announce=false){
+ navGeometryRevision++;
  document.dispatchEvent(new CustomEvent('nwtb-navigation-route',{detail:{geometry:j.geometry||[]}}));
- navSteps=j.steps||[];navRouteCoords=j.geometry||[];navProgress=buildProgress(j);navStepIndex=0;navTrafficAware=!!j.traffic_aware;navRouteSource=j.source||'';navLastTrafficCheck=Date.now();setRoutingMode();const latest=navLastFix?.pos||pos;drawRoute(latest);if(navLastFix&&Date.now()-navLastFix.at>NAV_GPS_STALE_MS)gpsWarning('GPS LOST — ETA AND DISTANCE PAUSED');else updateDisplay(latest,announce,navLastFix?.gps||{})
+ navSteps=j.steps||[];navRouteCoords=j.geometry||[];navProgress=buildProgress(j);navStepIndex=0;
+ let previous=0;navManeuverAlong=navSteps.map(step=>{if(!navProgress)return null;if(step.maneuver?.type==='arrive')return navProgress.length;const loc=step.maneuver?.location||[];if(!validCoord(loc[1],loc[0]))return null;const hit=projectRoute({lat:Number(loc[1]),lon:Number(loc[0])},{...navProgress,lastAlong:previous});if(!hit||hit.off>100)return null;previous=Math.max(previous,hit.along);return previous;});
+ navTrafficAware=!!j.traffic_aware;navRouteSource=j.source||'';navLastTrafficCheck=Date.now();setRoutingMode();const latest=navLastFix?.pos||pos;drawRoute(latest);if(navLastFix&&Date.now()-navLastFix.at>NAV_GPS_STALE_MS)gpsWarning('GPS LOST — ETA AND DISTANCE PAUSED');else updateDisplay(latest,announce,navLastFix?.gps||{})
 }
 async function reroute(pos,announce=false){if(!navTarget)return;const generation=navGeneration,target=navTarget,now=Date.now();if(now-navLastReroute<12000||!navProgress&&navRoutingRequest)return;navLastReroute=now;const request=++navRouteSequence;navRoutingRequest=request;document.getElementById('nwtbNavBanner').textContent=navTrafficAware?'LIVE TRAFFIC • Recalculating fastest route…':'Calculating route…';try{const j=await navPost({action:'route',origin:pos,destination:{lat:target.lat,lon:target.lon}});if(generation!==navGeneration||request!==navRouteSequence)return;applyRoute(j,pos,announce)}catch(e){if(generation!==navGeneration||request!==navRouteSequence)return;document.getElementById('nwtbNavBanner').className='navBanner warn';document.getElementById('nwtbNavBanner').textContent=e.message}finally{if(navRoutingRequest===request)navRoutingRequest=0}}
 async function trafficRefresh(pos){
@@ -180,7 +207,7 @@ async function trafficRefresh(pos){
  try{const j=await navPost({action:'route',origin:pos,destination:{lat:target.lat,lon:target.lon}});if(generation===navGeneration&&request===navRouteSequence&&j?.traffic_aware)applyRoute(j,pos,false)}catch(e){console.warn('Live traffic refresh failed',e)}finally{if(generation===navGeneration)navTrafficBusy=false}
 }
 function startNavWatch(){if(navWatch!==null||!navigator.geolocation||!navTarget)return;const generation=navGeneration,serial=++navWatchSerial;navWatch=navigator.geolocation.watchPosition(p=>{if(serial===navWatchSerial)receiveNavFix(p,generation)},e=>{if(serial===navWatchSerial&&generation===navGeneration)gpsError(e)},{enableHighAccuracy:true,maximumAge:0,timeout:15000})}
-async function beginNavigation(target,routeId){const generation=++navGeneration;clearNavWatch();navRouteSequence++;navRoutingRequest=0;navProgress=null;navLastFix=null;navLastRecovery=0;navPermissionBlocked=false;navLastReroute=0;navRouteCoords=[];navSteps=[];navTarget=target;navRouteId=routeId||route||'';navLastSpoken='';navVoiceCues=[];navStepIndex=0;arrivalFor='';arrivalHits=0;navTrafficAware=false;navRouteSource='';navLastTrafficCheck=0;navTrafficBusy=false;hideArrival();clearNearGlow();const p=ensurePanel();p.classList.add('show');clearMetrics();setRoutingMode();document.getElementById('nwtbNavBanner').className='navBanner';document.getElementById('nwtbNavBanner').textContent='Getting your location…';if(!navigator.geolocation){document.getElementById('nwtbNavBanner').className='navBanner warn';document.getElementById('nwtbNavBanner').textContent='This phone/browser does not provide GPS.';return}startNavHealth();navigator.geolocation.getCurrentPosition(async g=>{if(generation!==navGeneration||!receiveNavFix(g,generation,false))return;const pos=navLastFix.pos;initMap(pos.lat,pos.lon);await reroute(pos,true);if(generation!==navGeneration)return;startNavWatch();try{if(typeof requestWakeLock==='function')requestWakeLock()}catch{}},e=>{if(generation===navGeneration)gpsError(e)},{enableHighAccuracy:true,maximumAge:0,timeout:15000})}
+async function beginNavigation(target,routeId){const generation=++navGeneration;navHandoffPending=null;document.getElementById('nwtbHandoffRetry')?.remove();clearNavWatch();navRouteSequence++;navRoutingRequest=0;navProgress=null;navLastFix=null;navLastRecovery=0;navPermissionBlocked=false;navLastReroute=0;navRouteCoords=[];navSteps=[];navTarget=target;navRouteId=routeId||route||'';navLastSpoken='';navVoiceCues=[];navStepIndex=0;arrivalFor='';arrivalHits=0;navTrafficAware=false;navRouteSource='';navLastTrafficCheck=0;navTrafficBusy=false;hideArrival();clearNearGlow();const p=ensurePanel();p.classList.add('show');clearMetrics();setRoutingMode();document.getElementById('nwtbNavBanner').className='navBanner';document.getElementById('nwtbNavBanner').textContent='Getting your location…';if(!navigator.geolocation){document.getElementById('nwtbNavBanner').className='navBanner warn';document.getElementById('nwtbNavBanner').textContent='This phone/browser does not provide GPS.';return}startNavHealth();navigator.geolocation.getCurrentPosition(async g=>{if(generation!==navGeneration||!receiveNavFix(g,generation,false))return;const pos=navLastFix.pos;initMap(pos.lat,pos.lon);await reroute(pos,true);if(generation!==navGeneration)return;startNavWatch();try{if(typeof requestWakeLock==='function')requestWakeLock()}catch{}},e=>{if(generation===navGeneration)gpsError(e)},{enableHighAccuracy:true,maximumAge:0,timeout:15000})}
 
 async function targetForStop(stop){const o=stop?.delivery_orders||{};let lat=Number(o.lat),lon=Number(o.lon);if(!validCoord(lat,lon)){try{const g=await post(API,{action:'geocode',address:o.address});lat=Number(g.lat);lon=Number(g.lon)}catch{}}if(!validCoord(lat,lon))throw Error('This stop does not have a usable physical location.');return {name:o.customer_name||'Stop',address:o.address||'',lat,lon,stop_id:stop.id}}
 async function finalTarget(r){
@@ -193,17 +220,35 @@ async function finalTarget(r){
 }
 async function navigateNext(routeId){
  const fresh=await post(API,{action:'route_get',route_id:routeId});if(routeId!==route)return;navRouteMeta=fresh.route||navRouteMeta;const next=(fresh.stops||[]).find(s=>s.status==='PENDING');if(navRouteMeta?.paused||!['ACTIVE','COMPLETED'].includes(navRouteMeta?.status)||next&&navRouteMeta?.status!=='ACTIVE')throw Error('Start or resume this assigned route before navigating.');if(next){await beginNavigation(await targetForStop(next),routeId);return}
- const end=await finalTarget(navRouteMeta);if(end){await beginNavigation(end,routeId);document.getElementById('nwtbNavBanner').textContent=bannerText(`All stops complete — returning to ${end.name}`);speak(`All stops complete. Returning to ${end.name}`)}else{window.nwtbStopNavigation();speak('Route complete')}
+ const end=await finalTarget(navRouteMeta);if(end){speak(`All stops complete. Returning to ${end.name}`);await beginNavigation(end,routeId);document.getElementById('nwtbNavBanner').textContent=bannerText(`All stops complete — returning to ${end.name}`)}else{window.nwtbStopNavigation();speak('Route complete')}
 }
 
 window.nwtbCompleteNext=async()=>{if(!navTarget?.stop_id||typeof window.finish!=='function')return;const id=navTarget.stop_id;hideArrival();clearNearGlow();arrivalHits=0;try{await window.finish(id,'DELIVERED')}catch(e){alert(e.message||e)}};
 window.nwtbNotCompleted=async()=>{if(!navTarget?.stop_id||typeof window.finish!=='function')return;const id=navTarget.stop_id;hideArrival();clearNearGlow();arrivalHits=0;try{await window.finish(id,'NOT_DELIVERED')}catch(e){alert(e.message||e)}};
 // Called only after the POD/exception endpoint acknowledges the saved outcome.
-window.nwtbAfterStopSaved=async stopId=>{const id=route,advance=!!navTarget&&navRouteId===id&&navTarget.stop_id===stopId;if(!id)return;await window.openRoute(id);if(advance&&route===id)await navigateNext(id)};
+async function resumeSavedNavigation(id){
+ if(!id||id!==route||!navHandoffPending)return;
+ try{await navigateNext(id);if(route===id){navHandoffPending=null;document.getElementById('nwtbHandoffRetry')?.remove();syncVoiceStatus();}}
+ catch{if(route!==id||!navHandoffPending)return;clearMetrics();const panel=ensurePanel(),banner=document.getElementById('nwtbNavBanner');banner.className='navBanner warn';banner.textContent='STOP SAVED — NEXT / RETURN DIRECTIONS NEED TO RECONNECT';
+  if(!document.getElementById('nwtbHandoffRetry')){const retry=document.createElement('button');retry.id='nwtbHandoffRetry';retry.className='btn navVoice';retry.textContent='RESUME NEXT / RETURN DIRECTIONS';retry.onclick=()=>{window.nwtbPrimeVoice?.(false);void resumeSavedNavigation(id);};panel.appendChild(retry);}
+ }
+}
+window.nwtbAfterStopSaved=async stopId=>{const id=route,advance=!!navTarget&&navRouteId===id&&navTarget.stop_id===stopId;if(!id)return;
+ if(advance)navHandoffPending={routeId:id,generation:navGeneration};await window.openRoute(id);
+ if(advance&&route===id){await resumeSavedNavigation(id);const pending=navHandoffPending;if(pending)setTimeout(()=>{if(navHandoffPending===pending&&route===id)void resumeSavedNavigation(id);},2500);}
+};
 window.nwtbDriverViewChanged=id=>{if(!id||navRouteId&&navRouteId!==id)window.nwtbStopNavigation()};
+// Explicit Office changes reconcile the current target only after canonical data is refreshed.
+// Merely viewing a route from Office never calls this hook.
+window.nwtbOfficeRouteChanged=async(id)=>{
+ if(!id||id!==route||navRouteId!==id||!navTarget)return;
+ const j=await post(API,{action:'route_get',route_id:id});if(id!==route||navRouteId!==id||!navTarget)return;
+ const next=(j.stops||[]).find(s=>s.status==='PENDING');
+ if(navTarget.stop_id&&(!next||next.id!==navTarget.stop_id)||navTarget.final&&next)await navigateNext(id);
+};
 window.nwtbRepeatTurn=()=>{const s=currentStep();if(s)speak(instruction(s)+' '+(document.getElementById('nwtbTurnDist')?.textContent||''),true)};
 window.nwtbRecenter=()=>{if(navMap&&navPos)navMap.setView(navPos.getLatLng(),16)};
-window.nwtbStopNavigation=()=>{navGeneration++;navRouteSequence++;navRoutingRequest=0;clearNavWatch();if(navHealthTimer!==null){clearInterval(navHealthTimer);navHealthTimer=null}navProgress=null;navLastFix=null;navLastRecovery=0;navPermissionBlocked=false;navRouteId='';clearNearGlow();navTarget=null;navSteps=[];navRouteCoords=[];navStepIndex=0;navVoiceCues=[];navLastSpoken='';arrivalFor='';arrivalHits=0;navTrafficAware=false;navRouteSource='';navLastTrafficCheck=0;navTrafficBusy=false;hideArrival();try{speechSynthesis.cancel()}catch{}const p=document.getElementById('nwtbNavPanel');if(p)p.classList.remove('show')};
+window.nwtbStopNavigation=()=>{navHandoffPending=null;navManeuverAlong=[];document.getElementById('nwtbHandoffRetry')?.remove();navGeneration++;navRouteSequence++;navRoutingRequest=0;clearNavWatch();if(navHealthTimer!==null){clearInterval(navHealthTimer);navHealthTimer=null}navProgress=null;navLastFix=null;navLastRecovery=0;navPermissionBlocked=false;navRouteId='';clearNearGlow();navTarget=null;navSteps=[];navRouteCoords=[];navStepIndex=0;navVoiceCues=[];navLastSpoken='';arrivalFor='';arrivalHits=0;navTrafficAware=false;navRouteSource='';navLastTrafficCheck=0;navTrafficBusy=false;hideArrival();try{if(window.nwtbCancelVoice)window.nwtbCancelVoice();else speechSynthesis.cancel()}catch{}const p=document.getElementById('nwtbNavPanel');if(p)p.classList.remove('show')};
 
 async function decorateRoute(routeId){
  try{

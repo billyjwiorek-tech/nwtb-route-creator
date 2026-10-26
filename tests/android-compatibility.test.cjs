@@ -127,7 +127,7 @@ async function offlineShell(){
  const context=vm.createContext({self,URL,console,Response,caches:{open:async()=>({match:async(req,options)=>{lookups.push({url:req.url,ignoreSearch:options?.ignoreSearch===true});return options?.ignoreSearch?new Response('fixture cached shell'):null}})},fetch:async()=>{throw TypeError('Network unavailable')}});
  vm.runInContext(read('nwtb-driver-sw.js'),context);const shell=vm.runInContext('SHELL',context);ok(shell.some(x=>x.includes('leaflet@1.9.4/dist/leaflet.js')),'First install precaches Leaflet engine');ok(shell.some(x=>x.includes('leaflet@1.9.4/dist/leaflet.css')),'First install precaches map stylesheet');
  async function get(url){let response;handlers.get('fetch')({request:{url,method:'GET',mode:'cors'},respondWith:p=>response=p});return response}
- let r=await get('https://billyjwiorek-tech.github.io/nwtb-route-creator/driver-pod-live.js?v=20261021-android1');eq(await r.text(),'fixture cached shell','Versioned completion module can use current shell cache offline');
+ let r=await get('https://billyjwiorek-tech.github.io/nwtb-route-creator/driver-pod-live.js?v=20261026-driverdesk1');eq(await r.text(),'fixture cached shell','Versioned completion module can use current shell cache offline');
  r=await get('https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js?v=20261014');eq(await r.text(),'fixture cached shell','Leaflet query version can use cached map engine');
  const count=lookups.length;await assert.rejects(()=>get('https://photon.komoot.io/api/?q=different-business'),/offline/);checks++;ok(lookups.slice(count).every(x=>!x.ignoreSearch),'Offline asset fallback cannot return another business query result');
 }

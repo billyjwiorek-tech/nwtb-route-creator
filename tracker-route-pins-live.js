@@ -1,26 +1,31 @@
+/* Live Drivers: draw assigned road routes, return legs and optional actual phone paths. */
 (()=>{
 'use strict';
 if(window.__nwtbTrackerRoutePinsLive)return;window.__nwtbTrackerRoutePinsLive=true;
-const TRACK='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-live-tracking-v2';
-const API='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/nwtb-delivery';
-const KEY='sb_publishable_EqF-iooqhmngSG5BbzOxfQ_Vnf9Altc';
-const HOME={name:'Northwest Trucks - Bolingbrook',address:'201 S W Frontage Rd, Bolingbrook, IL 60440',lat:41.682487,lon:-88.072262};
-let routePins=[],depotPin=null,fitOnce=false,control=null;
-const tok=()=>localStorage.getItem('nwtb_delivery_token')||'';
-const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
-const valid=(a,b)=>Number.isFinite(Number(a))&&Number.isFinite(Number(b))&&Math.abs(Number(a))>1&&Math.abs(Number(b))>1;
-async function post(url,body){const r=await fetch(url,{method:'POST',headers:{'content-type':'application/json','apikey':KEY,'x-nwtb-session':tok()},body:JSON.stringify(body)}),j=await r.json().catch(()=>({error:'Route pin response error'}));if(!r.ok)throw Error(j.error||'Route pin request failed');return j}
-function style(){if(document.getElementById('nwtbOfficeRoutePinStyle'))return;const s=document.createElement('style');s.id='nwtbOfficeRoutePinStyle';s.textContent=`
-.nwtbOfficeStopPin{width:28px;height:28px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid #fff;box-shadow:0 2px 7px rgba(15,23,42,.35);display:grid;place-items:center;background:#f58220}.nwtbOfficeStopPin span{transform:rotate(45deg);color:#fff;font:900 11px/1 Arial,sans-serif}.nwtbOfficeStopPin.current{background:#2563eb;box-shadow:0 0 0 4px rgba(37,99,235,.18),0 2px 7px rgba(15,23,42,.35)}.nwtbOfficeStopPin.done{background:#16a34a}.nwtbOfficeStopPin.failed{background:#dc2626}.nwtbOfficeDepot{min-width:40px;height:26px;border-radius:8px;background:#0f172a;color:#fff;border:2px solid #fff;box-shadow:0 2px 7px rgba(15,23,42,.35);display:grid;place-items:center;font:900 9px/1 Arial,sans-serif;padding:0 5px}.nwtbOfficeAllStops{background:#fff;border:2px solid rgba(0,0,0,.2);border-radius:5px}.nwtbOfficeAllStops button{border:0;background:#fff;color:#0f172a;font:900 10px/1 Arial,sans-serif;padding:8px 9px;cursor:pointer}
-`;document.head.appendChild(s)}
-function pinIcon(seq,status,current){style();let cls='';if(current)cls=' current';else if(status==='DELIVERED')cls=' done';else if(status==='NOT_DELIVERED')cls=' failed';return L.divIcon({className:'',html:`<div class="nwtbOfficeStopPin${cls}"><span>${esc(seq)}</span></div>`,iconSize:[32,36],iconAnchor:[16,34],popupAnchor:[0,-32]})}
-function depotIcon(){style();return L.divIcon({className:'',html:'<div class="nwtbOfficeDepot">NWTB</div>',iconSize:[46,30],iconAnchor:[23,15]})}
-function map(){return window.__nwtbTrackerMap||null}
-function clear(){const m=map();if(!m)return;for(const p of routePins){try{m.removeLayer(p)}catch{}}routePins=[];if(depotPin){try{m.removeLayer(depotPin)}catch{}depotPin=null}}
-function addControl(){const m=map();if(!m||control||!window.L)return;control=L.control({position:'topright'});control.onAdd=()=>{const d=L.DomUtil.create('div','nwtbOfficeAllStops');d.innerHTML='<button type="button">ALL ROUTE STOPS</button>';L.DomEvent.disableClickPropagation(d);d.querySelector('button').onclick=()=>fitAll();return d};control.addTo(m)}
-let lastBounds=[];
-function fitAll(){const m=map();if(!m||!window.L||!lastBounds.length)return;const b=L.latLngBounds(lastBounds);if(b.isValid())m.fitBounds(b.pad(.16),{maxZoom:13,padding:[30,30]})}
-async function refresh(){const m=map();if(!m||!window.L||!tok())return;try{const loc=await post(TRACK,{action:'locations_latest'}),drivers=loc.drivers||[],byRoute=new Map();for(const d of drivers){if(d.route_id&&!byRoute.has(d.route_id))byRoute.set(d.route_id,d)}const rows=[];for(const [routeId,d] of byRoute){try{const j=await post(API,{action:'route_get',route_id:routeId});rows.push({driver:d,route:j.route||{},stops:j.stops||[]})}catch(e){console.warn('NWTB office route pins route load:',e)}}clear();addControl();lastBounds=[[HOME.lat,HOME.lon]];depotPin=L.marker([HOME.lat,HOME.lon],{icon:depotIcon(),zIndexOffset:500}).addTo(m).bindPopup(`<b>START / RETURN</b><br>${esc(HOME.name)}<br>${esc(HOME.address)}`);for(const row of rows){const next=row.stops.find(s=>s.status==='PENDING');for(const s of row.stops){const o=s.delivery_orders||{},lat=Number(o.lat),lon=Number(o.lon);if(!valid(lat,lon))continue;const current=!!next&&String(next.id)===String(s.id),mk=L.marker([lat,lon],{icon:pinIcon(s.stop_sequence,s.status,current),zIndexOffset:current?760:560}).addTo(m);mk.bindPopup(`<b>${esc(row.driver.display_name||row.route.driver_name||'Driver')}</b><br><b>STOP ${esc(s.stop_sequence)}: ${esc(o.customer_name||'Stop')}</b><br>${esc(o.address||'')}<br><span style="font-weight:800">${esc(s.status||'PENDING')}</span>`);routePins.push(mk);lastBounds.push([lat,lon])}if(valid(row.driver.lat,row.driver.lon))lastBounds.push([Number(row.driver.lat),Number(row.driver.lon)])}if(!fitOnce&&lastBounds.length>1){fitOnce=true;setTimeout(fitAll,100)}}catch(e){console.warn('NWTB office route pins:',e)}}
-let tries=0;const t=setInterval(()=>{if(map()){clearInterval(t);refresh();setInterval(refresh,10000)}else if(++tries>120)clearInterval(t)},100);
-window.nwtbShowAllOfficeRouteStops=fitAll;
+const BASE='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/',PUB='sb_publishable_EqF-iooqhmngSG5BbzOxfQ_Vnf9Altc';
+const overlays=new Map();let busy=false,control=null,fitOnce=false;
+async function read(endpoint,body){const r=await fetch(BASE+endpoint,{method:'POST',cache:'no-store',headers:{'content-type':'application/json','apikey':PUB,'x-nwtb-session':localStorage.getItem('nwtb_delivery_token')||''},body:JSON.stringify(body)}),j=await r.json();if(!r.ok)throw Error(j.error||'Route unavailable');return j;}
+function shell(){let w=window;for(let n=0;n<5;n++){if(typeof w.nwtbOpenOfficeDriverView==='function')return w;if(w===w.parent)break;w=w.parent;}return null;}
+function addControl(map){
+ if(control)return;control=L.control({position:'topright'});control.onAdd=()=>{const div=L.DomUtil.create('div');div.style.cssText='background:white;border-radius:8px;padding:8px;max-width:270px;font:11px/1.5 Arial;box-shadow:0 2px 8px #0003';div.innerHTML='<button type="button" style="border:0;padding:7px;background:#15304e;color:white;border-radius:6px;font-weight:bold">ALL ROUTE STOPS</button><div id="nwtbAssignedRoadStatus" role="status">Loading assigned routes…</div>';div.querySelector('button').onclick=()=>{for(const overlay of overlays.values())overlay.fit();};L.DomEvent.disableClickPropagation(div);return div;};control.addTo(map);
+}
+async function refresh(){
+ const map=window.__nwtbTrackerMap;if(busy||!map||!window.NWTBOfficeDriverMap||!localStorage.getItem('nwtb_delivery_token'))return;busy=true;
+ try{
+  const saved=await read('nwtb-delivery',{action:'routes_list'});
+  const rows=saved.routes.filter(r=>r.status==='ACTIVE'||r.status==='PLANNED'&&r.released_to_driver===true);
+  const current=new Set(rows.map(r=>r.id));for(const [id,overlay]of overlays)if(!current.has(id)){overlay.destroy();overlays.delete(id);}
+  addControl(map);let next=0,failed=0;
+  async function worker(){while(next<rows.length){const route=rows[next++];try{
+   const j=await read('nwtb-office-driver-view',{action:'view',route_id:route.id});
+   if(!overlays.has(route.id))overlays.set(route.id,window.NWTBOfficeDriverMap.create({map,L,showDriver:false,onStatus:(msg,warn)=>{const el=document.getElementById('nwtbAssignedRoadStatus');if(el){el.textContent=msg;el.style.color=warn?'#b42318':'#344054';}},onOpen:r=>shell()?.nwtbOpenOfficeDriverView(r.driver_employee_number,r.id)}));
+   await overlays.get(route.id).update(j);
+  }catch{failed++;}}}
+  await Promise.all([worker(),worker()]);const el=document.getElementById('nwtbAssignedRoadStatus');if(el&&!rows.length)el.textContent='No released or active routes. Online driver locations remain visible.';else if(el&&failed)el.textContent='Some route paths are temporarily unavailable. Driver markers remain visible.';
+  if(!fitOnce&&overlays.size){fitOnce=true;overlays.values().next().value.fit();}
+ }catch{const el=document.getElementById('nwtbAssignedRoadStatus');if(el)el.textContent='Route paths unavailable. Driver locations continue to refresh.';}finally{busy=false;}
+}
+document.addEventListener('click',e=>{const button=e.target.closest?.('[data-office-driver-view],[data-office-driver-chat]');if(!button)return;const host=shell();if(button.dataset.officeDriverChat)host?.nwtbChatWithDriver(button.dataset.officeDriverChat);else host?.nwtbOpenOfficeDriverView(button.dataset.officeDriverView,button.dataset.routeId);});
+let tries=0;const timer=setInterval(()=>{if(window.__nwtbTrackerMap&&window.NWTBOfficeDriverMap){clearInterval(timer);void refresh();setInterval(refresh,10000);}else if(++tries>150)clearInterval(timer);},100);
+window.nwtbShowAllOfficeRouteStops=()=>{for(const overlay of overlays.values())overlay.fit();};
 })();

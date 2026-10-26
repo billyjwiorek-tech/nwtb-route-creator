@@ -1,13 +1,37 @@
 name: NWTB return lifecycle
 on:
   push:
-    branches: [main, fix/nwtb-return-leg-lifecycle-20261020, fix/nwtb-driver-chat-seen-20261020, feat/nwtb-driver-presence-20261020, feat/nwtb-live-map-search-20261021, feat/nwtb-business-nearby-20261026]
+    branches: [main, fix/nwtb-return-leg-lifecycle-20261020, fix/nwtb-driver-chat-seen-20261020, feat/nwtb-driver-presence-20261020, feat/nwtb-live-map-search-20261021, feat/nwtb-business-nearby-20261026, feat/nwtb-office-driver-view-20261026]
     paths: ['driver-*.html', 'driver-*.js', '*.webmanifest', 'nwtb-driver-sw.js', 'nwtb-notifications.js', 'dispatch-*.js', 'tracker*.html', 'tracker*.js', 'office-*.js', 'office-*.html', 'office-*.mjs', 'unified-search.js', 'custom-master-search.js', 'custom-stop.js', 'driver-*.svg', 'delivery-*.html', 'dispatch*.html', 'dispatch-route-admin-native.js', 'dispatch-chat-live.js', 'supabase/**', 'tests/**', '.github/workflows/nwtb-return-lifecycle.yml']
   pull_request:
     paths: ['driver-*.html', 'driver-*.js', '*.webmanifest', 'nwtb-driver-sw.js', 'nwtb-notifications.js', 'dispatch-*.js', 'tracker*.html', 'tracker*.js', 'office-*.js', 'office-*.html', 'office-*.mjs', 'unified-search.js', 'custom-master-search.js', 'custom-stop.js', 'driver-*.svg', 'delivery-*.html', 'dispatch*.html', 'dispatch-route-admin-native.js', 'supabase/**', 'tests/**', '.github/workflows/nwtb-return-lifecycle.yml']
 permissions:
   contents: read
 jobs:
+  office-override-database:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.6
+        env:
+          POSTGRES_PASSWORD: fixture
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      FIXTURE_DATABASE_URL: postgresql://postgres:fixture@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate screen storage and Office override in disposable PostgreSQL
+        run: |
+          psql "$FIXTURE_DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/route-return-fixture-schema.sql
+          psql "$FIXTURE_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261020165715_preserve_return_leg_until_confirmation.sql
+          psql "$FIXTURE_DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/office-driver-view-fixture-schema.sql
+          psql "$FIXTURE_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261026144603_office_driver_screen_and_override.sql
+          psql "$FIXTURE_DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/office-driver-view-db.test.sql
   lifecycle:
     runs-on: ubuntu-latest
     services:
@@ -59,7 +83,7 @@ jobs:
           psql "$FIXTURE_DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/driver-presence-db.test.sql
   production-bytes:
     if: github.ref == 'refs/heads/main'
-    needs: lifecycle
+    needs: [lifecycle, office-override-database]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

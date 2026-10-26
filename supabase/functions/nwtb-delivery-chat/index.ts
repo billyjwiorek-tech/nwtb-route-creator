@@ -149,8 +149,9 @@ Deno.serve(async(req:Request)=>{
   if(de)return reply(req,{error:'Could not load drivers.'},500)
   const {data:msgs,error:me}=await db.from('delivery_chat_messages').select(fields).not('conversation_driver_employee_number','is',null).order('created_at',{ascending:false}).limit(500)
   if(me)return reply(req,{error:'Could not load chat threads.'},500)
+  const {data:roles,error:re}=await db.from('nwtb_delivery_roles').select('employee_number').eq('role','DRIVER').eq('active',true);if(re)return reply(req,{error:'Could not verify Driver roster.'},500);const driverIds=new Set((roles||[]).map((r:any)=>r.employee_number));
   const by:any={};for(const m of msgs||[]){const k=m.conversation_driver_employee_number;if(!by[k])by[k]={latest:m,unread:0};if(m.sender_role==='DRIVER'&&!m.read_by_dispatch_at)by[k].unread++}
-  return reply(req,{ok:true,threads:(drivers||[]).map((d:any)=>({driver_employee_number:d.employee_number,driver_name:d.display_name,latest:by[d.employee_number]?.latest||null,unread:by[d.employee_number]?.unread||0})).filter((x:any)=>x.latest||x.unread)})
+  return reply(req,{ok:true,threads:(drivers||[]).map((d:any)=>({driver_employee_number:d.employee_number,driver_name:d.display_name,latest:by[d.employee_number]?.latest||null,unread:by[d.employee_number]?.unread||0})).filter((x:any)=>driverIds.has(x.driver_employee_number)||x.latest||x.unread)})
  }
  if(action==='dispatch_unread'){if(!isDesk)return reply(req,{error:'Dispatch chat access only.'},403);
   const {data,error}=await db.from('delivery_chat_messages').select(fields).eq('sender_role','DRIVER').is('read_by_dispatch_at',null).order('created_at',{ascending:false}).limit(50)

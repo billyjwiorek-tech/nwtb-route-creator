@@ -62,10 +62,10 @@ button{font:inherit}.app{min-height:100vh;display:grid;grid-template-columns:230
     </div>
    </div>
   </section>
-  <section id="dispatch" class="view"><div class="pageIntro"><div><h2>Dispatch</h2><p>Create stops, optimize routes and assign drivers.</p></div><span class="chip">AUTO MULTI-DRIVER • PER-DRIVER DEPOT</span></div><div class="frameWrap"><iframe id="fDispatch" src="dispatch-native.html?v=20261026-nearby2" title="Dispatch"></iframe></div></section>
-  <section id="driver" class="view"><div class="pageIntro"><div><h2>Driver View</h2><p>Review saved driver routes on the NWTB map.</p></div><span class="chip">OFFICE ROUTE PREVIEW</span></div><div class="frameWrap"><iframe id="fDriver" src="office-driver-preview.html?v=20261022-trafficeta1" title="Office Route View"></iframe></div></section>
-  <section id="chat" class="view"><div class="pageIntro"><div><h2>Delivery / Pickup Chat</h2><p>Operations-only messaging.</p></div><span class="chip">SEPARATE FROM SALES</span></div><div class="frameWrap"><iframe id="fChat" src="dispatch-native.html?v=20261026-nearby2#chat" title="Delivery Pickup Chat"></iframe></div></section>
-  <section id="admin" class="view"><div class="pageIntro"><div><h2>Administration</h2><p>Manage Delivery customer and vendor master data.</p></div><span class="chip">MASTER DATA</span></div><div class="frameWrap"><iframe id="fAdmin" src="dispatch.html?v=20261021-android1#data" title="Master Data"></iframe></div></section>
+  <section id="dispatch" class="view"><div class="pageIntro"><div><h2>Dispatch</h2><p>Create stops, optimize routes and assign drivers.</p></div><span class="chip">AUTO MULTI-DRIVER • PER-DRIVER DEPOT</span></div><div class="frameWrap"><iframe id="fDispatch" src="dispatch-native.html?v=20261026-driverdesk1" title="Dispatch"></iframe></div></section>
+  <section id="driver" class="view"><div class="pageIntro"><div><h2>Driver View</h2><p>See the driver’s navigation, stops and POD. Chat or use a PIN-protected Office override.</p></div><span class="chip">LIVE DRIVER VIEW</span></div><div class="frameWrap"><iframe id="fDriver" src="office-driver-preview.html?v=20261026-driverdesk1" title="Office Route View"></iframe></div></section>
+  <section id="chat" class="view"><div class="pageIntro"><div><h2>Delivery / Pickup Chat</h2><p>Operations-only messaging.</p></div><span class="chip">SEPARATE FROM SALES</span></div><div class="frameWrap"><iframe id="fChat" src="dispatch-native.html?v=20261026-driverdesk1#chat" title="Delivery Pickup Chat"></iframe></div></section>
+  <section id="admin" class="view"><div class="pageIntro"><div><h2>Administration</h2><p>Manage Delivery customer and vendor master data.</p></div><span class="chip">MASTER DATA</span></div><div class="frameWrap"><iframe id="fAdmin" src="dispatch.html?v=20261026-driverdesk1#data" title="Master Data"></iframe></div></section>
  </div>
 </main>
 </div>
@@ -95,6 +95,7 @@ function syncKpis(){const d=getDispatchDoc();if(!d)return;const map={kUn:'stUn',
 setInterval(syncKpis,5000);
 const initial=location.hash.replace('#','');if(titles[initial])openView(initial);else openView('dashboard');
 </script>
+<script src="office-driver-links.js?v=20261026-driverdesk1"></script>
 <script src="office-driver-qr.js?v=20261021-driverqr1"></script>
 <script src="office-pause-alerts.js?v=20261021-android1"></script>
 <script src="nwtb-system-lock-live.js?v=20260929-1200" data-control="1"></script>
