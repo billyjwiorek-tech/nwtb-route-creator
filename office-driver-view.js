@@ -5,7 +5,7 @@ const BASE='https://ufnjyidhxuytrmbjzgtu.supabase.co/functions/v1/',PUB='sb_publ
 const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 const stamp=s=>s?new Date(s).toLocaleString('en-US',{timeZone:'America/Chicago'}):'Not reported';
 const session=()=>localStorage.getItem('nwtb_delivery_token')||'';
-let roster={drivers:[],routes:[]},detail=null,busy=false,selection=0,editing=null,temporaryPin='',pinTimer=null,requestId='',lastSession='',mapOverlay=null,refreshQueued=false,lastChatDriver='';
+let roster={drivers:[],routes:[]},detail=null,busy=false,selection=0,editing=null,temporaryPin='',pinTimer=null,requestId='',lastSession='',mapOverlay=null,refreshQueued=false,lastChatDriver='',lastRosterAt=0,followDriver=true,podSequence=0;
 async function post(body,endpoint='nwtb-office-driver-view'){
  const token=session();if(!token)throw Error('Office is still connecting. Open this screen from NWTB Office.');
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),20000);
@@ -15,14 +15,16 @@ function visible(){if(document.visibilityState==='hidden')return false;try{retur
 function viewStatus(text,error=false){$('viewStatus').textContent=text;$('viewStatus').className='small'+(error?' error':'');}
 function routePhase(r){return !r?'NO ROUTE':r.status==='ACTIVE'&&r.returning_started_at&&!r.returned_at?'RETURNING TO '+(r.end_name||'NWTB '+r.depot):r.status==='PLANNED'?(r.released_to_driver?'RELEASED TO DRIVER':'OFFICE ONLY — NOT RELEASED'):r.status;}
 function fillRoutes(preferred){
- const driver=$('driverSelect').value,rows=roster.routes.filter(r=>r.driver_employee_number===driver).sort((a,b)=>Number(b.status==='ACTIVE')-Number(a.status==='ACTIVE')||String(a.route_date).localeCompare(String(b.route_date)));
+ const rank=r=>r.status==='ACTIVE'?0:r.status==='PLANNED'?1:2;
+ const driver=$('driverSelect').value,rows=roster.routes.filter(r=>r.driver_employee_number===driver).sort((a,b)=>rank(a)-rank(b)||(a.status==='COMPLETED'?String(b.updated_at).localeCompare(String(a.updated_at)):String(a.route_date).localeCompare(String(b.route_date))));
  const keep=preferred===undefined?$('routeSelect').value:preferred;
  $('routeSelect').innerHTML='<option value="">DRIVER — NO ROUTE SELECTED</option>'+rows.map(r=>'<option value="'+esc(r.id)+'">'+esc(routePhase(r)+' • '+r.route_date+' • '+r.depot)+'</option>').join('');
- if(keep&&rows.some(r=>r.id===keep))$('routeSelect').value=keep;else if(rows.length)$('routeSelect').value=rows[0].id;
+ const active=followDriver&&preferred===undefined?rows.find(r=>r.status==='ACTIVE'):null;
+ if(active)$('routeSelect').value=active.id;else if(keep&&rows.some(r=>r.id===keep))$('routeSelect').value=keep;else if(rows.length)$('routeSelect').value=rows[0].id;
 }
 async function refreshRoster(preferredDriver,preferredRoute){
  const result=await post({action:'roster'}),driver=preferredDriver||$('driverSelect').value;
- roster=result;const active=new Set(roster.routes.filter(r=>r.status==='ACTIVE').map(r=>r.driver_employee_number));
+ roster=result;lastRosterAt=Date.now();const active=new Set(roster.routes.filter(r=>r.status==='ACTIVE').map(r=>r.driver_employee_number));
  roster.drivers.sort((a,b)=>Number(active.has(b.employee_number))-Number(active.has(a.employee_number))||a.display_name.localeCompare(b.display_name));
  $('driverSelect').innerHTML=roster.drivers.map(d=>'<option value="'+esc(d.employee_number)+'">'+esc(d.display_name+' ('+d.employee_number+')'+(active.has(d.employee_number)?' • ACTIVE ROUTE':''))+'</option>').join('');
  if(roster.drivers.some(d=>d.employee_number===driver))$('driverSelect').value=driver;
@@ -61,7 +63,7 @@ async function refresh(full=false){
  if(busy){refreshQueued=true;return;}busy=true;const request=selection;
  try{
   if(session()!==lastSession){closeOverride();lastSession=session();full=true;}
-  if(full||!roster.drivers.length)await refreshRoster();
+  if(full||!roster.drivers.length||Date.now()-lastRosterAt>30000)await refreshRoster();
   if(request!==selection)return;
   const no=$('driverSelect').value;if(!no){viewStatus('No active drivers are registered.');return;}
   const route=$('routeSelect').value,j=await post({action:'view',driver_employee_number:no,...(route?{route_id:route}:{})});
@@ -69,10 +71,11 @@ async function refresh(full=false){
  }catch(e){if(request===selection){viewStatus(e.message,true);if(detail){detail.phone={...detail.phone,live:false,reason:'SCREEN_UPDATE_STALE'};displayPhone(detail);void mapOverlay?.update(detail);}}}finally{busy=false;if(refreshQueued){refreshQueued=false;void refresh();}}
 }
 async function viewPod(id){
+ const request=++podSequence;
  $('podDialog').hidden=false;$('podDetail').textContent='Loading saved POD…';
- try{const {pod:p}=await post({action:'get',pod_id:id},'nwtb-pod');if($('podDialog').hidden)return;
+ try{const {pod:p}=await post({action:'get',pod_id:id},'nwtb-pod');if($('podDialog').hidden||request!==podSequence)return;
   $('podDetail').innerHTML='<p><b>POD #'+esc(p.pod_number)+' — '+esc(p.order?.customer_name||'Delivery')+'</b></p><p>Received by '+esc(p.recipient_name)+'<br>'+esc(stamp(p.captured_at))+' Central</p><p>'+esc(p.notes||'')+'</p><div class="podImages">'+(p.photo_url?'<div><b>DELIVERY PHOTO</b><img alt="Saved delivery photo" src="'+esc(p.photo_url)+'"></div>':'')+(p.signature_url?'<div><b>SIGNATURE</b><img alt="Saved recipient signature" src="'+esc(p.signature_url)+'"></div>':'')+'</div>';
- }catch(e){$('podDetail').textContent=e.message;}
+ }catch(e){if(request===podSequence)$('podDetail').textContent=e.message;}
 }
 function clearPin(){temporaryPin='';if(pinTimer!==null)clearTimeout(pinTimer);pinTimer=null;$('overridePin').value='';}
 function closeOverride(){clearPin();editing=null;requestId='';$('overrideDialog').hidden=true;$('overrideControls').hidden=true;$('pinStep').hidden=false;$('overrideStatus').textContent='';}
@@ -97,8 +100,8 @@ async function findAvailable(){
  }catch(e){$('overrideStatus').textContent=e.message;}
 }
 $('pinForm').onsubmit=async e=>{
- e.preventDefault();const candidate=$('overridePin').value;$('overridePin').value='';$('overrideStatus').textContent='Verifying PIN…';
- try{await post({action:'verify_override_pin',pin:candidate});if($('overrideDialog').hidden)return;temporaryPin=candidate;pinTimer=setTimeout(()=>{clearPin();$('overrideControls').hidden=true;$('pinStep').hidden=false;$('overrideStatus').textContent='PIN authorization expired. Enter your PIN again.';},300000);
+ e.preventDefault();const candidate=$('overridePin').value,expectedSession=session(),expectedEdit=editing;$('overridePin').value='';$('overrideStatus').textContent='Verifying PIN…';
+ try{await post({action:'verify_override_pin',pin:candidate});if($('overrideDialog').hidden||editing!==expectedEdit||session()!==expectedSession)return;temporaryPin=candidate;pinTimer=setTimeout(()=>{clearPin();$('overrideControls').hidden=true;$('pinStep').hidden=false;$('overrideStatus').textContent='PIN authorization expired. Enter your PIN again.';},300000);
   $('pinStep').hidden=true;$('overrideControls').hidden=false;$('overrideStatus').textContent='PIN verified. Review the selected driver, stop and reason before applying.';
  }catch(e){clearPin();$('overrideStatus').textContent=e.message;}
 };
@@ -113,20 +116,20 @@ $('overrideForm').onsubmit=async e=>{
   ...(op==='add_stop'?{order_id:$('availableStop').value,after_stop_id:$('insertAfter').value||null}:{stop_id:s.id,expected_stop_updated_at:s.updated_at}),
   ...(op==='priority'?{priority:$('overridePriority').value,make_next:$('overrideNext').checked}:{})};
  $('applyOverride').disabled=true;$('overrideStatus').textContent='Applying audited override…';
- try{await post({action:'override',pin:temporaryPin,override});closeOverride();await refresh(true);viewStatus('Office override saved. The driver will receive the route update.');}
+ try{await post({action:'override',pin:temporaryPin,override});closeOverride();await refresh(true);viewStatus('Office override saved. Review the updated route below.');}
  catch(e){$('overrideStatus').textContent=e.message;if(e.code==='ADMIN_PIN_REQUIRED'||e.code==='PIN_LOCKED'){clearPin();$('overrideControls').hidden=true;$('pinStep').hidden=false;}}
  finally{$('applyOverride').disabled=false;}
 };
-$('driverSelect').onchange=()=>{selection++;closeOverride();$('closeDriverChat').click();fillRoutes(null);void refresh();};$('routeSelect').onchange=()=>{selection++;closeOverride();void refresh();};
+$('driverSelect').onchange=()=>{selection++;followDriver=true;closeOverride();$('closeDriverChat').click();fillRoutes(null);void refresh();};$('routeSelect').onchange=()=>{selection++;followDriver=false;closeOverride();void refresh();};
 $('refreshView').onclick=()=>refresh(true);$('officeOverride').onclick=()=>openOverride();$('overrideOperation').onchange=()=>{operationFields();if($('overrideOperation').value==='add_stop')void findAvailable();};$('overrideStop').onchange=operationFields;$('findAvailable').onclick=findAvailable;
 $('availableSearch').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();void findAvailable();}});
-document.querySelectorAll('[data-close-override]').forEach(b=>b.onclick=closeOverride);$('closePod').onclick=()=>{$('podDialog').hidden=true;$('podDetail').innerHTML='';};
+document.querySelectorAll('[data-close-override]').forEach(b=>b.onclick=closeOverride);$('closePod').onclick=()=>{podSequence++;$('podDialog').hidden=true;$('podDetail').innerHTML='';};
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeOverride();$('closePod').click();$('closeDriverChat').click();}});
 window.nwtbOpenSelectedDriverChat=async(no=detail?.driver.employee_number)=>{if(!no)return;$('driverChatDialog').hidden=false;$('chatTab').classList.remove('hidden');$('driverChatTitle').textContent='CHAT WITH DRIVER — '+(roster.drivers.find(d=>d.employee_number===no)?.display_name||no)+' ('+no+')';if(lastChatDriver!==no&&$('chatInput'))$('chatInput').value='';lastChatDriver=no;await window.nwtbOpenDriverChat?.(no);};
 $('chatDriver').onclick=()=>window.nwtbOpenSelectedDriverChat();
 $('closeDriverChat').onclick=()=>{$('driverChatDialog').hidden=true;$('chatTab').classList.add('hidden');};
 $('savedRoute').onclick=async()=>{try{const desk=window.parent.document.getElementById('fDispatch')?.contentWindow;window.parent.openView('dispatch');await desk.viewOfficeRoute(detail.route.id);}catch{viewStatus('Full Route Screen is still connecting. Try again shortly.',true);}};
-window.nwtbSelectOfficeDriver=async(no,routeId)=>{selection++;closeOverride();$('closeDriverChat').click();while(busy)await new Promise(resolve=>setTimeout(resolve,50));await refreshRoster(no,routeId);await refresh();};
+window.nwtbSelectOfficeDriver=async(no,routeId)=>{selection++;followDriver=!routeId;closeOverride();$('closeDriverChat').click();while(busy)await new Promise(resolve=>setTimeout(resolve,50));await refreshRoster(no,routeId);await refresh();};
 if(window.L){const map=L.map('driverMap',{scrollWheelZoom:false}).setView([41.682487,-88.072262],10);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(map);
  mapOverlay=window.NWTBOfficeDriverMap.create({map,L,onStatus:(msg,warn)=>{$('mapStatus').textContent=msg;$('mapStatus').className='small'+(warn?' error':'');}});$('fitMap').onclick=()=>{map.invalidateSize();mapOverlay.fit();};
  void import('./office-map-live.mjs?v=20261021-mapsearch1').then(({installOfficeTraffic})=>installOfficeTraffic({map,L,config:{environment:'PRODUCTION',projectRef:'ufnjyidhxuytrmbjzgtu',backendUrl:'https://ufnjyidhxuytrmbjzgtu.supabase.co',siteOrigin:location.origin,publishableKey:PUB,officeTokenKey:'nwtb_delivery_token'},getRows:()=>[],getMarkers:()=>new Map(),getOfficeToken:session,isVisible:visible})).catch(()=>{});

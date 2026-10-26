@@ -1,0 +1,17 @@
+'use strict';
+const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path'),assert=require('node:assert/strict'),crypto=require('node:crypto'),{parseHTML}=require('linkedom');
+const source=fs.readFileSync(path.join(__dirname,'../driver-screen-sync.js'),'utf8'),settle=async()=>{for(let i=0;i<70;i++)await Promise.resolve();};
+(async()=>{
+ const {document}=parseHTML('<html><body></body></html>');Object.defineProperty(document,'visibilityState',{value:'visible',writable:true});
+ const timers=[],requests=[],storageReads=[],store=new Map([['nwtb_driver_token','fixture-driver-token'],['nwtb_delivery_token','fixture-office-token']]);
+ const route='10000000-0000-4000-8000-000000000001',geometry=[[-88,41.7],[-88,41.8]],window={__nwtbDriverScreenView:'ROUTE',__nwtbDriverScreenRoute:{updated_at:'2026-10-26T13:00:00Z',stops:[]},addEventListener:document.addEventListener.bind(document),nwtbNavigationScreenState:()=>({route_id:route,navigation_active:true,eta:'6 min',distance:'2.8 mi',geometry_key:route+':1',geometry,target:{lat:41.8,lon:-88}}),nwtbPodScreenState:()=>({pod_phase:'OPEN',pod_stop_id:'20000000-0000-4000-8000-000000000001'}),nwtbVoiceScreenState:()=>({state:'READY',needs_tap:false})};
+ const navigator={onLine:true,geolocation:{getCurrentPosition(){throw Error('Passive reporter requested GPS');},watchPosition(){throw Error('Passive reporter started GPS');}}};
+ const ctx=vm.createContext({window,document,navigator,crypto,AbortController,Map,Date,route,location:{pathname:'/nwtb-route-creator/driver-live.html'},localStorage:{getItem:key=>{storageReads.push(key);if(key==='nwtb_delivery_token')throw Error('Reporter read Office token');return store.get(key)||'';}},setInterval:(fn,ms)=>{timers.push({fn,ms});return timers.length;},setTimeout:(fn,ms)=>{timers.push({fn,ms});return timers.length;},clearTimeout(){},fetch:async(url,init)=>{requests.push({url,body:JSON.parse(init.body),headers:init.headers});return {ok:true,json:async()=>({ok:true,stored:true})};}});
+ vm.runInContext(source,ctx);const report=timers.find(x=>x.ms===2000).fn;await report();await settle();
+ assert.equal(requests.length,1);assert.equal(requests[0].body.snapshot.eta,'6 min');assert.equal(requests[0].body.snapshot.pod_phase,'OPEN');assert.equal(requests[0].headers['x-nwtb-session'],'fixture-driver-token');assert.equal(requests[0].body.geometry.length,2);assert.ok(requests[0].body.snapshot.geometry_key.startsWith(requests[0].body.page_id));
+ await report();assert.equal(requests[1].body.geometry,undefined,'Unchanged geometry is reused, not sent on every heartbeat');assert.equal(requests[1].body.sequence,2);
+ document.visibilityState='hidden';await report();assert.equal(requests[2].body.snapshot.visible,false,'Background state is reported without claiming a live foreground screen');
+ store.delete('nwtb_driver_token');const count=requests.length;await report();assert.equal(requests.length,count,'Logout stops reporting');assert.equal(store.get('nwtb_delivery_token'),'fixture-office-token');assert.ok(storageReads.every(k=>k==='nwtb_driver_token'));
+ assert.ok(requests.every(r=>r.body.action==='driver_snapshot'),'Reporter never starts or completes a route, submits POD or sends chat');assert.equal(geometry.length,2);
+ console.log('PASS: passive phone screen sync, exact displayed values, POD phase, geometry reuse, stale/background signaling and session separation. No production traffic.');
+})().catch(e=>{console.error(e);process.exitCode=1;});
