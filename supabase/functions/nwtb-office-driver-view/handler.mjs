@@ -28,6 +28,7 @@ export function cleanSnapshot(input,clock=Date.now){
  return {snapshot,route_id:route,geometry,geometry_key:key,captured_at:new Date(captured).toISOString()};
 }
 export function screenFreshness(screen,route,stops,clock=Date.now){
+ if(route?.status==='CANCELED')return {live:false,reason:'ROUTE_ENDED'};
  if(!screen)return {live:false,reason:'AWAITING_DRIVER_SYNC'};
  if(!screen.chat_sessions||Date.parse(screen.chat_sessions.expires_at)<=clock())return {live:false,reason:'DRIVER_SIGNED_OUT'};
  if(screen.route_id!==(route?.id||null))return {live:false,reason:'DRIVER_VIEWING_ANOTHER_SCREEN'};
@@ -73,7 +74,7 @@ export function createDriverViewHandler({db,clock=Date.now}){
     const roles=await checked(db.from('nwtb_delivery_roles').select('employee_number').eq('role','DRIVER').eq('active',true));
     const ids=roles.map(x=>x.employee_number);
     const drivers=ids.length?await checked(db.from('employees').select('employee_number,display_name').eq('active',true).in('employee_number',ids).order('display_name')):[];
-    const [routes,recent]=await Promise.all([checked(db.from('delivery_routes').select(ROUTE_FIELDS).in('status',['ACTIVE','PLANNED']).order('route_date')),checked(db.from('delivery_routes').select(ROUTE_FIELDS).eq('status','COMPLETED').order('updated_at',{ascending:false}).limit(100))]);
+    const [routes,recent]=await Promise.all([checked(db.from('delivery_routes').select(ROUTE_FIELDS).in('status',['ACTIVE','PLANNED']).order('route_date')),checked(db.from('delivery_routes').select(ROUTE_FIELDS).in('status',['COMPLETED','CANCELED']).order('updated_at',{ascending:false}).limit(100))]);
     return json({ok:true,drivers,routes:[...routes,...recent]});
    }
    if(action==='view'){
@@ -102,7 +103,8 @@ export function createDriverViewHandler({db,clock=Date.now}){
    }
    if(action==='verify_override_pin'||action==='override'){
     const operation=input.override;
-    if(action==='override'&&(!operation||!UUID.test(operation.route_id)||!UUID.test(operation.request_id)||!['complete_stop','priority','add_stop','remove_stop'].includes(operation.operation)||text(operation.reason,501).length<3))return json({error:'Choose an override action and enter a reason.'},400);
+    if(action==='override'&&(!operation||!UUID.test(operation.route_id)||!UUID.test(operation.request_id)||!['complete_stop','priority','add_stop','remove_stop','end_route'].includes(operation.operation)||text(operation.reason,501).length<3))return json({error:'Choose an override action and enter a reason.'},400);
+    if(action==='override'&&operation.operation==='end_route'&&(!Array.isArray(operation.expected_stops)||operation.expected_stops.length>500||operation.expected_stops.some(s=>!s||!UUID.test(s.id)||!['PENDING','DELIVERED','NOT_DELIVERED','SKIPPED'].includes(s.status)||s.updated_at!=null&&!Number.isFinite(Date.parse(s.updated_at)))))return json({error:'Refresh and review the route stops before ending this route.'},400);
     const name=action==='override'?'nwtb_office_override':'nwtb_check_office_override_pin';
     const args={p_employee_number:session.employee_number,p_pin:text(input.pin,21),...(action==='override'?{p_input:operation}:{})};
     const {data,error}=await db.rpc(name,args);

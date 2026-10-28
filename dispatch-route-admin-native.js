@@ -27,6 +27,11 @@ window.holdOfficeRoute=async function(routeId){
 };
 window.viewRouteForStop=orderId=>openOfficeRoute({action:'route_for_order',order_id:orderId});
 window.viewOfficeRoute=routeId=>openOfficeRoute({action:'route_details',route_id:routeId});
+window.endOfficeRoute=async function(driver,routeId){
+ window.closeRouteModal();
+ if(typeof window.parent?.nwtbEndOfficeRoute==='function')await window.parent.nwtbEndOfficeRoute(driver,routeId);
+ else window.open('office-driver-preview.html?driver='+encodeURIComponent(driver)+'&route='+encodeURIComponent(routeId)+'&end=1','_blank','noopener');
+};
 async function openOfficeRoute(request){
  const requestId=++officePreviewRequest;
  window.NWTBOfficeRouteMap?.destroy();
@@ -52,6 +57,7 @@ async function openOfficeRoute(request){
   document.getElementById('routeModalBody').dataset.officeRouteMode='preview';
   document.getElementById('routeModalBody').innerHTML=
    '<div class="banner show ok" style="margin-top:12px"><b>READ-ONLY OFFICE PREVIEW</b> — opening this screen does not start the route, create a driver session, change route status, or affect the driver’s 4-digit login.</div>'+releaseState+
+   (['PLANNED','ACTIVE'].includes(r.status)?'<div class="toolbar" style="margin-top:12px"><button type="button" class="btn dangerMini" onclick="window.endOfficeRoute(\''+esc(r.driver_employee_number)+'\',\''+esc(r.id)+'\')">END ROUTE 🔒</button><span class="small">PIN and confirmation required. Completed deliveries and saved POD are kept.</span></div>':'')+
    '<h3 class="small" style="margin:14px 0 8px">SAVED ROUTE TOTALS</h3><div class="routeSummary">'+
     '<div class="routeMetric"><span>Driver</span><b>'+esc(r.driver_name)+'</b></div>'+
     '<div class="routeMetric"><span>Stops</span><b>'+stops.length+'</b></div>'+

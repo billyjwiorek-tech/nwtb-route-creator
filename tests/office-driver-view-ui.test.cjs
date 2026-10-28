@@ -14,7 +14,10 @@ function fixture({ready=true,phase='ACTIVE',live=true}={}){
   if(body.action==='roster')result={drivers:[data.driver],routes:[data.route]};
   if(body.action==='view')result=JSON.parse(JSON.stringify(data));
   if(body.action==='verify_override_pin')result={ok:body.pin==='fixture-pin'};
-  if(body.action==='override')result={ok:true};
+  if(body.action==='override'){
+   result={ok:true};
+   if(body.override?.operation==='end_route'){const pending=data.stops.filter(s=>s.status==='PENDING');data.route.status='CANCELED';for(const s of pending)s.status='SKIPPED';data.phone={live:false,reason:'ROUTE_ENDED'};result.returned_to_queue=pending.length;}
+  }
   if(body.action==='dispatch_threads')result={threads:[{driver_employee_number:'1234',driver_name:'Fixture Driver',unread:0,latest:null}]};
   if(body.action==='dispatch_list')result={messages:[],driver:{display_name:'Fixture Driver'}};
   if(body.action==='available_stops')result={orders:[]};
@@ -24,7 +27,7 @@ function fixture({ready=true,phase='ACTIVE',live=true}={}){
  const window={parent:{openView:name=>views.push(name),document:{getElementById:()=>({contentWindow:{viewOfficeRoute:id=>previews.push(id)}})}},addEventListener:document.addEventListener.bind(document),dispatchEvent:document.dispatchEvent.bind(document)};
  const localStorage={getItem:key=>{storageReads.push(key);if(key!=='nwtb_delivery_token')throw Error('Office read Driver storage');return ready?'fixture-office-token':'';}};
  const schedule=(fn,ms)=>{const id=++timer;timers.set(id,{fn,ms});return id;};
- const ctx=vm.createContext({window,document,console,crypto,localStorage,fetch,AbortController,Promise,Map,Set,Date,location:{origin:'https://billyjwiorek-tech.github.io',hash:''},setTimeout:schedule,setInterval:schedule,clearTimeout:id=>timers.delete(id),navigator:{geolocation:{getCurrentPosition(){throw Error('Office requested GPS');},watchPosition(){throw Error('Office started GPS');}}},confirm:()=>true});
+ const ctx=vm.createContext({window,document,console,crypto,localStorage,fetch,AbortController,Promise,Map,Set,Date,URLSearchParams,location:{origin:'https://billyjwiorek-tech.github.io',hash:''},setTimeout:schedule,setInterval:schedule,clearTimeout:id=>timers.delete(id),navigator:{geolocation:{getCurrentPosition(){throw Error('Office requested GPS');},watchPosition(){throw Error('Office started GPS');}}},confirm:()=>true});
  window.NWTBOfficeRouteMap={valid:()=>true};vm.runInContext(read('dispatch-chat-live.js'),ctx);vm.runInContext(read('office-driver-view.js'),ctx);
  return {window,document,data,requests,storageReads,views,previews,timers,ctx,async boot(){for(const [id,t]of [...timers])if(t.ms===0){timers.delete(id);t.fn();}await settle();},async click(id){await document.getElementById(id).onclick();await settle();}};
 }

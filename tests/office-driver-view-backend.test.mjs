@@ -51,3 +51,10 @@ test('override endpoint forwards PIN validation to the atomic RPC for every muta
  const f=fixture({rpcResult:{ok:false,status:403,code:'ADMIN_PIN_REQUIRED',error:'Incorrect management PIN.'}});const r=await f.request(input);assert.equal(r.status,403);assert.equal(f.calls[0].name,'nwtb_office_override');assert.equal(f.calls[0].args.p_pin,'fixture-pin');assert.equal(f.calls[0].args.p_employee_number,'9998');
  const invalid=fixture();assert.equal((await invalid.request({...input,override:{...input.override,operation:'delete_driver'}})).status,400);assert.equal(invalid.calls.length,0);
 });
+test('entire-route ending uses the mandatory PIN RPC without requiring a stop and validates the reviewed stop set',async()=>{
+ const input={action:'override',pin:'fixture-pin',override:{operation:'end_route',route_id:rid,request_id:page,reason:'Fixture route ended',expected_stops:[]}};
+ const f=fixture({rpcResult:{ok:true,route_status:'CANCELED',returned_to_queue:0}}),r=await f.request(input);assert.equal(r.status,200);assert.equal(f.calls[0].name,'nwtb_office_override');assert.equal(f.calls[0].args.p_pin,'fixture-pin');assert.equal(f.calls[0].args.p_input.operation,'end_route');
+ for(const expected_stops of [undefined,null,'bad',[{id:'bad',status:'PENDING'}],[{id:sid,status:'UNKNOWN'}]]){const f=fixture();assert.equal((await f.request({...input,override:{...input.override,expected_stops}})).status,400);assert.equal(f.calls.length,0);}
+ const denied=fixture({office:false});assert.equal((await denied.request(input)).status,403);assert.equal(denied.calls.length,0);
+ assert.equal(screenFreshness(null,{...route,status:'CANCELED'},[],()=>now).reason,'ROUTE_ENDED');
+});

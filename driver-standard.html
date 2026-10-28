@@ -128,12 +128,27 @@ async function enableAlerts(test=false){try{const AC=window.AudioContext||window
 function playAlertTone(urgent=true){if(!alertsReady)return;try{if(!audioCtx){const AC=window.AudioContext||window.webkitAudioContext;if(AC)audioCtx=new AC()}if(!audioCtx)return;const t=audioCtx.currentTime;[[0,880,.18],[.24,urgent?1100:660,.22]].forEach(([off,f,d])=>{const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.frequency.value=f;o.type='square';g.gain.setValueAtTime(.0001,t+off);g.gain.exponentialRampToValueAtTime(.22,t+off+.01);g.gain.exponentialRampToValueAtTime(.0001,t+off+d);o.connect(g);g.connect(audioCtx.destination);o.start(t+off);o.stop(t+off+d+.02)})}catch{}}
 window.nwtbDriverMessageSound=function(){if(!alertsReady||!audioCtx||audioCtx.state!=='running')return false;playAlertTone(true);return true};
 function showRouteAlert(ev){if(ev.event_type.startsWith('OFFICE_')){const bar=$('routeAlert');bar.className='alertbar show add';bar.textContent='ROUTE UPDATED BY OFFICE — '+(ev.note||'Review your updated route.');playAlertTone(true);window.NWTBNotifications?.show('NWTB — OFFICE ROUTE UPDATE',{body:ev.note||'Your route was updated.',tag:'nwtb-route-'+route,renotify:true});setTimeout(()=>{bar.className='alertbar'},9000);return}const added=ev.event_type==='STOP_ADDED_ACTIVE',bar=$('routeAlert');bar.className='alertbar show '+(added?'add':'remove');bar.innerHTML=(added?'STOP ADDED TO YOUR ROUTE':'STOP REMOVED FROM YOUR ROUTE')+'<div class="sub">'+esc(ev.note||'Your route was updated by Dispatch.')+'</div>';playAlertTone(true);if(navigator.vibrate)navigator.vibrate(added?[250,120,250,120,450]:[500,180,500]);window.NWTBNotifications?.show(added?'NWTB — STOP ADDED':'NWTB — STOP REMOVED',{body:ev.note||'Dispatch changed your route.',tag:'nwtb-route-'+route,renotify:true});setTimeout(()=>{bar.className='alertbar'},9000)}
+async function handleOfficeEndedRoute(id,note){
+ if(!id||route!==id)return;
+ stopChangePolling();window.nwtbStopNavigation?.();
+ window.__nwtbDriverTrackingRoute=null;currentRouteState=null;currentPaused=false;route='';
+ window.__nwtbDriverScreenRoute=null;window.__nwtbDriverScreenView='ROUTE_LIST';
+ window.nwtbDriverViewChanged?.('');closePauseModal();
+ document.getElementById('podCancel')?.click();document.getElementById('exCancel')?.click();
+ window.nwtbStopBuiltInTracking?.();
+ const message=note||'Dispatch ended this route. Contact Dispatch for your next assignment.';
+ $('routes').innerHTML='<div class="panel warn"><b>ROUTE ENDED BY DISPATCH</b><p>'+esc(message)+'</p></div>';
+ const bar=$('routeAlert');bar.className='alertbar show remove';bar.textContent='ROUTE ENDED BY DISPATCH — '+message;
+ playAlertTone(true);window.NWTBNotifications?.show('NWTB — ROUTE ENDED',{body:message,tag:'nwtb-route-ended-'+id,renotify:true});
+ await loadRoutes();
+}
 async function loadRoutes(){
+ const viewRequest=window.__nwtbDriverViewSequence=(window.__nwtbDriverViewSequence||0)+1;
  window.__nwtbDriverScreenView='ROUTE_LIST';window.__nwtbDriverScreenRoute=null;
  stopChangePolling();
  if(!driver){showLogin('Enter your employee number.');return}
  try{
-  const j=await post(ROUTE_API,{action:'driver_routes'});
+  const j=await post(ROUTE_API,{action:'driver_routes'});if(viewRequest!==window.__nwtbDriverViewSequence)return;
   const today=(()=>{const p={};for(const x of new Intl.DateTimeFormat('en-US',{timeZone:'America/Chicago',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()))p[x.type]=x.value;return p.year+'-'+p.month+'-'+p.day})();
   const routes=(j.routes||[]).slice().sort((a,b)=>{
    const as=String(a.status||'')==='ACTIVE'?0:1,bs=String(b.status||'')==='ACTIVE'?0:1;if(as!==bs)return as-bs;
@@ -153,9 +168,11 @@ async function loadRoutes(){
  }catch(e){$('routes').innerHTML='<div class="panel warn">'+esc(e.message)+'</div>'}
 }
 async function openRoute(id,fromChange=false){
- route=id;
+ const viewRequest=window.__nwtbDriverViewSequence=(window.__nwtbDriverViewSequence||0)+1;route=id;
  try{
   const [j,stateResp]=await Promise.all([post(API,{action:'route_get',route_id:id}),post(ROUTE_API,{action:'driver_route_state',route_id:id}).catch(()=>({route:null}))]);
+  if(viewRequest!==window.__nwtbDriverViewSequence||route!==id)return;
+  if((stateResp.route?.status||j.route?.status)==='CANCELED'){await handleOfficeEndedRoute(id);return;}
   const stops=j.stops||[],r=j.route||{},state=stateResp.route||r||{};window.__nwtbDriverScreenView='ROUTE';window.__nwtbDriverScreenRoute={id,updated_at:r.updated_at,stops:stops.map(s=>({id:s.id,status:s.status}))};currentRouteState=state;currentPaused=!!state.paused;
   const links=routeLinks(r,stops),pts=stops.map(s=>s.delivery_orders||{}),ep=routeEndpoints(r,pts.map(o=>({name:o.customer_name||'Stop',address:o.address||''})));
   const status=String(state.status||r.status||'PLANNED').toUpperCase();
@@ -184,7 +201,7 @@ async function startRoute(id){await enableAlerts(false);try{await post(ROUTE_API
 async function finish(id,status){if(currentPaused){alert('This route is paused. Resume the route before completing stops.');return}let note='';if(status==='NOT_DELIVERED')note=prompt('Reason / note:')||'';try{await post(ROUTE_API,{action:'stop_status_driver',stop_id:id,status,note});openRoute(route)}catch(e){alert(e.message)}}
 function startChangePolling(id){stopChangePolling();changeTimer=setInterval(()=>checkRouteChanges(id),5000);checkRouteChanges(id)}
 function stopChangePolling(){if(changeTimer){clearInterval(changeTimer);changeTimer=null}}
-async function checkRouteChanges(id){if(!id||id!==route||!driver)return;const key='nwtb_route_event_'+id,last=Number(localStorage.getItem(key)||0);try{const j=await post(ROUTE_API,{action:'route_changes',route_id:id,after_id:last,include_office_overrides:true}),events=j.events||[];if(!events.length)return;for(const ev of events){showRouteAlert(ev);localStorage.setItem(key,String(ev.id))}await openRoute(id,true);if(events.some(ev=>ev.event_type.startsWith('OFFICE_')))await window.nwtbOfficeRouteChanged?.(id)}catch(e){console.warn('Route change check failed',e)}}
+async function checkRouteChanges(id){if(!id||id!==route||!driver)return;const key='nwtb_route_event_'+id,last=Number(localStorage.getItem(key)||0);try{const j=await post(ROUTE_API,{action:'route_changes',route_id:id,after_id:last,include_office_overrides:true}),events=j.events||[];if(id!==route)return;if(j.route_status==='CANCELED'||events.some(ev=>ev.event_type==='OFFICE_ROUTE_ENDED')){for(const ev of events)localStorage.setItem(key,String(ev.id));await handleOfficeEndedRoute(id,events.find(ev=>ev.event_type==='OFFICE_ROUTE_ENDED')?.note);return;}if(!events.length)return;for(const ev of events){showRouteAlert(ev);localStorage.setItem(key,String(ev.id))}await openRoute(id,true);if(events.some(ev=>ev.event_type.startsWith('OFFICE_')))await window.nwtbOfficeRouteChanged?.(id)}catch(e){console.warn('Route change check failed',e)}}
 function openPauseModal(){$('pauseReasonInput').value='';$('pauseMsg').textContent='';$('pauseOverlay').classList.add('show');setTimeout(()=>$('pauseReasonInput').focus(),50)}
 function closePauseModal(){$('pauseOverlay').classList.remove('show')}
 async function submitPause(){const reason=($('pauseReasonInput').value||'').trim();if(reason.length<3){$('pauseMsg').innerHTML='<span class="warn">A reason is required.</span>';return}try{$('pauseMsg').textContent='Notifying Dispatch…';await post(ROUTE_API,{action:'route_pause_driver',route_id:route,reason});closePauseModal();await openRoute(route,true);alert('Route paused. Dispatch was notified.')}catch(e){$('pauseMsg').innerHTML='<span class="warn">'+esc(e.message)+'</span>'}}

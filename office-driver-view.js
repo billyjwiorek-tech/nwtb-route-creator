@@ -32,9 +32,9 @@ async function refreshRoster(preferredDriver,preferredRoute){
 }
 function displayPhone(j){
  const p=j.phone||{},s=p.snapshot||{},live=p.live===true,active=live&&s.navigation_active;
- const labels={AWAITING_DRIVER_SYNC:'AWAITING DRIVER SCREEN SYNC',DRIVER_SIGNED_OUT:'DRIVER SESSION ENDED',DRIVER_VIEWING_ANOTHER_SCREEN:'DRIVER IS VIEWING A DIFFERENT SCREEN',SCREEN_UPDATE_STALE:'DRIVER SCREEN UPDATE STALE',PHONE_APP_IN_BACKGROUND:'DRIVER APP IS IN BACKGROUND',ROUTE_CHANGED:'ROUTE CHANGED — AWAITING DRIVER REFRESH'};
+ const labels={ROUTE_ENDED:'ROUTE ENDED BY OFFICE',AWAITING_DRIVER_SYNC:'AWAITING DRIVER SCREEN SYNC',DRIVER_SIGNED_OUT:'DRIVER SESSION ENDED',DRIVER_VIEWING_ANOTHER_SCREEN:'DRIVER IS VIEWING A DIFFERENT SCREEN',SCREEN_UPDATE_STALE:'DRIVER SCREEN UPDATE STALE',PHONE_APP_IN_BACKGROUND:'DRIVER APP IS IN BACKGROUND',ROUTE_CHANGED:'ROUTE CHANGED — AWAITING DRIVER REFRESH'};
  $('syncState').textContent=live?'LIVE DRIVER SCREEN':labels[p.reason]||'SCREEN SYNC UNAVAILABLE';$('syncState').className='state '+(live?'ok':'warn');
- $('syncDetail').textContent=p.captured_at?'Last phone screen report: '+stamp(p.captured_at)+' Central. '+(live?'Values below come from the phone.':'Live ETA is paused until a fresh matching report arrives.'):'Route and saved POD records are available. The driver must open the updated Driver app while parked to begin screen syncing.';
+ $('syncDetail').textContent=p.reason==='ROUTE_ENDED'?'Dispatch ended this route. Route history and saved proof of delivery remain available.':p.captured_at?'Last phone screen report: '+stamp(p.captured_at)+' Central. '+(live?'Values below come from the phone.':'Live ETA is paused until a fresh matching report arrives.'):'Route and saved POD records are available. The driver must open the updated Driver app while parked to begin screen syncing.';
  $('navMode').textContent=active?s.mode||'NWTB TURN-BY-TURN':live?'DRIVER APP — '+(s.edition||'GPS'):'DRIVER SCREEN SYNC';
  $('navTurn').textContent=active?s.turn||'Navigation is starting':live?(s.pod_phase!=='CLOSED'?'PROOF OF DELIVERY OPEN':s.view==='ROUTE_LIST'?'DRIVER IS VIEWING THEIR ROUTE LIST':'DRIVER IS VIEWING THE ROUTE'):'Live phone navigation is unavailable';
  $('driverEta').textContent=active?s.eta||'—':'—';$('driverDistance').textContent=active?s.distance||'—':'—';$('turnDistance').textContent=active?s.turn_distance||'—':'—';
@@ -47,7 +47,7 @@ function displayPhone(j){
 }
 function render(j){
  detail=j;const r=j.route,byPod=new Map(j.pods.map(p=>[p.stop_id,p])),phone=j.phone?.live?j.phone.snapshot:null;
- displayPhone(j);$('chatDriver').disabled=!j.driver;$('officeOverride').disabled=!r||!['ACTIVE','PLANNED'].includes(r.status);$('savedRoute').disabled=!r;
+ displayPhone(j);$('chatDriver').disabled=!j.driver;$('officeOverride').disabled=!r||!['ACTIVE','PLANNED'].includes(r.status);$('endRoute').disabled=!r||!['ACTIVE','PLANNED'].includes(r.status);$('savedRoute').disabled=!r;
  $('routeState').textContent=routePhase(r)+(r?' • '+r.route_date+' • '+r.depot:'')+(r?.status==='ACTIVE'&&r.returning_started_at&&!r.returned_at?' • Route remains active until the driver confirms arrival back.':'');
  $('stops').innerHTML=(j.stops||[]).map(s=>{const o=s.delivery_orders||{},pod=byPod.get(s.id),override=j.audit.find(a=>a.stop_id===s.id&&a.operation==='complete_stop'),arrived=phone?.arrived_stop_id===s.id&&s.status==='PENDING',podOpen=phone?.pod_stop_id===s.id&&phone.pod_phase!=='CLOSED';
   const localStatus=phone?.displayed_stops?.find(x=>x.id===s.id)?.status;const status=podOpen?'POD '+phone.pod_phase:arrived?'ARRIVED':localStatus&&localStatus!==s.status?localStatus+' ON PHONE — AWAITING SYNC':s.status;
@@ -79,18 +79,19 @@ async function viewPod(id){
 }
 function clearPin(){temporaryPin='';if(pinTimer!==null)clearTimeout(pinTimer);pinTimer=null;$('overridePin').value='';}
 function closeOverride(){clearPin();editing=null;requestId='';$('overrideDialog').hidden=true;$('overrideControls').hidden=true;$('pinStep').hidden=false;$('overrideStatus').textContent='';}
-function openOverride(stopId){
- if(!detail?.route)return;closeOverride();editing=JSON.parse(JSON.stringify(detail));requestId=crypto.randomUUID();
+function openOverride(stopId,operation){
+ if(!detail?.route||!['ACTIVE','PLANNED'].includes(detail.route.status))return;closeOverride();editing=JSON.parse(JSON.stringify(detail));requestId=crypto.randomUUID();
  $('overrideDialog').hidden=false;$('overrideTitle').textContent='OFFICE OVERRIDE — '+detail.driver.display_name;
  $('overrideStop').innerHTML=editing.stops.filter(s=>s.status==='PENDING').map(s=>'<option value="'+esc(s.id)+'">STOP '+esc(s.stop_sequence)+' — '+esc(s.delivery_orders?.customer_name||'Stop')+'</option>').join('');
  if(stopId)$('overrideStop').value=stopId;
- $('overrideOperation').value=editing.route.status==='ACTIVE'?'complete_stop':'priority';$('overrideReason').value='';$('overrideNext').checked=false;
+ $('overrideOperation').value=operation||(!editing.stops.length?'end_route':editing.route.status==='ACTIVE'?'complete_stop':'priority');$('overrideReason').value='';$('overrideNext').checked=false;
  $('insertAfter').innerHTML='<option value="">APPEND AT END</option>'+editing.stops.map(s=>'<option value="'+esc(s.id)+'">STOP '+esc(s.stop_sequence)+' — '+esc(s.delivery_orders?.customer_name||'Stop')+'</option>').join('');
  operationFields();$('overridePin').focus();
 }
 function operationFields(){
- const op=$('overrideOperation').value;$('targetLabel').hidden=op==='add_stop';$('priorityFields').hidden=op!=='priority';$('addFields').hidden=op!=='add_stop';
- $('overrideNotice').textContent=op==='complete_stop'?'Marks this stop delivered by Office override. It does not create a signature or photo. Any required return leg remains active.':op==='remove_stop'?'Removes the pending stop from this route and returns it to AVAILABLE. Customer and order records are retained.':op==='priority'?'Changes the priority. Select “Make this the next pending stop” only when you want to change the remaining stop order.':'Adds an existing available stop to this route. Office-only routes stay hidden until explicitly released.';
+ const op=$('overrideOperation').value;$('targetLabel').hidden=op==='add_stop'||op==='end_route';$('priorityFields').hidden=op!=='priority';$('addFields').hidden=op!=='add_stop';
+ $('overrideTitle').textContent=(op==='end_route'?'END ROUTE':'OFFICE OVERRIDE')+' — '+(editing?.driver.display_name||'');$('applyOverride').textContent=op==='end_route'?'END ROUTE':'REVIEW OVERRIDE';
+ $('overrideNotice').textContent=op==='end_route'?'End this '+editing.route.status+' route for '+editing.driver.display_name+' • '+editing.route.route_date+' • '+editing.route.depot+'. '+editing.stops.filter(s=>s.status==='PENDING').length+' unfinished stop(s) will return to AVAILABLE. Completed deliveries, POD and route history are kept. This records CANCELED / ENDED BY OFFICE, not a driver return. The driver stays logged in.':op==='complete_stop'?'Marks this stop delivered by Office override. It does not create a signature or photo. Any required return leg remains active.':op==='remove_stop'?'Removes the pending stop from this route and returns it to AVAILABLE. Customer and order records are retained.':op==='priority'?'Changes the priority. Select “Make this the next pending stop” only when you want to change the remaining stop order.':'Adds an existing available stop to this route. Office-only routes stay hidden until explicitly released.';
  const s=editing?.stops.find(s=>s.id===$('overrideStop').value);$('overridePriority').value=s?.delivery_orders?.priority||'NORMAL';
 }
 async function findAvailable(){
@@ -106,22 +107,22 @@ $('pinForm').onsubmit=async e=>{
  }catch(e){clearPin();$('overrideStatus').textContent=e.message;}
 };
 $('overrideForm').onsubmit=async e=>{
- e.preventDefault();if(!editing||!temporaryPin)return;
+ e.preventDefault();if(!editing||!temporaryPin||$('applyOverride').disabled)return;
  const op=$('overrideOperation').value,s=editing.stops.find(s=>s.id===$('overrideStop').value),reason=$('overrideReason').value.trim();
  if(reason.length<3){$('overrideStatus').textContent='Enter a reason of at least three characters.';return;}
- if(op!=='add_stop'&&!s||op==='add_stop'&&!$('availableStop').value){$('overrideStatus').textContent='Choose a stop.';return;}
- const chosen=op==='add_stop'?$('availableStop').selectedOptions[0]?.textContent:s.delivery_orders?.customer_name;
- if(!confirm('Apply '+op.replace(/_/g,' ').toUpperCase()+'?\n\nDriver: '+editing.driver.display_name+' ('+editing.driver.employee_number+')\nStop: '+chosen+'\nReason: '+reason+'\n\nThis will change the saved route and notify the updated Driver app.'))return;
+ if(!['add_stop','end_route'].includes(op)&&!s||op==='add_stop'&&!$('availableStop').value){$('overrideStatus').textContent='Choose a stop.';return;}
+ const chosen=op==='end_route'?'ENTIRE ROUTE':op==='add_stop'?$('availableStop').selectedOptions[0]?.textContent:s.delivery_orders?.customer_name;
+ if(!confirm((op==='end_route'?'END THIS ROUTE?':'Apply '+op.replace(/_/g,' ').toUpperCase()+'?')+'\n\nDriver: '+editing.driver.display_name+' ('+editing.driver.employee_number+')\nRoute: '+editing.route.route_date+' • '+editing.route.depot+' • '+editing.route.status+'\n'+(op==='end_route'?$('overrideNotice').textContent:'Stop: '+chosen)+'\nReason: '+reason+'\n\nThis will change the saved route and notify the updated Driver app.'))return;
  const override={operation:op,request_id:requestId,route_id:editing.route.id,expected_updated_at:editing.route.updated_at,reason,
-  ...(op==='add_stop'?{order_id:$('availableStop').value,after_stop_id:$('insertAfter').value||null}:{stop_id:s.id,expected_stop_updated_at:s.updated_at}),
+  ...(op==='end_route'?{expected_stops:editing.stops.map(s=>({id:s.id,status:s.status,updated_at:s.updated_at??null}))}:op==='add_stop'?{order_id:$('availableStop').value,after_stop_id:$('insertAfter').value||null}:{stop_id:s.id,expected_stop_updated_at:s.updated_at}),
   ...(op==='priority'?{priority:$('overridePriority').value,make_next:$('overrideNext').checked}:{})};
  $('applyOverride').disabled=true;$('overrideStatus').textContent='Applying audited override…';
- try{await post({action:'override',pin:temporaryPin,override});closeOverride();await refresh(true);viewStatus('Office override saved. Review the updated route below.');}
+ try{const result=await post({action:'override',pin:temporaryPin,override});closeOverride();await refresh(true);viewStatus(op==='end_route'?'ROUTE ENDED BY OFFICE. '+result.returned_to_queue+' unfinished stop(s) returned to AVAILABLE. Completed deliveries and saved POD retained.':'Office override saved. Review the updated route below.');}
  catch(e){$('overrideStatus').textContent=e.message;if(e.code==='ADMIN_PIN_REQUIRED'||e.code==='PIN_LOCKED'){clearPin();$('overrideControls').hidden=true;$('pinStep').hidden=false;}}
  finally{$('applyOverride').disabled=false;}
 };
 $('driverSelect').onchange=()=>{selection++;followDriver=true;closeOverride();$('closeDriverChat').click();fillRoutes(null);void refresh();};$('routeSelect').onchange=()=>{selection++;followDriver=false;closeOverride();void refresh();};
-$('refreshView').onclick=()=>refresh(true);$('officeOverride').onclick=()=>openOverride();$('overrideOperation').onchange=()=>{operationFields();if($('overrideOperation').value==='add_stop')void findAvailable();};$('overrideStop').onchange=operationFields;$('findAvailable').onclick=findAvailable;
+$('refreshView').onclick=()=>refresh(true);$('officeOverride').onclick=()=>openOverride();$('endRoute').onclick=()=>openOverride(undefined,'end_route');$('overrideOperation').onchange=()=>{operationFields();if($('overrideOperation').value==='add_stop')void findAvailable();};$('overrideStop').onchange=operationFields;$('findAvailable').onclick=findAvailable;
 $('availableSearch').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();void findAvailable();}});
 document.querySelectorAll('[data-close-override]').forEach(b=>b.onclick=closeOverride);$('closePod').onclick=()=>{podSequence++;$('podDialog').hidden=true;$('podDetail').innerHTML='';};
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeOverride();$('closePod').click();$('closeDriverChat').click();}});
@@ -130,6 +131,7 @@ $('chatDriver').onclick=()=>window.nwtbOpenSelectedDriverChat();
 $('closeDriverChat').onclick=()=>{$('driverChatDialog').hidden=true;$('chatTab').classList.add('hidden');};
 $('savedRoute').onclick=async()=>{try{const desk=window.parent.document.getElementById('fDispatch')?.contentWindow;window.parent.openView('dispatch');await desk.viewOfficeRoute(detail.route.id);}catch{viewStatus('Full Route Screen is still connecting. Try again shortly.',true);}};
 window.nwtbSelectOfficeDriver=async(no,routeId)=>{selection++;followDriver=!routeId;closeOverride();$('closeDriverChat').click();while(busy)await new Promise(resolve=>setTimeout(resolve,50));await refreshRoster(no,routeId);await refresh();};
+window.nwtbBeginOfficeEndRoute=(expectedRoute,expectedDriver)=>{if(expectedRoute&&detail?.route?.id!==expectedRoute||expectedDriver&&detail?.driver.employee_number!==expectedDriver){viewStatus('The selected route changed. Select and review the intended driver route before ending it.',true);return;}openOverride(undefined,'end_route');};
 if(window.L){const map=L.map('driverMap',{scrollWheelZoom:false}).setView([41.682487,-88.072262],10);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(map);
  mapOverlay=window.NWTBOfficeDriverMap.create({map,L,onStatus:(msg,warn)=>{$('mapStatus').textContent=msg;$('mapStatus').className='small'+(warn?' error':'');}});$('fitMap').onclick=()=>{map.invalidateSize();mapOverlay.fit();};
  void import('./office-map-live.mjs?v=20261026-etarefresh1').then(({installOfficeTraffic})=>installOfficeTraffic({map,L,config:{environment:'PRODUCTION',projectRef:'ufnjyidhxuytrmbjzgtu',backendUrl:'https://ufnjyidhxuytrmbjzgtu.supabase.co',siteOrigin:location.origin,publishableKey:PUB,officeTokenKey:'nwtb_delivery_token'},getRows:()=>[],getMarkers:()=>new Map(),getOfficeToken:session,isVisible:visible})).catch(()=>{});
@@ -138,5 +140,5 @@ if(window.L){const map=L.map('driverMap',{scrollWheelZoom:false}).setView([41.68
 }
 setInterval(()=>{if(visible())void refresh();},5000);document.addEventListener('visibilitychange',()=>{if(visible())void refresh(true);});window.addEventListener('focus',()=>{if(visible())void refresh(true);});
 window.addEventListener('storage',e=>{if(e.key==='nwtb_delivery_token'){closeOverride();detail=null;void refresh(true);}});window.addEventListener('pagehide',closeOverride);
-void refresh(true);
+void (async()=>{await refresh(true);const query=new URLSearchParams(location.search||''),no=query.get('driver'),id=query.get('route');if(/^\d{4}$/.test(no||'')&&/^[0-9a-f-]{36}$/i.test(id||'')){await window.nwtbSelectOfficeDriver(no,id);if(query.get('end')==='1')window.nwtbBeginOfficeEndRoute(id,no);}})();
 })();
