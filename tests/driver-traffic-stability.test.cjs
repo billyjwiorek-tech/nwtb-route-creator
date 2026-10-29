@@ -30,7 +30,16 @@ async function stableReturn(){for(const device of [{ios:true},{android:true}]){
  s.fail(false);let release;s.hold(()=>new Promise(r=>release=r));const pending=s.refresh();await settle();s.f.window.nwtbStopNavigation();release?.();await pending;eq(s.f.private.target,null,'Late traffic reply cannot restart stopped navigation');
  eq(s.f.local.get('nwtb_delivery_token'),'fixture-office-token');eq(s.f.local.get('nwtb_driver_token'),'fixture-driver-token');eq(s.f.requests.filter(r=>['route_start_driver','route_return_driver','stop_status_driver'].includes(r.body.action)).length,0,'Stability checks make no route or delivery mutations');
 }}
+async function betweenPolylinePoints(){
+ const s=await scenario({android:true}),{f}=s;
+ f.private.applyRoute({source:'TOMTOM',traffic_aware:true,distance_m:3000,duration_s:600,geometry:[[-88.06,41.69],[-88.04,41.69],[-88.04,41.70]],steps:[
+  {point_index:0,maneuver:{type:'depart',location:[-88.06,41.69]},distance_m:1000,duration_s:200},
+  {point_index:0,instruction_text:'Turn at the synthetic mid-segment junction',maneuver:{type:'turn',location:[-88.05,41.69]},distance_m:2000,duration_s:400},
+  {point_index:2,maneuver:{type:'arrive',location:[-88.04,41.70]},distance_m:0,duration_s:0}
+ ]},{lat:41.69,lon:-88.06});
+ eq(s.turn(),'Turn at the synthetic mid-segment junction','A TomTom maneuver between polyline points is not skipped at the preceding point');f.window.nwtbStopNavigation();
+}
 async function offRoute(){const s=await scenario({android:true}),{f}=s,start=s.requests.length;
  const emit=async()=>{for(const cb of [...f.watches.values()])cb({timestamp:f.ctx.Date.now(),coords:{latitude:41.685,longitude:-88.09,accuracy:3,speed:8,heading:270}});await settle();};
  await f.tick(15000);await f.tick(15000);await emit();eq(s.requests.length,start,'One good off-route fix does not reverse guidance');await f.tick(4000);await emit();eq(s.requests.length,start,'Two good fixes still wait for confirmation');await f.tick(4000);await emit();eq(s.requests.length,start+1,'Three consistent fixes over eight seconds permit a new route');eq(s.requests.at(-1).purpose,'off_route');eq(s.requests.at(-1).heading,270);f.window.nwtbStopNavigation();}
-(async()=>{if(process.argv.includes('--prove-original'))return proveOriginal();await stableReturn();await offRoute();console.log('PASS: '+checks+' iPhone/Android return-route stability, reference-route timing, heading, POD/background pause, off-route confirmation, late-response and session-isolation checks. Offline fixtures only.');})().catch(e=>{console.error(e);process.exitCode=1});
+(async()=>{if(process.argv.includes('--prove-original'))return proveOriginal();await stableReturn();await betweenPolylinePoints();await offRoute();console.log('PASS: '+checks+' iPhone/Android return-route stability, reference-route timing, heading, POD/background pause, off-route confirmation, late-response and session-isolation checks. Offline fixtures only.');})().catch(e=>{console.error(e);process.exitCode=1});

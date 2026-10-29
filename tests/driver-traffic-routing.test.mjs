@@ -8,6 +8,7 @@ test('TomTom guidance retains exact text, highway references, roundabout exits a
  const n=normalizeTomTomRoute(providerRoute());assert.equal(n.steps[1].instruction_text,'Turn right onto Synthetic east road');assert.equal(n.steps[1].ref,'I-55');assert.equal(n.steps[2].maneuver.type,'roundabout');assert.equal(n.steps[2].maneuver.exit,2);assert.equal(n.steps.at(-1).maneuver.type,'arrive');assert.equal(n.steps.reduce((s,x)=>s+x.distance_m,0),5000);assert.equal(n.steps.reduce((s,x)=>s+x.duration_s,0),600);assert.deepEqual(n.steps[1].maneuver.location,[-88.055,41.69]);assert.equal(n.steps[1].point_index,1);
  const bad=providerRoute();bad.guidance.instructions[1].travelTimeInSeconds=-1;assert.throws(()=>normalizeTomTomRoute(bad));
  const missing=providerRoute();delete missing.guidance;assert.throws(()=>normalizeTomTomRoute(missing));
+ const invalidPoint=providerRoute();invalidPoint.guidance.instructions[1].point.latitude=0;assert.throws(()=>normalizeTomTomRoute(invalidPoint));
  const unknown=providerRoute();unknown.guidance.instructions[1].maneuver='NEW_PROVIDER_CODE';assert.equal(normalizeTomTomRoute(unknown).steps[1].instruction_text,'Turn right onto Synthetic east road');
 });
 test('small ETA fluctuations retain the current road route; meaningful gains wait for the hold period',()=>{
@@ -56,6 +57,7 @@ function handlerFixture(options={}){
 test('Driver navigation requires their own active released next stop and preserves route/POD/session state',async()=>{
  const f=handlerFixture(),r=await f.request();assert.equal(r.status,200);assert.equal(r.body.routing.audit_saved,true);assert.equal(f.writes.filter(w=>w.mutation==='insert').length,1);assert.ok(f.writes.every(w=>w.table==='nwtb_navigation_audit'));const row=f.writes[0].payload;assert.equal(row.target_kind,'STOP');assert.equal(row.stop_id,sid);for(const field of ['origin','destination','geometry','key','pin','session_token'])assert.equal(row[field],undefined);
  for(const options of [{route:{status:'PLANNED'}},{route:{released_to_driver:false}},{route:{driver_employee_number:'5678'}},{route:{paused_at:'2026-10-29T13:00:00Z'}}]){const f=handlerFixture(options);assert.equal((await f.request()).status,409);assert.equal(f.calls.length,0);assert.equal(f.writes.length,0);}
+ const geocoded=handlerFixture();geocoded.state.stops[0].delivery_orders={lat:null,lon:null};assert.equal((await geocoded.request()).status,200,'Existing Driver geocoding fallback remains available for its identified assigned stop');
  const bad=handlerFixture();assert.equal((await bad.request({destination:origin})).status,409);assert.equal((await bad.request({},'')).status,401);assert.equal((await handlerFixture({role:'ADMIN'}).request()).status,403);
 });
 test('return navigation uses the assigned depot and Office preview makes no routing-audit writes',async()=>{

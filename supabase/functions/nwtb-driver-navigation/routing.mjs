@@ -17,7 +17,8 @@ export function normalizeTomTomRoute(raw){
  const input=raw.guidance?.instructions;
  if(!Array.isArray(input)||!input.length)throw Error('PROVIDER_GUIDANCE_UNAVAILABLE');
  let previousOffset=-1,previousSeconds=-1;
- const instructions=input.filter(i=>validPoint({lat:i.point?.latitude,lon:i.point?.longitude})).map(i=>{
+ const instructions=input.map(i=>{
+  if(!validPoint({lat:i.point?.latitude,lon:i.point?.longitude}))throw Error('INVALID_PROVIDER_GUIDANCE');
   const offset=number(i.routeOffsetInMeters,-1),elapsed=number(i.travelTimeInSeconds,-1),index=number(i.pointIndex,-1);
   if(offset<previousOffset||elapsed<previousSeconds||offset<0||offset>s.lengthInMeters+10||elapsed<0||elapsed>s.travelTimeInSeconds+10||!Number.isInteger(index)||index<0||index>=geometry.length)throw Error('INVALID_PROVIDER_GUIDANCE');
   previousOffset=offset;previousSeconds=elapsed;return {...i,offset,elapsed,index};
