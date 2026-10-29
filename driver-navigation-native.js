@@ -190,7 +190,7 @@ function navigationRequest(pos,purpose='initial'){
  const request={action:'route',origin:pos,destination:{lat:navTarget.lat,lon:navTarget.lon},route_id:navRouteId,stop_id:navTarget.stop_id||null,purpose,...(Number.isFinite(navHeading)&&Date.now()-navHeadingAt<=15000&&(navLastFix?.gps.speed==null||Number(navLastFix.gps.speed)>=2.2)?{heading:navHeading}:{})};
  if(purpose==='traffic'){
   const hit=projectRoute(pos);if(!hit||hit.off>60)return null;
-  const index=Math.max(1,navProgress.cumulative.findIndex(value=>value>=hit.along));const remaining=[[pos.lon,pos.lat],...navRouteCoords.slice(index)],stride=Math.max(1,Math.ceil(remaining.length/1998)),geometry=remaining.filter((_,i)=>i===0||i===remaining.length-1||i%stride===0);
+  const index=Math.max(1,navProgress.cumulative.findIndex(value=>value>=hit.along)),a=navProgress.points[index-1],b=navProgress.points[index],span=navProgress.cumulative[index]-navProgress.cumulative[index-1],fraction=Math.max(0,Math.min(1,(hit.along-navProgress.cumulative[index-1])/(span||1))),projected=[a.lon+(b.lon-a.lon)*fraction,a.lat+(b.lat-a.lat)*fraction];const remaining=[projected,...navRouteCoords.slice(index)],stride=Math.max(1,Math.ceil(remaining.length/1998)),geometry=remaining.filter((_,i)=>i===0||i===remaining.length-1||i%stride===0);
   if(geometry.length<2)return null;request.reference={geometry,change_age_s:Math.max(0,(Date.now()-navLastRouteChange)/1000)};
  }
  return request;

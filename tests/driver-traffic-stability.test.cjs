@@ -30,6 +30,11 @@ async function stableReturn(){for(const device of [{ios:true},{android:true}]){
  s.fail(false);let release;s.hold(()=>new Promise(r=>release=r));const pending=s.refresh();await settle();s.f.window.nwtbStopNavigation();release?.();await pending;eq(s.f.private.target,null,'Late traffic reply cannot restart stopped navigation');
  eq(s.f.local.get('nwtb_delivery_token'),'fixture-office-token');eq(s.f.local.get('nwtb_driver_token'),'fixture-driver-token');eq(s.f.requests.filter(r=>['route_start_driver','route_return_driver','stop_status_driver'].includes(r.body.action)).length,0,'Stability checks make no route or delivery mutations');
 }}
+async function referenceGpsJitter(){
+ const s=await scenario({android:true}),{f}=s;
+ f.private.receiveNavFix({timestamp:f.ctx.Date.now(),coords:{latitude:41.6902,longitude:-88.058,accuracy:25,speed:4,heading:90}});
+ await s.refresh();const first=s.requests.at(-1).reference.geometry[0];assert.ok(Math.abs(first[1]-41.69)<1e-7,'Remaining reference stays on the chosen road when GPS drifts toward a parallel road');checks++;f.window.nwtbStopNavigation();
+}
 async function betweenPolylinePoints(){
  const s=await scenario({android:true}),{f}=s;
  f.private.applyRoute({source:'TOMTOM',traffic_aware:true,distance_m:3000,duration_s:600,geometry:[[-88.06,41.69],[-88.04,41.69],[-88.04,41.70]],steps:[
@@ -42,4 +47,4 @@ async function betweenPolylinePoints(){
 async function offRoute(){const s=await scenario({android:true}),{f}=s,start=s.requests.length;
  const emit=async()=>{for(const cb of [...f.watches.values()])cb({timestamp:f.ctx.Date.now(),coords:{latitude:41.685,longitude:-88.09,accuracy:3,speed:8,heading:270}});await settle();};
  await f.tick(15000);await f.tick(15000);await emit();eq(s.requests.length,start,'One good off-route fix does not reverse guidance');await f.tick(4000);await emit();eq(s.requests.length,start,'Two good fixes still wait for confirmation');await f.tick(4000);await emit();eq(s.requests.length,start+1,'Three consistent fixes over eight seconds permit a new route');eq(s.requests.at(-1).purpose,'off_route');eq(s.requests.at(-1).heading,270);f.window.nwtbStopNavigation();}
-(async()=>{if(process.argv.includes('--prove-original'))return proveOriginal();await stableReturn();await betweenPolylinePoints();await offRoute();console.log('PASS: '+checks+' iPhone/Android return-route stability, reference-route timing, heading, POD/background pause, off-route confirmation, late-response and session-isolation checks. Offline fixtures only.');})().catch(e=>{console.error(e);process.exitCode=1});
+(async()=>{if(process.argv.includes('--prove-original'))return proveOriginal();await stableReturn();await referenceGpsJitter();await betweenPolylinePoints();await offRoute();console.log('PASS: '+checks+' iPhone/Android return-route stability, reference-route timing, heading, POD/background pause, off-route confirmation, late-response and session-isolation checks. Offline fixtures only.');})().catch(e=>{console.error(e);process.exitCode=1});
