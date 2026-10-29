@@ -24,7 +24,10 @@ export function cleanSnapshot(input,clock=Date.now){
   pod_stop_id:id(s.pod_stop_id),pod_phase:['OPEN','SAVING','OFFLINE_QUEUED','CLOSED'].includes(s.pod_phase)?s.pod_phase:'CLOSED',
   eta:text(s.eta,60),distance:text(s.distance,60),turn:text(s.turn,500),turn_distance:text(s.turn_distance,60),banner:text(s.banner,500),mode:text(s.mode,100),
   traffic_aware:s.traffic_aware===true,source:text(s.source,80),fix_at:Number.isFinite(Date.parse(s.fix_at))?s.fix_at:null,
-  position:point(s.position)?{lat:s.position.lat,lon:s.position.lon}:null,geometry_key:key};
+  position:point(s.position)?{lat:s.position.lat,lon:s.position.lon}:null,geometry_key:key,
+  routing:s.routing&&['TOMTOM','OSRM'].includes(s.routing.source)&&Number.isFinite(Date.parse(s.routing.calculated_at))?{
+   source:s.routing.source,calculated_at:s.routing.calculated_at,decision:text(s.routing.decision,50),vehicle_profile:s.routing.vehicle_profile==='truck'?'truck':'car',
+   saving_seconds:Math.max(0,Math.min(172800,Number(s.routing.saving_seconds)||0)),heading_used:s.routing.heading_used===true,audit_saved:s.routing.audit_saved===true}:null};
  return {snapshot,route_id:route,geometry,geometry_key:key,captured_at:new Date(captured).toISOString()};
 }
 export function screenFreshness(screen,route,stops,clock=Date.now){
@@ -84,17 +87,18 @@ export function createDriverViewHandler({db,clock=Date.now}){
     if(!/^\d{4}$/.test(driver)||driver==='9998')return json({error:'Choose a driver.'},400);
     const employee=await checked(db.from('employees').select('employee_number,display_name,active').eq('employee_number',driver).maybeSingle());
     if(!employee)return json({error:'Driver not found.'},404);
-    const [stops,pods,screen,locations,audit]=await Promise.all([
+    const [stops,pods,screen,locations,audit,navigationAudit]=await Promise.all([
      route?checked(db.from('delivery_route_stops').select('id,route_id,order_id,stop_sequence,status,arrived_at,completed_at,driver_note,updated_at,delivery_orders(id,customer_name,address,stop_type,priority,status,pieces,notes,lat,lon,sales_order_no,reference_no)').eq('route_id',route.id).order('stop_sequence')):[],
      route?checked(db.from('delivery_pods').select('id,pod_number,stop_id,recipient_name,captured_at,delivery_result,notes,signature_path,photo_path').eq('route_id',route.id)):[],
      checked(db.from('nwtb_driver_screen_state').select('route_id,snapshot,geometry,received_at,captured_at,chat_sessions(expires_at)').eq('driver_employee_number',driver).maybeSingle()),
      checked(db.from('delivery_driver_locations').select('lat,lon,accuracy_m,speed_mps,captured_at').eq('driver_employee_number',driver).order('captured_at',{ascending:false}).limit(1)),
-     route?checked(db.from('nwtb_office_override_audit').select('id,stop_id,order_id,employee_number,operation,reason,created_at').eq('route_id',route.id).order('created_at',{ascending:false}).limit(30)):[]
+     route?checked(db.from('nwtb_office_override_audit').select('id,stop_id,order_id,employee_number,operation,reason,created_at').eq('route_id',route.id).order('created_at',{ascending:false}).limit(30)):[],
+     route?checked(db.from('nwtb_navigation_audit').select('id,calculated_at,target_kind,source,traffic_aware,decision,vehicle_profile,heading_used,saving_seconds,alternatives').eq('route_id',route.id).order('calculated_at',{ascending:false}).limit(8)):[]
     ]);
     const freshness=screenFreshness(screen,route,stops,clock);
     // Tokens, file paths and hashes never leave the service. POD images use the existing authorized signed-URL API.
     const phone=screen?{snapshot:screen.snapshot,geometry:screen.geometry,captured_at:screen.captured_at,received_at:screen.received_at,...freshness}:freshness;
-    return json({ok:true,driver:employee,route,stops,pods:pods.map(({signature_path,photo_path,...pod})=>({...pod,has_signature:!!signature_path,has_photo:!!photo_path})),phone,location:locations[0]||null,audit,server_at:new Date(clock()).toISOString()});
+    return json({ok:true,driver:employee,route,stops,pods:pods.map(({signature_path,photo_path,...pod})=>({...pod,has_signature:!!signature_path,has_photo:!!photo_path})),phone,location:locations[0]||null,audit,navigation_audit:navigationAudit,server_at:new Date(clock()).toISOString()});
    }
    if(action==='available_stops'){
     let q=db.from('delivery_orders').select('id,customer_name,address,stop_type,priority,lat,lon,updated_at').eq('status','UNASSIGNED').order('customer_name').limit(100);

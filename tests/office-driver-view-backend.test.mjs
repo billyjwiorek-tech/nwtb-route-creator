@@ -27,6 +27,11 @@ test('screen reports preserve exact displayed values and exclude drafts or arbit
  assert.equal(s.snapshot.eta,'6 min');assert.equal(s.snapshot.distance,'2.8 mi');assert.equal(s.snapshot.target.stop_id,sid);assert.equal(s.snapshot.pin,undefined);assert.equal(s.snapshot.recipient_draft,undefined);assert.equal(s.geometry.length,2);
  for(const change of [p=>p.sequence=0,p=>p.captured_at='2020-01-01',p=>p.geometry=[[0,0],[0,0]],p=>p.geometry=Array(20001).fill([-88,41.7]),p=>p.snapshot.route_id='invalid']){const p=packet();change(p);assert.throws(()=>cleanSnapshot(p,()=>now));}
 });
+test('routing freshness is sanitized and alternatives are available only to Office through the audit read',async()=>{
+ const p=packet();p.snapshot.routing={source:'TOMTOM',calculated_at:new Date(now).toISOString(),decision:'ROUTE_RETAINED',vehicle_profile:'car',saving_seconds:1,heading_used:true,audit_saved:true,key:'fixture-private-key',geometry:[[0,0]],alternatives:[{private:'untrusted'}]};
+ const routing=cleanSnapshot(p,()=>now).snapshot.routing;assert.equal(routing.source,'TOMTOM');assert.equal(routing.calculated_at,new Date(now).toISOString());assert.equal(routing.key,undefined);assert.equal(routing.geometry,undefined);assert.equal(routing.alternatives,undefined);
+ const f=fixture();const r=await f.request({action:'view',route_id:rid});assert.equal(r.status,200);assert.deepEqual(r.body.navigation_audit,[]);assert.ok(f.reads.some(x=>x.table==='nwtb_navigation_audit'));assert.equal((await fixture({office:false}).request({action:'view',route_id:rid})).status,403);
+});
 test('live screen requires a fresh, foreground matching route and valid Driver session',()=>{
  const screen={route_id:rid,captured_at:new Date(now).toISOString(),received_at:new Date(now).toISOString(),snapshot:cleanSnapshot(packet(),()=>now).snapshot,chat_sessions:{expires_at:new Date(now+60000).toISOString()}};
  assert.equal(screenFreshness(screen,route,stops,()=>now).live,true);

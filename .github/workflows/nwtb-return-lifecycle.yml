@@ -1,7 +1,7 @@
 name: NWTB return lifecycle
 on:
   push:
-    branches: [main, fix/nwtb-return-leg-lifecycle-20261020, fix/nwtb-driver-chat-seen-20261020, feat/nwtb-driver-presence-20261020, feat/nwtb-live-map-search-20261021, feat/nwtb-business-nearby-20261026, feat/nwtb-office-driver-view-20261026, fix/nwtb-eta-refresh-20261026, feat/nwtb-office-end-route-20261028]
+    branches: [main, fix/nwtb-return-leg-lifecycle-20261020, fix/nwtb-driver-chat-seen-20261020, feat/nwtb-driver-presence-20261020, feat/nwtb-live-map-search-20261021, feat/nwtb-business-nearby-20261026, feat/nwtb-office-driver-view-20261026, fix/nwtb-eta-refresh-20261026, feat/nwtb-office-end-route-20261028, feat/nwtb-fastest-traffic-20261029]
     paths: ['driver-*.html', 'driver-*.js', '*.webmanifest', 'nwtb-driver-sw.js', 'nwtb-notifications.js', 'dispatch-*.js', 'tracker*.html', 'tracker*.js', 'office-*.js', 'office-*.html', 'office-*.mjs', 'unified-search.js', 'custom-master-search.js', 'custom-stop.js', 'driver-*.svg', 'delivery-*.html', 'dispatch*.html', 'dispatch-route-admin-native.js', 'dispatch-chat-live.js', 'supabase/**', 'tests/**', '.github/workflows/nwtb-return-lifecycle.yml']
   pull_request:
     paths: ['driver-*.html', 'driver-*.js', '*.webmanifest', 'nwtb-driver-sw.js', 'nwtb-notifications.js', 'dispatch-*.js', 'tracker*.html', 'tracker*.js', 'office-*.js', 'office-*.html', 'office-*.mjs', 'unified-search.js', 'custom-master-search.js', 'custom-stop.js', 'driver-*.svg', 'delivery-*.html', 'dispatch*.html', 'dispatch-route-admin-native.js', 'supabase/**', 'tests/**', '.github/workflows/nwtb-return-lifecycle.yml']
@@ -36,6 +36,10 @@ jobs:
           psql "$FIXTURE_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$end_route_migration_path"
           psql "$FIXTURE_DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/office-driver-view-db.test.sql
           psql "$FIXTURE_DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/office-end-route-db.test.sql
+          nav_audit_migration_path=$(find supabase/migrations -maxdepth 1 -type f -name '*_driver_live_traffic_navigation_audit.sql' -print -quit)
+          test -n "$nav_audit_migration_path"
+          psql "$FIXTURE_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$nav_audit_migration_path"
+          psql "$FIXTURE_DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/driver-navigation-audit-db.test.sql
   lifecycle:
     runs-on: ubuntu-latest
     services:

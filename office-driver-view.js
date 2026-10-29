@@ -39,15 +39,22 @@ function displayPhone(j){
  $('navTurn').textContent=active?s.turn||'Navigation is starting':live?(s.pod_phase!=='CLOSED'?'PROOF OF DELIVERY OPEN':s.view==='ROUTE_LIST'?'DRIVER IS VIEWING THEIR ROUTE LIST':'DRIVER IS VIEWING THE ROUTE'):'Live phone navigation is unavailable';
  $('driverEta').textContent=active?s.eta||'—':'—';$('driverDistance').textContent=active?s.distance||'—':'—';$('turnDistance').textContent=active?s.turn_distance||'—':'—';
  $('navBanner').textContent=active?s.banner||'Navigation is active':live?'Driver has not started turn-by-turn navigation on this screen.':'Saved route and stop status remain visible below.';
+ const routing=s.routing;
+ if($('routingSource'))$('routingSource').textContent=routing?'PHONE ROUTING: '+routing.source+(routing.source==='OSRM'?' — NO LIVE TRAFFIC':'')+' • Calculated '+stamp(routing.calculated_at)+' Central'+(!live?' • LAST REPORTED':''):'';
  const arrived=live&&s.arrived_stop_id&&j.stops.some(x=>x.id===s.arrived_stop_id&&x.status==='PENDING');
  $('arrivalState').innerHTML=arrived?'<p class="driverControl">ARRIVED AT STOP'+(s.arrival_visible?' — ARRIVAL POPUP IS OPEN ON THE PHONE':'')+'</p>':'';
  $('podState').innerHTML=live&&s.pod_phase&&s.pod_phase!=='CLOSED'?'<p class="driverControl">'+esc(s.pod_phase==='SAVING'?'DRIVER IS SAVING PROOF OF DELIVERY':s.pod_phase==='OFFLINE_QUEUED'?'POD SAVED ON PHONE — AWAITING UPLOAD':'DRIVER HAS THE POD FORM OPEN')+'</p>':'';
  if(live&&s.voice?.needs_tap)$('podState').innerHTML+='<p class="state warn">PHONE VOICE PAUSED — DRIVER CAN TAP RESUME VOICE</p>';
  if(live&&s.handoff_pending)$('podState').innerHTML+='<p class="state warn">STOP SAVED — PHONE IS RECONNECTING NEXT / RETURN DIRECTIONS</p>';
 }
+function renderRoutingAudit(rows){
+ const el=$('routingAudit');if(!el)return;
+ const labels={INITIAL_ROUTE:'NEW LEG',ROUTE_RETAINED:'CURRENT ROAD ROUTE KEPT',TRAFFIC_REROUTE:'FASTER TRAFFIC ROUTE SELECTED',ROAD_CLOSURE_REROUTE:'ROAD CLOSURE DETOUR',OFF_ROUTE_REROUTE:'CONFIRMED OFF-ROUTE RECALCULATION',NO_LIVE_TRAFFIC:'TRAFFIC UNAVAILABLE — STATIC ESTIMATE'};
+ el.innerHTML=rows.length?rows.map(a=>'<p><b>'+esc(labels[a.decision]||a.decision)+'</b> • '+esc(a.source)+' • '+esc(stamp(a.calculated_at))+' Central<br>'+esc(a.target_kind==='RETURN'?'RETURN TO DEPOT':'ASSIGNED STOP')+(a.saving_seconds?' • Compared saving '+Math.round(a.saving_seconds)+' sec':'')+'<br>'+esc((a.alternatives||[]).map(x=>(x.selected?'SELECTED: ':'OPTION: ')+Math.ceil(x.seconds/60)+' min / '+(x.meters/1609.344).toFixed(1)+' mi'+(x.roads?.length?' • '+x.roads.join(', '):'')+(x.closed?' • CLOSED':'')).join(' | '))+'</p>').join(''):'No routing decisions recorded for this route yet.';
+}
 function render(j){
  detail=j;const r=j.route,byPod=new Map(j.pods.map(p=>[p.stop_id,p])),phone=j.phone?.live?j.phone.snapshot:null;
- displayPhone(j);$('chatDriver').disabled=!j.driver;$('officeOverride').disabled=!r||!['ACTIVE','PLANNED'].includes(r.status);$('endRoute').disabled=!r||!['ACTIVE','PLANNED'].includes(r.status);$('savedRoute').disabled=!r;
+ displayPhone(j);renderRoutingAudit(j.navigation_audit||[]);$('chatDriver').disabled=!j.driver;$('officeOverride').disabled=!r||!['ACTIVE','PLANNED'].includes(r.status);$('endRoute').disabled=!r||!['ACTIVE','PLANNED'].includes(r.status);$('savedRoute').disabled=!r;
  $('routeState').textContent=routePhase(r)+(r?' • '+r.route_date+' • '+r.depot:'')+(r?.status==='ACTIVE'&&r.returning_started_at&&!r.returned_at?' • Route remains active until the driver confirms arrival back.':'');
  $('stops').innerHTML=(j.stops||[]).map(s=>{const o=s.delivery_orders||{},pod=byPod.get(s.id),override=j.audit.find(a=>a.stop_id===s.id&&a.operation==='complete_stop'),arrived=phone?.arrived_stop_id===s.id&&s.status==='PENDING',podOpen=phone?.pod_stop_id===s.id&&phone.pod_phase!=='CLOSED';
   const localStatus=phone?.displayed_stops?.find(x=>x.id===s.id)?.status;const status=podOpen?'POD '+phone.pod_phase:arrived?'ARRIVED':localStatus&&localStatus!==s.status?localStatus+' ON PHONE — AWAITING SYNC':s.status;
