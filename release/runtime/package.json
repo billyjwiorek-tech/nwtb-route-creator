@@ -1,0 +1,9 @@
+{
+  "private": true,
+  "description": "Audit inventory of NWTB server/browser npm dependencies; not an application bundle",
+  "dependencies": {
+    "@supabase/supabase-js": "2.95.0",
+    "leaflet": "1.9.4",
+    "web-push": "3.6.7"
+  }
+}

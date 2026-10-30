@@ -40,7 +40,7 @@ async function endpointTests(){
  b=backend(tracking,{killed:true});x=await b.call(finish);eq(x.status,423);eq(b.calls.length,0,'System lock blocks completion');
  b=backend(tracking,{rpcFailure:true});x=await b.call(finish);eq(x.status,500);ok(!x.body.ok,'Database failure cannot report a completed return');
  for(const [file,employee,action] of [[tracking,'1234','stop_status_driver'],['supabase/functions/nwtb-delivery/index.ts','1234','stop_status'],['supabase/functions/nwtb-delivery-route-ops/index.ts','9998','stop_status_driver']]){
-  b=backend(file,{employee});x=await b.call({action,stop_id:'fixture-stop',driver_employee_number:'1234',status:'DELIVERED'});
+  b=backend(file,{employee});x=await b.call({action,stop_id:'fixture-stop',driver_employee_number:'1234',status:'NOT_DELIVERED'});
   eq(x.status,200,file);eq(b.calls.at(-1).name,'nwtb_finish_route_stops',file+' uses authoritative lifecycle');eq(x.body.return_pending,true);ok(!b.writes.some(w=>w.table==='delivery_routes'),'Edge cannot prematurely close return route');
   b=backend(file,{employee,assigned:'5678'});x=await b.call({action,stop_id:'fixture-stop',driver_employee_number:'1234',status:'DELIVERED'});eq(x.status,403,'Stop ownership preserved');eq(b.calls.length,0);
  }

@@ -16,6 +16,7 @@ for(let pass=0;pass<6;pass++)for(const file of [...files]){
  }
 }
 if(!files.includes('nwt-logo.svg'))files.push('nwt-logo.svg');
+for(const file of [...Object.keys(JSON.parse(fs.readFileSync('release/nwtb-client-assets.json','utf8')).assets),'release/nwtb-client-assets.json','release/nwtb-functions.json','release/nwtb-dependencies.json'])if(!files.includes(file))files.push(file);
 async function main(){
  const expected = new Map(files.map(path => [path, fs.readFileSync(path,'utf8')]));
  let pending = [...files];

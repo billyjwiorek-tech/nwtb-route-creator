@@ -9,7 +9,7 @@ const allowControl=script?.dataset?.control==='1';
 let killed=false,lastStatus=null,timer=null;
 
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
-const token=()=>localStorage.getItem('nwtb_delivery_token')||'';
+const token=()=>localStorage.getItem(/^driver-(?:live|standard)\.html$/.test(location.pathname.split('/').pop())?'nwtb_driver_token':'nwtb_delivery_token')||'';
 async function call(action,payload={}){
  const headers={'content-type':'application/json','apikey':KEY};
  const t=token();if(t)headers['x-nwtb-session']=t;

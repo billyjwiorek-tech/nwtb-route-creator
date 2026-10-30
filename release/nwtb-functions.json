@@ -1,0 +1,232 @@
+{
+  "project_ref": "ufnjyidhxuytrmbjzgtu",
+  "functions": {
+    "nwtb-chat": {
+      "version": 9,
+      "verify_jwt": false,
+      "files": {
+        "supabase/functions/nwtb-chat/index.ts": "f48f0d6fa0cc70610159da6d9388ed4270137cead8d417b81d0ef286fc794f82",
+        "supabase/functions/_shared/sales-route-server.ts": "df32a2c69f1461302a6f612ecd23af7ee1fbd6c0fb1a772b7426b07b85554223",
+        "supabase/functions/_shared/sales-route-policy.js": "87d1e5117a22acbfffee45924a56e55a5e035f99979582ae615f612ba9a80607"
+      }
+    },
+    "nwtb-delivery": {
+      "version": 12,
+      "verify_jwt": false,
+      "files": {
+        "supabase/functions/nwtb-delivery/index.ts": "8d6a0bc2afe8114946e6476f59952a232f5300a05c88221cf33dc0821934fee5"
+      }
+    },
+    "nwtb-delivery-chat": {
+      "version": 8,
+      "verify_jwt": false,
+      "files": {
+        "supabase/functions/nwtb-delivery-chat/index.ts": "50d7044c493a173e1d2c9fe34bb5e09fae4b20eaebf76c540bbe5ef853f7664e"
+      }
+    },
+    "nwtb-delivery-tracking": {
+      "version": 18,
+      "verify_jwt": false,
+      "files": {
+        "supabase/functions/nwtb-delivery-tracking/index.ts": "63be4cc94606fdd7d484571ab46e7b9fa88a38cb037ea90735e79f1dc9a2ad77"
+      }
+    },
+    "nwtb-route-matrix": {
+      "version": 3,
+      "verify_jwt": false,
+      "files": {
+        "supabase/functions/nwtb-route-matrix/index.ts": "5f362f60317461f7dbad7d6b1300eea485753ac14d9bdbefcdeceb87206498d2"
+      }
+    },
+    "nwtb-delivery-route-admin": {
+      "version": 13,
+      "verify_jwt": false,
+      "files": {
+        "supabase/functions/nwtb-delivery-route-admin/index.ts": "c83697bf30753aed275173d96923af467e00b2c3900fa329a8dfc2551d7da258"
+      }
+    },
+    "nwtb-location-resolver": {
+      "version": 8,
+      "verify_jwt": false,
+      "files": {
+        "supabase/functions/nwtb-location-resolver/index.ts": "2f48ab07250349d5904c61de9146bfd9570eb1525b7f8bb8a99587312519b7a1"
+      }
+    },
+    "nwtb-master-geocoder": {
+      "version": 5,
+      "verify_jwt": false,
+      "files": {
+        "supabase/functions/nwtb-master-geocoder/index.ts": "2680395d772a7bbc647266a0355a3fcb3356744226ae15b14b9539a70fa516c6"
+      }
+    },
+    "nwtb-delivery-board-admin": {
+      "version": 4,
+      "verify_jwt": false,
+      "files": {
+        "supabase/functions/nwtb-delivery-board-admin/index.ts": "2f89bfe719ae6e4cb8e0f7419accecef34ddb46729a115002b2979c559beedb4"
+      }
+    },
+    "nwtb-custom-route": {
+      "version": 5,
+      "verify_jwt": false,
+      "files": {
+        "supabase/functions/nwtb-custom-route/index.ts": "02f0e55f593756dbea1642e77ccb3df27acf28558123e224f13cf9fb758420e4"
+      }
+    },
+    "nwtb-traccar": {
+      "version": 3,
+      "verify_jwt": false,
+      "files": {
+        "supabase/functions/nwtb-traccar/index.ts": "687ee8c888420c793ea4ff9291a8c586a182c137cf5b78448c12bdb03fec4bf3"
+      }
+    },
+    "nwtb-traccar-provision": {
+      "version": 3,
+      "verify_jwt": false,
+      "files": {
+        "supabase/functions/nwtb-traccar-provision/index.ts": "806b8ca8860d72548dd3a6a4e762f9544b25f4750211b4c18936ff68353aa483"
+      }
+    },
+    "nwtb-delivery-route-ops": {
+      "version": 6,
+      "verify_jwt": false,
+      "files": {
+        "supabase/functions/nwtb-delivery-route-ops/index.ts": "05529bcef62d06d1761239223c7924b312532ff4bce5d6d0afb14bf7b8be579a"
+      }
+    },
+    "nwtb-driver-navigation": {
+      "version": 6,
+      "verify_jwt": false,
+      "files": {
+        "supabase/functions/nwtb-driver-navigation/index.ts": "5ce6102733ebf40e71eb1fc51c70fc9745f33fd202cce7c20e635c1a0ef43aba",
+        "supabase/functions/nwtb-driver-navigation/handler.mjs": "17072a9103b81997a577ec6da6c556e0e98606f3d1e0aef3b194f979a3093da1",
+        "supabase/functions/nwtb-driver-navigation/routing.mjs": "a5c8598b4388bfec677ecf70ccb5906e3080135b306bef07798c8c200348a218",
+        "supabase/functions/nwtb-driver-navigation/legacy-sales.ts": "2ea46d8039d098866625a5a14dc79504a12449aad1a13ddf735d42fe5da1d7ad"
+      }
+    },
+    "nwtb-live-tracking-v2": {
+      "version": 8,
+      "verify_jwt": false,
+      "files": {
+        "supabase/functions/nwtb-live-tracking-v2/index.ts": "a52e60b7cabb73651af0a0aec032793141f0198bc9a0829cdf9b392bda7b7a5e"
+      }
+    },
+    "nwtb-custom-geocoder-v2": {
+      "version": 2,
+      "verify_jwt": false,
+      "files": {
+        "supabase/functions/nwtb-custom-geocoder-v2/index.ts": "564b0b70e58c16395619b9f2df4e961ca214fc27e199f9a02de8910ccb316039"
+      }
+    },
+    "nwtb-driver-bootstrap": {
+      "version": 3,
+      "verify_jwt": false,
+      "files": {
+        "supabase/functions/nwtb-driver-bootstrap/index.ts": "24c3c6230a268320b1cd45d7728147ea67062126547101e5e06835d6c6faa3e6"
+      }
+    },
+    "nwtb-driver-supervisor": {
+      "version": 3,
+      "verify_jwt": false,
+      "files": {
+        "supabase/functions/nwtb-driver-supervisor/index.ts": "831f06e03799c925a2905968af1d90a5b4a1017d416c1dcdecde8d25e0555009"
+      }
+    },
+    "nwtb-route-priority": {
+      "version": 4,
+      "verify_jwt": false,
+      "files": {
+        "supabase/functions/nwtb-route-priority/index.ts": "530d084ce7e520c7beb506f409a969c8edef1ff98ed8b3ca6ebf5d6a2b23af42"
+      }
+    },
+    "nwtb-system-control": {
+      "version": 3,
+      "verify_jwt": false,
+      "files": {
+        "supabase/functions/nwtb-system-control/index.ts": "ee506ad53aedae9010d580ea28e014efed3b5e3ac221bd37524abd3cd8078f80"
+      }
+    },
+    "nwtb-admin-roles": {
+      "version": 4,
+      "verify_jwt": false,
+      "files": {
+        "supabase/functions/nwtb-admin-roles/index.ts": "bfc52f34aad11272a1aef61ef08462cd08f05bc32b587a80a4b71fc6c7649e53"
+      }
+    },
+    "nwtb-delivery-audit": {
+      "version": 2,
+      "verify_jwt": false,
+      "files": {
+        "supabase/functions/nwtb-delivery-audit/index.ts": "d9d1b3337180aaf68ac8ab3aea55255f0abe54480996216345a7fc8f12f035b2"
+      }
+    },
+    "nwtb-pod": {
+      "version": 3,
+      "verify_jwt": false,
+      "files": {
+        "supabase/functions/nwtb-pod/index.ts": "949d7cc36442dba4125f9c60cf3efe454494ca017828ce787a5115176e295157"
+      }
+    },
+    "nwtb-delivery-exceptions": {
+      "version": 2,
+      "verify_jwt": false,
+      "files": {
+        "supabase/functions/nwtb-delivery-exceptions/index.ts": "8bcf08ba1e2e5de5a795f07321adca799ff59e970a8856939365115633adaef2"
+      }
+    },
+    "nwtb-dispatch-health": {
+      "version": 2,
+      "verify_jwt": false,
+      "files": {
+        "supabase/functions/nwtb-dispatch-health/index.ts": "fbfd85a480f0f1d35daa6c820bcf02f3cec02a2b89f7e1834596c9510fe9dc05"
+      }
+    },
+    "nwtb-smart-route": {
+      "version": 2,
+      "verify_jwt": false,
+      "files": {
+        "supabase/functions/nwtb-smart-route/index.ts": "cb730e956fb65915c2b2a2cb914271be7cf6fd2f17c42e67d79fcbf41256b64f"
+      }
+    },
+    "nwtb-delivery-profiles": {
+      "version": 2,
+      "verify_jwt": false,
+      "files": {
+        "supabase/functions/nwtb-delivery-profiles/index.ts": "a6711275f638fb76c7921aa26d04cfdfa3070eeee4bacf365cca19e329ddb201"
+      }
+    },
+    "nwtb-v2-multi-route": {
+      "version": 8,
+      "verify_jwt": false,
+      "files": {
+        "supabase/functions/nwtb-v2-multi-route/index.ts": "b7a5c1c668f225eccc6cec4fca0de8fec4ec0adb9b4b2114902f19d8fd2a467e"
+      }
+    },
+    "nwtb-multi-route": {
+      "version": 3,
+      "verify_jwt": false,
+      "files": {
+        "supabase/functions/nwtb-multi-route/index.ts": "ac3c1d63547786fe4c972944aef63317b2753492b93fd150fd91fd7e71d4daa0"
+      }
+    },
+    "nwtb-office-map": {
+      "version": 7,
+      "verify_jwt": false,
+      "files": {
+        "supabase/functions/nwtb-office-map/index.ts": "5917071b63cc67fac5409be3d439cfeb133639358bba93389c83f6e04e3689d4",
+        "supabase/functions/nwtb-office-map/handler.mjs": "a8393183a2ef0c247b9e48b28945e4b45c3f2cb98a4ec3087536b848572b707d",
+        "supabase/functions/nwtb-office-map/policy.mjs": "1516dba0af81702a938f4131832932427fc1771b7315652659870b85a6d03dd1",
+        "supabase/functions/nwtb-office-map/preview.mjs": "af24125b91a10d77fd1d7904f08b9adf3d0779f184c6a8a46264e8206e2bd943",
+        "supabase/functions/nwtb-office-map/business.mjs": "0c8bae71c6f3e85ade5170488732bee7ae6eb63df8b92cfa4aacaf59562a1067"
+      }
+    },
+    "nwtb-office-driver-view": {
+      "version": 3,
+      "verify_jwt": false,
+      "files": {
+        "supabase/functions/nwtb-office-driver-view/index.ts": "6c6f6e752978cd00f0d1f9a61cbd4677faab8d6da921239b890ac67b7e6c1eca",
+        "supabase/functions/nwtb-office-driver-view/handler.mjs": "726c148caeda017f8688c4d7835a9c615ca5795fc5a2f2405cc76fdc03507565"
+      }
+    }
+  }
+}

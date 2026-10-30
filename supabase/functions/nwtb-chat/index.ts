@@ -35,6 +35,19 @@ Deno.serve(async(req:Request)=>{
   return reply(req,{ok:true,token:session.token,employee_number:employee.employee_number,display_name:employee.display_name})
  }
 
+ if(action==='delivery_driver_login'){
+  const employeeNumber=String(input?.employee_number||'').trim()
+  if(!/^[0-9]{4}$/.test(employeeNumber))return reply(req,{error:'Enter a 4-digit employee number.'},400)
+  if(employeeNumber==='9998')return reply(req,{error:'Use the Delivery / Pickup Manager for this account.'},403)
+  const [{data:employee},{data:role}]=await Promise.all([
+   db.from('employees').select('employee_number,display_name,active').eq('employee_number',employeeNumber).maybeSingle(),
+   db.from('nwtb_delivery_roles').select('role,active').eq('employee_number',employeeNumber).maybeSingle()
+  ])
+  if(!employee||!employee.active||!role?.active||role.role!=='DRIVER')return reply(req,{error:'This employee number is not an active NWTB Delivery driver.'},401)
+  const {data:session,error}=await db.from('chat_sessions').insert({employee_number:employeeNumber}).select('token').single()
+  if(error)return reply(req,{error:'Could not start driver session.'},500)
+  return reply(req,{ok:true,token:session.token,employee_number:employee.employee_number,display_name:employee.display_name})
+ }
  if(action==='login'){
   const employeeNumber=String(input?.employee_number||'').trim()
   if(!/^\d{4}$/.test(employeeNumber))return reply(req,{error:'Enter a 4-digit employee number.'},400)

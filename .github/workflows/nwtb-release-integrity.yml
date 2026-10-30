@@ -1,0 +1,25 @@
+name: NWTB release integrity
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  release-integrity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci --prefix tests --ignore-scripts
+      - name: Check current dependency advisories
+        run: |
+          npm audit --prefix tests --audit-level=high
+          npm audit --prefix release/runtime --audit-level=high
+      - name: Check complete source, entry points, dependencies and cached build
+        run: node scripts/nwtb-release-check.cjs
+      - name: Test real authorization, old links, failed uploads and partial updates
+        run: node --test tests/release-integrity.test.cjs

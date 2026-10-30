@@ -1,11 +1,2 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NWTB Live Driver Tracker</title></head><body><div style="font-family:Arial,sans-serif;padding:24px">Loading Live Driver Tracker…</div><script>
-(async()=>{
- const base='https://raw.githubusercontent.com/billyjwiorek-tech/nwtb-route-creator/52681eac6ded426c7e65ff9a37c42f7bae95010c/tracker.html';
- try{
-  const r=await fetch(base,{cache:'no-store'});if(!r.ok)throw Error('Could not load Live Driver Tracker.');
-  let html=await r.text();
-  html=html.replace('</body>','<script src="tracker-add-stop.js?v=20260923-2235"><\/script><script src="office-pause-alerts.js?v=20260923-2235"><\/script><script src="tracker-route-filter.js?v=20260923-2235"><\/script><script src="tracker-gps-status.js?v=20260923-2235"><\/script></body>');
-  document.open();document.write(html);document.close();
- }catch(e){document.body.innerHTML='<div style="font-family:Arial,sans-serif;padding:24px;color:#b42318"><b>Live Driver Tracker failed to load.</b><br>'+e.message+'</div>'}
-})();
-</script></body></html>
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Cache-Control" content="no-store"><title>NWTB Live Drivers — Current App</title></head><body><p>This older link opens the current NWTB app.</p><a id="current" href="tracker-live.html">OPEN NWTB LIVE DRIVERS</a><script>const next=new URL('tracker-live.html',location.href);next.search=location.search;next.hash=location.hash;document.getElementById("current").href=next.href;location.replace(next.href);</script></body></html>

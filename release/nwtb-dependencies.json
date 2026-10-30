@@ -1,0 +1,21 @@
+{
+  "vendored": [
+    {
+      "name": "SheetJS",
+      "version": "0.20.3",
+      "file": "vendor/xlsx-0.20.3.full.min.js",
+      "sha256": "cc015130aa8521e7f088f88898eba949ccdcbfb38df0bd129b44b7273c3a6f41",
+      "source": "https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js",
+      "license": "vendor/XLSX-LICENSE.txt"
+    }
+  ],
+  "runtime": {
+    "supabase-js": "2.95.0",
+    "leaflet": "1.9.4",
+    "web-push": "3.6.7"
+  },
+  "reviewed_advisories": [
+    "https://cdn.sheetjs.com/advisories/CVE-2023-30533",
+    "https://cdn.sheetjs.com/advisories/CVE-2024-22363"
+  ]
+}

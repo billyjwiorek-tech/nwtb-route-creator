@@ -25,7 +25,7 @@ function endpoint(file,options={}){
    if(operation==='insert'||operation==='upsert'){
     const input=Array.isArray(values)?values:[values],affected=[];tables[table]||=[];
     for(const value of input){const found=operation==='upsert'&&conflict?tables[table].find(r=>r[conflict]===value[conflict]):null;
-     const created=found||{id:table==='delivery_chat_messages'?tables[table].length+1:'fixture-'+table+'-'+tables[table].length,created_at:iso(now)};Object.assign(created,value);if(!found)tables[table].push(created);affected.push(created);
+     const created=found||{id:table==='delivery_chat_messages'?tables[table].length+1:'fixture-'+table+'-'+tables[table].length,created_at:iso(now),...(table==='chat_sessions'?{token:'11111111-1111-4111-8111-111111111111'}:{})};Object.assign(created,value);if(!found)tables[table].push(created);affected.push(created);
     }rows=affected;
    }else if(operation==='update')rows.forEach(r=>Object.assign(r,values));
    else if(operation==='delete')tables[table]=(tables[table]||[]).filter(r=>!rows.includes(r));
